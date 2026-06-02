@@ -20,7 +20,7 @@ function SyncQuickActions({ onAfterAction }) {
   const configured = !!(app.syncConfig?.enabled && app.syncConfig?.token && app.syncConfig?.owner && app.syncConfig?.repo);
   const busy = app.syncStatus?.state === "syncing";
   const statusClass =
-    app.syncStatus?.state === "error" || app.syncStatus?.state === "conflict" ? "warn" :
+    app.syncStatus?.state === "error" ? "warn" :
     app.syncStatus?.state === "ok" ? "good" :
     app.syncMeta?.dirty ? "warn" : "";
   const run = async (action) => {

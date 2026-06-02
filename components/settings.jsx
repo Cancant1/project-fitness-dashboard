@@ -262,7 +262,7 @@ function GitHubSyncPanel() {
     return next;
   };
   const statusClass =
-    app.syncStatus.state === "error" || app.syncStatus.state === "conflict" ? "warn" :
+    app.syncStatus.state === "error" ? "warn" :
     app.syncStatus.state === "ok" ? "good" : "";
   return (
     <div className="panel">
@@ -276,6 +276,7 @@ function GitHubSyncPanel() {
       <div className="panel-body" style={{display:"flex", flexDirection:"column", gap: 12}}>
         <div className="kpi-label" style={{lineHeight: 1.6}}>
           Sync uses one private repo file and one token per device. Use a fine-grained GitHub token with Contents read/write for your private data repository.
+          Manual sync is last-click-wins: Pull replaces this browser with GitHub, Push replaces GitHub with this browser.
         </div>
         <div style={{display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap: 8}}>
           <label>
@@ -313,16 +314,6 @@ function GitHubSyncPanel() {
           <span className={`chip ${statusClass}`.trim()}>{app.syncStatus.message}</span>
           {app.syncMeta.lastSyncAt && <span className="mono muted" style={{fontSize: 10}}>last sync {new Date(app.syncMeta.lastSyncAt).toLocaleString()}</span>}
         </div>
-        {app.syncConflict && (
-          <div style={{padding: 10, border:"1px solid var(--bad)", borderRadius:"var(--r-sm)", background:"color-mix(in oklch, var(--bad) 8%, var(--surface))"}}>
-            <div style={{fontWeight: 600, color:"var(--bad)", marginBottom: 6}}>Sync conflict</div>
-            <div className="kpi-label" style={{lineHeight: 1.5}}>This browser and GitHub both changed. Choose which state should win.</div>
-            <div style={{display:"flex", gap: 6, marginTop: 8}}>
-              <button className="btn sm" onClick={() => app.resolveSyncConflict("remote")}>Use GitHub</button>
-              <button className="btn primary sm" onClick={() => app.resolveSyncConflict("local")}>Use this device</button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
