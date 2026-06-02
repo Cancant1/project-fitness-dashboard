@@ -80,6 +80,15 @@ function applyTweaks(t) {
     root.style.setProperty("--accent-soft", `oklch(${dark ? 28 : 94}% ${dark ? a.c * 0.4 : 0.04} ${a.h})`);
     root.style.setProperty("--accent-line", `oklch(${dark ? 38 : 86}% ${a.c * 0.5} ${a.h})`);
   }
+
+  // Keep the iOS Safari status-bar / theme-color in sync with the active theme.
+  try {
+    const meta = document.getElementById("theme-color");
+    if (meta) {
+      const bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+      if (bg) meta.setAttribute("content", bg);
+    }
+  } catch (e) {}
 }
 
 function App() {
@@ -114,7 +123,7 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  const { Sidebar, TopBar } = RepsLayout;
+  const { Sidebar, TopBar, MobileNav } = RepsLayout;
   const { Routines, Exercises, Body, Plan, ExportView } = RepsViews;
   const Settings = window.RepsSettings;
   const chooseTheme = (theme) => setTweak("theme", theme);
@@ -124,6 +133,7 @@ function App() {
       <div className="shell">
         <Sidebar view={view} setView={setView} />
         <div className="main">
+          <MobileNav view={view} setView={setView} />
           <TopBar view={view} setView={setView} />
           {view === "dashboard" && <RepsDashboard setView={setView} />}
           {view === "log"       && <RepsLog />}

@@ -113,6 +113,11 @@ I.Dots = function () {
     d: "M6 12h.01M12 12h.01M18 12h.01"
   });
 };
+I.Menu = function () {
+  return React.createElement(Icon, {
+    d: "M4 7h16M4 12h16M4 17h16"
+  });
+};
 I.Settings = function () {
   return React.createElement(Icon, {
     d: "M12 15a3 3 0 100-6 3 3 0 000 6zM19 12a7 7 0 00-.1-1.2l2-1.5-2-3.5-2.4.9a7 7 0 00-2-1.2L14 3h-4l-.5 2.5a7 7 0 00-2 1.2L5 5.8 3 9.3l2 1.5a7 7 0 000 2.4l-2 1.5 2 3.5 2.4-.9a7 7 0 002 1.2L10 21h4l.5-2.5a7 7 0 002-1.2l2.4.9 2-3.5-2-1.5c.07-.4.1-.8.1-1.2z"
@@ -2340,9 +2345,140 @@ function ProfileSwitcher(_ref3) {
     }
   }, React.createElement(I.Settings, null), " Manage profiles"))));
 }
+function MobileNav(_ref4) {
+  var _window$RepsState2, _window$RepsState2$us;
+  var view = _ref4.view,
+    setView = _ref4.setView;
+  var _useState3 = useState(false),
+    _useState4 = _slicedToArray(_useState3, 2),
+    open = _useState4[0],
+    setOpen = _useState4[1];
+  var app = (_window$RepsState2 = window.RepsState) === null || _window$RepsState2 === void 0 || (_window$RepsState2$us = _window$RepsState2.useApp) === null || _window$RepsState2$us === void 0 ? void 0 : _window$RepsState2$us.call(_window$RepsState2);
+  var profile = app === null || app === void 0 ? void 0 : app.activeProfile;
+  var labels = {
+    dashboard: "Dashboard",
+    log: "Log",
+    routines: "Routines",
+    exercises: "Exercises",
+    body: "Body",
+    plan: "Plan",
+    export: "AI Export",
+    settings: "Settings",
+    sessions: "Sessions",
+    strength: "Strength"
+  };
+  useEffect(function () {
+    if (!open) return undefined;
+    var onKey = function onKey(e) {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    var prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return function () {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+  var go = function go(id) {
+    setView(id);
+    setOpen(false);
+  };
+  return React.createElement(React.Fragment, null, React.createElement("header", {
+    className: "m-appbar"
+  }, React.createElement("button", {
+    className: "m-icon-btn",
+    "aria-label": "Open menu",
+    "aria-expanded": open,
+    onClick: function onClick() {
+      return setOpen(true);
+    }
+  }, React.createElement(I.Menu, null)), React.createElement("div", {
+    className: "m-appbar-title"
+  }, React.createElement("span", {
+    className: "m-appbar-brand"
+  }, "Reps", React.createElement("span", {
+    className: "dot"
+  }, ".")), React.createElement("span", {
+    className: "m-appbar-here"
+  }, labels[view])), React.createElement("button", {
+    className: "m-icon-btn m-appbar-log",
+    "aria-label": "Log workout",
+    onClick: function onClick() {
+      return go("log");
+    }
+  }, React.createElement(I.Plus, null))), React.createElement("div", {
+    className: "m-drawer-scrim ".concat(open ? "is-open" : ""),
+    onClick: function onClick() {
+      return setOpen(false);
+    },
+    "aria-hidden": "true"
+  }), React.createElement("aside", {
+    className: "m-drawer ".concat(open ? "is-open" : ""),
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "Main navigation"
+  }, React.createElement("div", {
+    className: "m-drawer-head"
+  }, React.createElement("div", {
+    className: "brand m-drawer-brand"
+  }, React.createElement("span", {
+    className: "brand-mark"
+  }, "R"), React.createElement("span", {
+    className: "brand-name"
+  }, "Reps", React.createElement("span", {
+    className: "dot"
+  }, ".")), React.createElement("span", {
+    className: "brand-meta"
+  }, "v0.3")), React.createElement("button", {
+    className: "m-icon-btn",
+    "aria-label": "Close menu",
+    onClick: function onClick() {
+      return setOpen(false);
+    }
+  }, React.createElement(I.X, null))), profile && React.createElement("button", {
+    className: "m-drawer-profile",
+    onClick: function onClick() {
+      return go("settings");
+    }
+  }, React.createElement("span", {
+    className: "brand-mark profile-avatar"
+  }, profile.name[0]), React.createElement("span", {
+    className: "m-drawer-profile-copy"
+  }, React.createElement("span", {
+    className: "m-drawer-profile-name"
+  }, profile.name), React.createElement("span", {
+    className: "m-drawer-profile-meta"
+  }, profile.unit || "kg", " \xB7 ", profile.preset || "maintain")), React.createElement("span", {
+    className: "icon m-drawer-profile-chev"
+  }, React.createElement(I.Chevron, null))), React.createElement("nav", {
+    className: "nav m-drawer-nav"
+  }, NAV_ITEMS.map(function (item) {
+    var Ico = item.icon;
+    return React.createElement("button", {
+      key: item.id,
+      className: "nav-item ".concat(view === item.id ? "is-active" : ""),
+      onClick: function onClick() {
+        return go(item.id);
+      }
+    }, React.createElement("span", {
+      className: "nav-icon"
+    }, React.createElement(Ico, null)), React.createElement("span", null, item.label));
+  }), React.createElement("div", {
+    className: "nav-section"
+  }, "Workspace"), React.createElement("button", {
+    className: "nav-item ".concat(view === "settings" ? "is-active" : ""),
+    onClick: function onClick() {
+      return go("settings");
+    }
+  }, React.createElement("span", {
+    className: "nav-icon"
+  }, React.createElement(I.Settings, null)), React.createElement("span", null, "Settings")))));
+}
 window.RepsLayout = {
   Sidebar: Sidebar,
   TopBar: TopBar,
+  MobileNav: MobileNav,
   NAV_ITEMS: NAV_ITEMS
 };
 
@@ -16122,6 +16258,13 @@ function applyTweaks(t) {
     root.style.setProperty("--accent-soft", "oklch(".concat(dark ? 28 : 94, "% ").concat(dark ? a.c * 0.4 : 0.04, " ").concat(a.h, ")"));
     root.style.setProperty("--accent-line", "oklch(".concat(dark ? 38 : 86, "% ").concat(a.c * 0.5, " ").concat(a.h, ")"));
   }
+  try {
+    var meta = document.getElementById("theme-color");
+    if (meta) {
+      var bg = getComputedStyle(root).getPropertyValue("--bg").trim();
+      if (bg) meta.setAttribute("content", bg);
+    }
+  } catch (e) {}
 }
 function App() {
   var _useState = useState("dashboard"),
@@ -16172,7 +16315,8 @@ function App() {
   }, []);
   var _RepsLayout = RepsLayout,
     Sidebar = _RepsLayout.Sidebar,
-    TopBar = _RepsLayout.TopBar;
+    TopBar = _RepsLayout.TopBar,
+    MobileNav = _RepsLayout.MobileNav;
   var _RepsViews = RepsViews,
     Routines = _RepsViews.Routines,
     Exercises = _RepsViews.Exercises,
@@ -16190,7 +16334,10 @@ function App() {
     setView: setView
   }), React.createElement("div", {
     className: "main"
-  }, React.createElement(TopBar, {
+  }, React.createElement(MobileNav, {
+    view: view,
+    setView: setView
+  }), React.createElement(TopBar, {
     view: view,
     setView: setView
   }), view === "dashboard" && React.createElement(RepsDashboard, {

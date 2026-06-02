@@ -158,4 +158,96 @@ function ProfileSwitcher({ app, profile, setView }) {
   );
 }
 
-window.RepsLayout = { Sidebar, TopBar, NAV_ITEMS };
+// Mobile-only top app bar + slide-in navigation drawer (shown <= 980px via CSS).
+function MobileNav({ view, setView }) {
+  const [open, setOpen] = useState(false);
+  const app = window.RepsState?.useApp?.();
+  const profile = app?.activeProfile;
+  const labels = {
+    dashboard: "Dashboard", log: "Log", routines: "Routines",
+    exercises: "Exercises", body: "Body", plan: "Plan", export: "AI Export",
+    settings: "Settings", sessions: "Sessions", strength: "Strength"
+  };
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
+  const go = (id) => { setView(id); setOpen(false); };
+
+  return (
+    <>
+      <header className="m-appbar">
+        <button className="m-icon-btn" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
+          <I.Menu />
+        </button>
+        <div className="m-appbar-title">
+          <span className="m-appbar-brand">Reps<span className="dot">.</span></span>
+          <span className="m-appbar-here">{labels[view]}</span>
+        </div>
+        <button className="m-icon-btn m-appbar-log" aria-label="Log workout" onClick={() => go("log")}>
+          <I.Plus />
+        </button>
+      </header>
+
+      <div
+        className={`m-drawer-scrim ${open ? "is-open" : ""}`}
+        onClick={() => setOpen(false)}
+        aria-hidden="true"></div>
+
+      <aside className={`m-drawer ${open ? "is-open" : ""}`} role="dialog" aria-modal="true" aria-label="Main navigation">
+        <div className="m-drawer-head">
+          <div className="brand m-drawer-brand">
+            <span className="brand-mark">R</span>
+            <span className="brand-name">Reps<span className="dot">.</span></span>
+            <span className="brand-meta">v0.3</span>
+          </div>
+          <button className="m-icon-btn" aria-label="Close menu" onClick={() => setOpen(false)}><I.X /></button>
+        </div>
+
+        {profile && (
+          <button className="m-drawer-profile" onClick={() => go("settings")}>
+            <span className="brand-mark profile-avatar">{profile.name[0]}</span>
+            <span className="m-drawer-profile-copy">
+              <span className="m-drawer-profile-name">{profile.name}</span>
+              <span className="m-drawer-profile-meta">{profile.unit || "kg"} · {profile.preset || "maintain"}</span>
+            </span>
+            <span className="icon m-drawer-profile-chev"><I.Chevron /></span>
+          </button>
+        )}
+
+        <nav className="nav m-drawer-nav">
+          {NAV_ITEMS.map(item => {
+            const Ico = item.icon;
+            return (
+              <button
+                key={item.id}
+                className={`nav-item ${view === item.id ? "is-active" : ""}`}
+                onClick={() => go(item.id)}>
+                <span className="nav-icon"><Ico /></span>
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+          <div className="nav-section">Workspace</div>
+          <button
+            className={`nav-item ${view === "settings" ? "is-active" : ""}`}
+            onClick={() => go("settings")}>
+            <span className="nav-icon"><I.Settings /></span>
+            <span>Settings</span>
+          </button>
+        </nav>
+      </aside>
+    </>
+  );
+}
+
+window.RepsLayout = { Sidebar, TopBar, MobileNav, NAV_ITEMS };
