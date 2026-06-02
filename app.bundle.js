@@ -1126,12 +1126,10 @@ function AppStateProvider(_ref3) {
       });
     });
     if (syncConfig.enabled && syncConfig.token && !syncConflict) {
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-      pushTimerRef.current = setTimeout(function () {
-        pushRemoteState({
-          silent: true
-        });
-      }, 2200);
+      setSyncStatus({
+        state: "idle",
+        message: "Local changes saved. Push when done."
+      });
     }
   }, [state]);
   useEffect(function () {
@@ -1271,35 +1269,17 @@ function AppStateProvider(_ref3) {
           case 3:
             latestMeta = syncMetaRef.current;
             remoteChanged = latestMeta.lastRemoteSha && remote.sha !== latestMeta.lastRemoteSha;
-            if (!(latestMeta.dirty && (!latestMeta.lastRemoteSha || remoteChanged))) {
-              _context.n = 6;
+            if (!latestMeta.dirty) {
+              _context.n = 4;
               break;
             }
-            if (!remoteWasWrittenByThisDevice(remote, config)) {
-              _context.n = 5;
-              break;
-            }
-            updateSyncMeta(function (prev) {
-              return _objectSpread(_objectSpread({}, prev), {}, {
-                lastRemoteSha: remote.sha
-              });
-            });
-            _context.n = 4;
-            return pushRemoteState({
-              config: config,
-              forceSha: remote.sha,
-              silent: true
-            });
+            createConflict(remote, remoteChanged ? "Remote data changed while this device has unsynced edits." : "This device has unsynced edits. Push them or choose GitHub.");
+            return _context.a(2, remote);
           case 4:
-            return _context.a(2, remote);
-          case 5:
-            createConflict(remote, "Remote data changed while this device has unsynced edits.");
-            return _context.a(2, remote);
-          case 6:
             setRemoteCleanState(remote.state, remote.sha, "Pulled GitHub state");
             return _context.a(2, remote);
-          case 7:
-            _context.p = 7;
+          case 5:
+            _context.p = 5;
             _t = _context.v;
             setSyncStatus({
               state: "error",
@@ -1307,7 +1287,7 @@ function AppStateProvider(_ref3) {
             });
             return _context.a(2, null);
         }
-      }, _callee, null, [[1, 7]]);
+      }, _callee, null, [[1, 5]]);
     }));
     return function pullRemoteState() {
       return _ref4.apply(this, arguments);
@@ -1505,13 +1485,6 @@ function AppStateProvider(_ref3) {
       return _ref7.apply(this, arguments);
     };
   }();
-  useEffect(function () {
-    if (syncConfig.enabled && syncConfig.token) {
-      pullRemoteState({
-        startup: true
-      });
-    }
-  }, [syncConfig.enabled, syncConfig.token, syncConfig.owner, syncConfig.repo, syncConfig.branch, syncConfig.path]);
   var updateProfile = function updateProfile(id, patch) {
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
@@ -2095,6 +2068,10 @@ function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) 
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
 function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+function _regenerator() { var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
+function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
+function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
+function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
 var _React = React,
   useState = _React.useState,
   useEffect = _React.useEffect,
@@ -2146,9 +2123,81 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-function Sidebar(_ref) {
-  var view = _ref.view,
-    setView = _ref.setView;
+function SyncQuickActions(_ref) {
+  var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncStatus4, _app$syncMeta, _app$syncMeta2, _app$syncStatus5;
+  var onAfterAction = _ref.onAfterAction;
+  var app = (_window$RepsState = window.RepsState) === null || _window$RepsState === void 0 || (_window$RepsState$use = _window$RepsState.useApp) === null || _window$RepsState$use === void 0 ? void 0 : _window$RepsState$use.call(_window$RepsState);
+  if (!app) return null;
+  var configured = !!((_app$syncConfig = app.syncConfig) !== null && _app$syncConfig !== void 0 && _app$syncConfig.enabled && (_app$syncConfig2 = app.syncConfig) !== null && _app$syncConfig2 !== void 0 && _app$syncConfig2.token && (_app$syncConfig3 = app.syncConfig) !== null && _app$syncConfig3 !== void 0 && _app$syncConfig3.owner && (_app$syncConfig4 = app.syncConfig) !== null && _app$syncConfig4 !== void 0 && _app$syncConfig4.repo);
+  var busy = ((_app$syncStatus = app.syncStatus) === null || _app$syncStatus === void 0 ? void 0 : _app$syncStatus.state) === "syncing";
+  var statusClass = ((_app$syncStatus2 = app.syncStatus) === null || _app$syncStatus2 === void 0 ? void 0 : _app$syncStatus2.state) === "error" || ((_app$syncStatus3 = app.syncStatus) === null || _app$syncStatus3 === void 0 ? void 0 : _app$syncStatus3.state) === "conflict" ? "warn" : ((_app$syncStatus4 = app.syncStatus) === null || _app$syncStatus4 === void 0 ? void 0 : _app$syncStatus4.state) === "ok" ? "good" : (_app$syncMeta = app.syncMeta) !== null && _app$syncMeta !== void 0 && _app$syncMeta.dirty ? "warn" : "";
+  var run = function () {
+    var _ref2 = _asyncToGenerator(_regenerator().m(function _callee(action) {
+      return _regenerator().w(function (_context) {
+        while (1) switch (_context.n) {
+          case 0:
+            if (!(!configured || busy)) {
+              _context.n = 1;
+              break;
+            }
+            return _context.a(2);
+          case 1:
+            if (!(action === "pull")) {
+              _context.n = 2;
+              break;
+            }
+            _context.n = 2;
+            return app.pullRemoteState();
+          case 2:
+            if (!(action === "push")) {
+              _context.n = 3;
+              break;
+            }
+            _context.n = 3;
+            return app.pushRemoteState();
+          case 3:
+            onAfterAction === null || onAfterAction === void 0 || onAfterAction();
+          case 4:
+            return _context.a(2);
+        }
+      }, _callee);
+    }));
+    return function run(_x) {
+      return _ref2.apply(this, arguments);
+    };
+  }();
+  var status = !configured ? "Sync not configured" : (_app$syncMeta2 = app.syncMeta) !== null && _app$syncMeta2 !== void 0 && _app$syncMeta2.dirty ? "Local changes not pushed" : ((_app$syncStatus5 = app.syncStatus) === null || _app$syncStatus5 === void 0 ? void 0 : _app$syncStatus5.message) || "Manual sync ready";
+  return React.createElement("div", {
+    className: "sync-quick"
+  }, React.createElement("button", {
+    className: "sync-quick-btn",
+    type: "button",
+    disabled: !configured || busy,
+    onClick: function onClick() {
+      return run("pull");
+    }
+  }, React.createElement("span", {
+    className: "nav-icon"
+  }, React.createElement(I.Download, null)), React.createElement("span", {
+    className: "nav-label"
+  }, "Pull GitHub")), React.createElement("button", {
+    className: "sync-quick-btn primary",
+    type: "button",
+    disabled: !configured || busy,
+    onClick: function onClick() {
+      return run("push");
+    }
+  }, React.createElement("span", {
+    className: "nav-icon"
+  }, React.createElement(I.Export, null)), React.createElement("span", {
+    className: "nav-label"
+  }, "Push GitHub")), React.createElement("div", {
+    className: "sync-quick-status ".concat(statusClass).trim()
+  }, status));
+}
+function Sidebar(_ref3) {
+  var view = _ref3.view,
+    setView = _ref3.setView;
   return React.createElement("aside", {
     className: "sidebar"
   }, React.createElement("div", {
@@ -2161,7 +2210,7 @@ function Sidebar(_ref) {
     className: "dot"
   }, ".")), React.createElement("span", {
     className: "brand-meta"
-  }, "v0.3")), React.createElement("nav", {
+  }, "v0.3")), React.createElement(SyncQuickActions, null), React.createElement("nav", {
     className: "nav"
   }, NAV_ITEMS.map(function (item) {
     var Ico = item.icon;
@@ -2173,19 +2222,21 @@ function Sidebar(_ref) {
       }
     }, React.createElement("span", {
       className: "nav-icon"
-    }, React.createElement(Ico, null)), React.createElement("span", null, item.label), React.createElement("span", {
+    }, React.createElement(Ico, null)), React.createElement("span", {
+      className: "nav-label"
+    }, item.label), React.createElement("span", {
       className: "nav-kbd"
     }, item.kbd));
-  })), React.createElement("div", {
-    className: "nav-section"
-  }, "Workspace"), React.createElement("button", {
+  })), React.createElement("button", {
     className: "nav-item ".concat(view === "settings" ? "is-active" : ""),
     onClick: function onClick() {
       return setView("settings");
     }
   }, React.createElement("span", {
     className: "nav-icon"
-  }, React.createElement(I.Settings, null)), React.createElement("span", null, "Settings"), React.createElement("span", {
+  }, React.createElement(I.Settings, null)), React.createElement("span", {
+    className: "nav-label"
+  }, "Settings"), React.createElement("span", {
     className: "nav-kbd"
   }, "0")), React.createElement("div", {
     className: "sidebar-foot"
@@ -2195,10 +2246,10 @@ function Sidebar(_ref) {
     className: "kbd"
   }, "K"), React.createElement("span", null, "command")));
 }
-function TopBar(_ref2) {
-  var _window$RepsState, _window$RepsState$use, _window$RepsData;
-  var view = _ref2.view,
-    setView = _ref2.setView;
+function TopBar(_ref4) {
+  var _window$RepsState2, _window$RepsState2$us, _window$RepsData;
+  var view = _ref4.view,
+    setView = _ref4.setView;
   var labels = {
     dashboard: "Dashboard",
     log: "Log",
@@ -2211,7 +2262,7 @@ function TopBar(_ref2) {
     sessions: "Sessions",
     strength: "Strength"
   };
-  var app = (_window$RepsState = window.RepsState) === null || _window$RepsState === void 0 || (_window$RepsState$use = _window$RepsState.useApp) === null || _window$RepsState$use === void 0 ? void 0 : _window$RepsState$use.call(_window$RepsState);
+  var app = (_window$RepsState2 = window.RepsState) === null || _window$RepsState2 === void 0 || (_window$RepsState2$us = _window$RepsState2.useApp) === null || _window$RepsState2$us === void 0 ? void 0 : _window$RepsState2$us.call(_window$RepsState2);
   var profile = app === null || app === void 0 ? void 0 : app.activeProfile;
   return React.createElement("header", {
     className: "topbar"
@@ -2259,11 +2310,11 @@ function TopBar(_ref2) {
     className: "icon"
   }, React.createElement(I.Plus, null)), "Log workout")));
 }
-function ProfileSwitcher(_ref3) {
+function ProfileSwitcher(_ref5) {
   var _app$state;
-  var app = _ref3.app,
-    profile = _ref3.profile,
-    setView = _ref3.setView;
+  var app = _ref5.app,
+    profile = _ref5.profile,
+    setView = _ref5.setView;
   var _useState = useState(false),
     _useState2 = _slicedToArray(_useState, 2),
     open = _useState2[0],
@@ -2345,15 +2396,15 @@ function ProfileSwitcher(_ref3) {
     }
   }, React.createElement(I.Settings, null), " Manage profiles"))));
 }
-function MobileNav(_ref4) {
-  var _window$RepsState2, _window$RepsState2$us;
-  var view = _ref4.view,
-    setView = _ref4.setView;
+function MobileNav(_ref6) {
+  var _window$RepsState3, _window$RepsState3$us;
+  var view = _ref6.view,
+    setView = _ref6.setView;
   var _useState3 = useState(false),
     _useState4 = _slicedToArray(_useState3, 2),
     open = _useState4[0],
     setOpen = _useState4[1];
-  var app = (_window$RepsState2 = window.RepsState) === null || _window$RepsState2 === void 0 || (_window$RepsState2$us = _window$RepsState2.useApp) === null || _window$RepsState2$us === void 0 ? void 0 : _window$RepsState2$us.call(_window$RepsState2);
+  var app = (_window$RepsState3 = window.RepsState) === null || _window$RepsState3 === void 0 || (_window$RepsState3$us = _window$RepsState3.useApp) === null || _window$RepsState3$us === void 0 ? void 0 : _window$RepsState3$us.call(_window$RepsState3);
   var profile = app === null || app === void 0 ? void 0 : app.activeProfile;
   var labels = {
     dashboard: "Dashboard",
@@ -2451,7 +2502,7 @@ function MobileNav(_ref4) {
     className: "m-drawer-profile-meta"
   }, profile.unit || "kg", " \xB7 ", profile.preset || "maintain")), React.createElement("span", {
     className: "icon m-drawer-profile-chev"
-  }, React.createElement(I.Chevron, null))), React.createElement("nav", {
+  }, React.createElement(I.Chevron, null))), React.createElement(SyncQuickActions, null), React.createElement("nav", {
     className: "nav m-drawer-nav"
   }, NAV_ITEMS.map(function (item) {
     var Ico = item.icon;
@@ -2463,17 +2514,19 @@ function MobileNav(_ref4) {
       }
     }, React.createElement("span", {
       className: "nav-icon"
-    }, React.createElement(Ico, null)), React.createElement("span", null, item.label));
-  }), React.createElement("div", {
-    className: "nav-section"
-  }, "Workspace"), React.createElement("button", {
+    }, React.createElement(Ico, null)), React.createElement("span", {
+      className: "nav-label"
+    }, item.label));
+  }), React.createElement("button", {
     className: "nav-item ".concat(view === "settings" ? "is-active" : ""),
     onClick: function onClick() {
       return go("settings");
     }
   }, React.createElement("span", {
     className: "nav-icon"
-  }, React.createElement(I.Settings, null)), React.createElement("span", null, "Settings")))));
+  }, React.createElement(I.Settings, null)), React.createElement("span", {
+    className: "nav-label"
+  }, "Settings")))));
 }
 window.RepsLayout = {
   Sidebar: Sidebar,
@@ -3867,7 +3920,7 @@ function exerciseFromLoggedEntry() {
   var date = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "";
   var firstSet = (entry.sets || [])[0] || {};
   return {
-    _key: "l-".concat(date, "-").concat(index),
+    _key: loggedEntryKey(entry, index, date),
     name: entry.exercise,
     sets: entry.targetSets || (entry.sets || []).length || 1,
     reps: entry.targetReps || (firstSet.durationMinutes || firstSet.duration ? "".concat(firstSet.durationMinutes || firstSet.duration, " min") : "8-12"),
@@ -3876,6 +3929,12 @@ function exerciseFromLoggedEntry() {
     track: firstSet.durationMinutes || firstSet.duration ? "duration" : undefined,
     duration: firstSet.durationMinutes || firstSet.duration || undefined
   };
+}
+function loggedEntryKey() {
+  var entry = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var index = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var date = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "";
+  return entry.logKey || entry._key || "l-".concat(date, "-").concat(index);
 }
 function setsFromLoggedEntry() {
   var entry = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -3916,6 +3975,11 @@ function loggedSessionForDate(date) {
   }) || matches[0] || null;
 }
 function loggedEntryIndexFromKey(key, date) {
+  var entries = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : [];
+  var explicitIndex = entries.findIndex(function (entry, index) {
+    return loggedEntryKey(entry, index, date) === key;
+  });
+  if (explicitIndex >= 0) return explicitIndex;
   var prefix = "l-".concat(date, "-");
   if (!String(key || "").startsWith(prefix)) return null;
   var index = Number(String(key).slice(prefix.length));
@@ -3934,9 +3998,11 @@ function reorderedLoggedEntriesForKeys() {
   try {
     for (_iterator.s(); !(_step = _iterator.n()).done;) {
       var key = _step.value;
-      var index = loggedEntryIndexFromKey(key, session.date);
+      var index = loggedEntryIndexFromKey(key, session.date, entries);
       if (index == null || !entries[index] || used.has(index)) continue;
-      next.push(entries[index]);
+      next.push(_objectSpread(_objectSpread({}, entries[index]), {}, {
+        logKey: loggedEntryKey(entries[index], index, session.date)
+      }));
       used.add(index);
     }
   } catch (err) {
@@ -3945,7 +4011,9 @@ function reorderedLoggedEntriesForKeys() {
     _iterator.f();
   }
   entries.forEach(function (entry, index) {
-    if (!used.has(index)) next.push(entry);
+    if (!used.has(index)) next.push(_objectSpread(_objectSpread({}, entry), {}, {
+      logKey: loggedEntryKey(entry, index, session.date)
+    }));
   });
   if (next.length !== entries.length) return null;
   return next.some(function (entry, index) {
@@ -4465,7 +4533,7 @@ function LogView() {
     var loggedSets = {};
     var skipped = new Set();
     (session.entries || []).forEach(function (entry, i) {
-      var key = "l-".concat(logDate, "-").concat(i);
+      var key = loggedEntryKey(entry, i, logDate);
       loggedSets[key] = setsFromLoggedEntry(entry);
       if (session.ignoreForProgression || entry.ignoreForProgression) skipped.add(key);
     });
@@ -4693,7 +4761,7 @@ function LogView() {
       var loggedSets = {};
       var skipped = new Set();
       (existingLogged.entries || []).forEach(function (entry, i) {
-        var key = "l-".concat(date, "-").concat(i);
+        var key = loggedEntryKey(entry, i, date);
         loggedSets[key] = setsFromLoggedEntry(entry);
         if (existingLogged.ignoreForProgression || entry.ignoreForProgression) skipped.add(key);
       });
@@ -5020,6 +5088,7 @@ function LogView() {
         return clipboardSetEntered(s, durationMode);
       });
       return {
+        logKey: ex._key,
         exercise: ex.name,
         movementGroup: window.RepsData.movementFor(ex.name),
         targetSets: ex.sets,

@@ -14,6 +14,41 @@ const NAV_ITEMS = [
   { id: "export",    label: "AI Export", icon: I.Export,    kbd: "9" }
 ];
 
+function SyncQuickActions({ onAfterAction }) {
+  const app = window.RepsState?.useApp?.();
+  if (!app) return null;
+  const configured = !!(app.syncConfig?.enabled && app.syncConfig?.token && app.syncConfig?.owner && app.syncConfig?.repo);
+  const busy = app.syncStatus?.state === "syncing";
+  const statusClass =
+    app.syncStatus?.state === "error" || app.syncStatus?.state === "conflict" ? "warn" :
+    app.syncStatus?.state === "ok" ? "good" :
+    app.syncMeta?.dirty ? "warn" : "";
+  const run = async (action) => {
+    if (!configured || busy) return;
+    if (action === "pull") await app.pullRemoteState();
+    if (action === "push") await app.pushRemoteState();
+    onAfterAction?.();
+  };
+  const status = !configured
+    ? "Sync not configured"
+    : app.syncMeta?.dirty
+      ? "Local changes not pushed"
+      : (app.syncStatus?.message || "Manual sync ready");
+  return (
+    <div className="sync-quick">
+      <button className="sync-quick-btn" type="button" disabled={!configured || busy} onClick={() => run("pull")}>
+        <span className="nav-icon"><I.Download /></span>
+        <span className="nav-label">Pull GitHub</span>
+      </button>
+      <button className="sync-quick-btn primary" type="button" disabled={!configured || busy} onClick={() => run("push")}>
+        <span className="nav-icon"><I.Export /></span>
+        <span className="nav-label">Push GitHub</span>
+      </button>
+      <div className={`sync-quick-status ${statusClass}`.trim()}>{status}</div>
+    </div>
+  );
+}
+
 function Sidebar({ view, setView }) {
   return (
     <aside className="sidebar">
@@ -22,6 +57,7 @@ function Sidebar({ view, setView }) {
         <span className="brand-name">Reps<span className="dot">.</span></span>
         <span className="brand-meta">v0.3</span>
       </div>
+      <SyncQuickActions />
       <nav className="nav">
         {NAV_ITEMS.map(item => {
           const Ico = item.icon;
@@ -31,18 +67,17 @@ function Sidebar({ view, setView }) {
               className={`nav-item ${view === item.id ? "is-active" : ""}`}
               onClick={() => setView(item.id)}>
               <span className="nav-icon"><Ico /></span>
-              <span>{item.label}</span>
+              <span className="nav-label">{item.label}</span>
               <span className="nav-kbd">{item.kbd}</span>
             </button>
           );
         })}
       </nav>
-      <div className="nav-section">Workspace</div>
       <button
         className={`nav-item ${view === "settings" ? "is-active" : ""}`}
         onClick={() => setView("settings")}>
         <span className="nav-icon"><I.Settings /></span>
-        <span>Settings</span>
+        <span className="nav-label">Settings</span>
         <span className="nav-kbd">0</span>
       </button>
       <div className="sidebar-foot">
@@ -224,6 +259,8 @@ function MobileNav({ view, setView }) {
           </button>
         )}
 
+        <SyncQuickActions />
+
         <nav className="nav m-drawer-nav">
           {NAV_ITEMS.map(item => {
             const Ico = item.icon;
@@ -233,16 +270,15 @@ function MobileNav({ view, setView }) {
                 className={`nav-item ${view === item.id ? "is-active" : ""}`}
                 onClick={() => go(item.id)}>
                 <span className="nav-icon"><Ico /></span>
-                <span>{item.label}</span>
+                <span className="nav-label">{item.label}</span>
               </button>
             );
           })}
-          <div className="nav-section">Workspace</div>
           <button
             className={`nav-item ${view === "settings" ? "is-active" : ""}`}
             onClick={() => go("settings")}>
             <span className="nav-icon"><I.Settings /></span>
-            <span>Settings</span>
+            <span className="nav-label">Settings</span>
           </button>
         </nav>
       </aside>

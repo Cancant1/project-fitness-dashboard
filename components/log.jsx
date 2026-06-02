@@ -504,7 +504,7 @@ function ruleLabel(exercise = {}, rules = null) {
 function exerciseFromLoggedEntry(entry = {}, index = 0, date = "") {
   const firstSet = (entry.sets || [])[0] || {};
   return {
-    _key: `l-${date}-${index}`,
+    _key: loggedEntryKey(entry, index, date),
     name: entry.exercise,
     sets: entry.targetSets || (entry.sets || []).length || 1,
     reps: entry.targetReps || (firstSet.durationMinutes || firstSet.duration ? `${firstSet.durationMinutes || firstSet.duration} min` : "8-12"),
@@ -513,6 +513,10 @@ function exerciseFromLoggedEntry(entry = {}, index = 0, date = "") {
     track: firstSet.durationMinutes || firstSet.duration ? "duration" : undefined,
     duration: firstSet.durationMinutes || firstSet.duration || undefined
   };
+}
+
+function loggedEntryKey(entry = {}, index = 0, date = "") {
+  return entry.logKey || entry._key || `l-${date}-${index}`;
 }
 
 function setsFromLoggedEntry(entry = {}) {
@@ -545,7 +549,9 @@ function loggedSessionForDate(date, routineDay = null) {
   return matches.find(s => s.status === "performed") || matches[0] || null;
 }
 
-function loggedEntryIndexFromKey(key, date) {
+function loggedEntryIndexFromKey(key, date, entries = []) {
+  const explicitIndex = entries.findIndex((entry, index) => loggedEntryKey(entry, index, date) === key);
+  if (explicitIndex >= 0) return explicitIndex;
   const prefix = `l-${date}-`;
   if (!String(key || "").startsWith(prefix)) return null;
   const index = Number(String(key).slice(prefix.length));
@@ -559,13 +565,13 @@ function reorderedLoggedEntriesForKeys(session = {}, orderedKeys = []) {
   const next = [];
   const used = new Set();
   for (const key of orderedKeys) {
-    const index = loggedEntryIndexFromKey(key, session.date);
+    const index = loggedEntryIndexFromKey(key, session.date, entries);
     if (index == null || !entries[index] || used.has(index)) continue;
-    next.push(entries[index]);
+    next.push({ ...entries[index], logKey: loggedEntryKey(entries[index], index, session.date) });
     used.add(index);
   }
   entries.forEach((entry, index) => {
-    if (!used.has(index)) next.push(entry);
+    if (!used.has(index)) next.push({ ...entry, logKey: loggedEntryKey(entry, index, session.date) });
   });
   if (next.length !== entries.length) return null;
   return next.some((entry, index) => entry !== entries[index]) ? next : null;
@@ -935,7 +941,7 @@ function LogView() {
     const loggedSets = {};
     const skipped = new Set();
     (session.entries || []).forEach((entry, i) => {
-      const key = `l-${logDate}-${i}`;
+      const key = loggedEntryKey(entry, i, logDate);
       loggedSets[key] = setsFromLoggedEntry(entry);
       if (session.ignoreForProgression || entry.ignoreForProgression) skipped.add(key);
     });
@@ -1129,7 +1135,7 @@ function LogView() {
       const loggedSets = {};
       const skipped = new Set();
       (existingLogged.entries || []).forEach((entry, i) => {
-        const key = `l-${date}-${i}`;
+        const key = loggedEntryKey(entry, i, date);
         loggedSets[key] = setsFromLoggedEntry(entry);
         if (existingLogged.ignoreForProgression || entry.ignoreForProgression) skipped.add(key);
       });
@@ -1384,6 +1390,7 @@ function LogView() {
       const durationMode = isDurationExercise(ex);
       const sets = (setsByExercise[ex._key] || []).filter(s => clipboardSetEntered(s, durationMode));
       return {
+        logKey: ex._key,
         exercise: ex.name,
         movementGroup: window.RepsData.movementFor(ex.name),
         targetSets: ex.sets,

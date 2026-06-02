@@ -462,10 +462,7 @@ function AppStateProvider({ children }) {
     }
     updateSyncMeta(prev => ({ ...prev, dirty: true, conflict: false }));
     if (syncConfig.enabled && syncConfig.token && !syncConflict) {
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-      pushTimerRef.current = setTimeout(() => {
-        pushRemoteState({ silent: true });
-      }, 2200);
+      setSyncStatus({ state: "idle", message: "Local changes saved. Push when done." });
     }
   }, [state]);
 
@@ -553,13 +550,10 @@ function AppStateProvider({ children }) {
       }
       const latestMeta = syncMetaRef.current;
       const remoteChanged = latestMeta.lastRemoteSha && remote.sha !== latestMeta.lastRemoteSha;
-      if (latestMeta.dirty && (!latestMeta.lastRemoteSha || remoteChanged)) {
-        if (remoteWasWrittenByThisDevice(remote, config)) {
-          updateSyncMeta(prev => ({ ...prev, lastRemoteSha: remote.sha }));
-          await pushRemoteState({ config, forceSha: remote.sha, silent: true });
-          return remote;
-        }
-        createConflict(remote, "Remote data changed while this device has unsynced edits.");
+      if (latestMeta.dirty) {
+        createConflict(remote, remoteChanged
+          ? "Remote data changed while this device has unsynced edits."
+          : "This device has unsynced edits. Push them or choose GitHub.");
         return remote;
       }
       setRemoteCleanState(remote.state, remote.sha, "Pulled GitHub state");
@@ -646,13 +640,6 @@ function AppStateProvider({ children }) {
       await pushRemoteState({ forceSha: syncConflict.remoteSha });
     }
   };
-
-  useEffect(() => {
-    if (syncConfig.enabled && syncConfig.token) {
-      pullRemoteState({ startup: true });
-    }
-  }, [syncConfig.enabled, syncConfig.token, syncConfig.owner, syncConfig.repo, syncConfig.branch, syncConfig.path]);
-
   const updateProfile = (id, patch) => {
     setState(s => ({
       ...s,
