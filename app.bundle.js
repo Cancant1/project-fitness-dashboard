@@ -870,45 +870,45 @@ function fetchGithubState(_x) {
   return _fetchGithubState.apply(this, arguments);
 }
 function _fetchGithubState() {
-  _fetchGithubState = _asyncToGenerator(_regenerator().m(function _callee4(config) {
+  _fetchGithubState = _asyncToGenerator(_regenerator().m(function _callee5(config) {
     var res, text, file, payload;
-    return _regenerator().w(function (_context4) {
-      while (1) switch (_context4.n) {
+    return _regenerator().w(function (_context5) {
+      while (1) switch (_context5.n) {
         case 0:
-          _context4.n = 1;
+          _context5.n = 1;
           return fetch(githubContentUrl(config), {
             headers: githubApiHeaders(config)
           });
         case 1:
-          res = _context4.v;
+          res = _context5.v;
           if (!(res.status === 404)) {
-            _context4.n = 2;
+            _context5.n = 2;
             break;
           }
-          return _context4.a(2, null);
+          return _context5.a(2, null);
         case 2:
           if (res.ok) {
-            _context4.n = 4;
+            _context5.n = 4;
             break;
           }
-          _context4.n = 3;
+          _context5.n = 3;
           return res.text();
         case 3:
-          text = _context4.v;
+          text = _context5.v;
           throw new Error("GitHub pull failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
         case 4:
-          _context4.n = 5;
+          _context5.n = 5;
           return res.json();
         case 5:
-          file = _context4.v;
+          file = _context5.v;
           payload = JSON.parse(base64DecodeUtf8(file.content || ""));
-          return _context4.a(2, {
+          return _context5.a(2, {
             sha: file.sha,
             envelope: payload,
             state: migrateState(unwrapRemoteState(payload))
           });
       }
-    }, _callee4);
+    }, _callee5);
   }));
   return _fetchGithubState.apply(this, arguments);
 }
@@ -916,7 +916,7 @@ function putGithubState(_x2, _x3) {
   return _putGithubState.apply(this, arguments);
 }
 function _putGithubState() {
-  _putGithubState = _asyncToGenerator(_regenerator().m(function _callee5(config, state) {
+  _putGithubState = _asyncToGenerator(_regenerator().m(function _callee6(config, state) {
     var _result$content;
     var sha,
       cleanPath,
@@ -925,11 +925,11 @@ function _putGithubState() {
       res,
       text,
       result,
-      _args5 = arguments;
-    return _regenerator().w(function (_context5) {
-      while (1) switch (_context5.n) {
+      _args6 = arguments;
+    return _regenerator().w(function (_context6) {
+      while (1) switch (_context6.n) {
         case 0:
-          sha = _args5.length > 2 && _args5[2] !== undefined ? _args5[2] : null;
+          sha = _args6.length > 2 && _args6[2] !== undefined ? _args6[2] : null;
           cleanPath = String(config.path || "state/reps-app-state.json").trim();
           body = {
             message: "Sync Reps dashboard state ".concat(new Date().toISOString()),
@@ -938,7 +938,7 @@ function _putGithubState() {
           };
           if (sha) body.sha = sha;
           url = "https://api.github.com/repos/".concat(encodeURIComponent(config.owner), "/").concat(encodeURIComponent(config.repo), "/contents/").concat(cleanPath.split("/").map(encodeURIComponent).join("/"));
-          _context5.n = 1;
+          _context6.n = 1;
           return fetch(url, {
             method: "PUT",
             headers: _objectSpread(_objectSpread({}, githubApiHeaders(config)), {}, {
@@ -947,24 +947,24 @@ function _putGithubState() {
             body: JSON.stringify(body)
           });
         case 1:
-          res = _context5.v;
+          res = _context6.v;
           if (res.ok) {
-            _context5.n = 3;
+            _context6.n = 3;
             break;
           }
-          _context5.n = 2;
+          _context6.n = 2;
           return res.text();
         case 2:
-          text = _context5.v;
+          text = _context6.v;
           throw new Error("GitHub push failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
         case 3:
-          _context5.n = 4;
+          _context6.n = 4;
           return res.json();
         case 4:
-          result = _context5.v;
-          return _context5.a(2, ((_result$content = result.content) === null || _result$content === void 0 ? void 0 : _result$content.sha) || null);
+          result = _context6.v;
+          return _context6.a(2, ((_result$content = result.content) === null || _result$content === void 0 ? void 0 : _result$content.sha) || null);
       }
-    }, _callee5);
+    }, _callee6);
   }));
   return _putGithubState.apply(this, arguments);
 }
@@ -1090,7 +1090,19 @@ function AppStateProvider(_ref3) {
   var didMountRef = useRef(false);
   var remoteApplyRef = useRef(false);
   var pushTimerRef = useRef(null);
+  var stateRef = useRef(state);
+  var syncMetaRef = useRef(syncMeta);
+  var pushInFlightRef = useRef(null);
+  var updateSyncMeta = function updateSyncMeta(updater) {
+    setSyncMetaState(function (prev) {
+      var next = typeof updater === "function" ? updater(prev) : updater;
+      syncMetaRef.current = next;
+      writeJsonStorage(SYNC_META_KEY, next);
+      return next;
+    });
+  };
   useEffect(function () {
+    stateRef.current = state;
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(state));
     } catch (e) {}
@@ -1102,7 +1114,7 @@ function AppStateProvider(_ref3) {
       remoteApplyRef.current = false;
       return;
     }
-    setSyncMetaState(function (prev) {
+    updateSyncMeta(function (prev) {
       return _objectSpread(_objectSpread({}, prev), {}, {
         dirty: true,
         conflict: false
@@ -1121,6 +1133,7 @@ function AppStateProvider(_ref3) {
     writeJsonStorage(SYNC_CONFIG_KEY, syncConfig);
   }, [syncConfig]);
   useEffect(function () {
+    syncMetaRef.current = syncMeta;
     writeJsonStorage(SYNC_META_KEY, syncMeta);
   }, [syncMeta]);
   var activeProfile = state.profiles.find(function (p) {
@@ -1141,7 +1154,7 @@ function AppStateProvider(_ref3) {
         token: ""
       });
     });
-    setSyncMetaState(defaultSyncMeta());
+    updateSyncMeta(defaultSyncMeta());
     setSyncConflict(null);
     setSyncStatus({
       state: "idle",
@@ -1154,7 +1167,7 @@ function AppStateProvider(_ref3) {
     if (options.remoteClean) remoteApplyRef.current = true;
     setState(next);
     if (options.remoteClean) {
-      setSyncMetaState(function (prev) {
+      updateSyncMeta(function (prev) {
         return _objectSpread(_objectSpread({}, prev), {}, {
           dirty: false,
           conflict: false
@@ -1170,8 +1183,9 @@ function AppStateProvider(_ref3) {
   var setRemoteCleanState = function setRemoteCleanState(nextState, sha) {
     var message = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "Pulled GitHub state";
     remoteApplyRef.current = true;
+    stateRef.current = nextState;
     setState(nextState);
-    setSyncMetaState(function (prev) {
+    updateSyncMeta(function (prev) {
       return _objectSpread(_objectSpread({}, prev), {}, {
         lastRemoteSha: sha,
         lastSyncAt: new Date().toISOString(),
@@ -1191,9 +1205,9 @@ function AppStateProvider(_ref3) {
       remoteSha: remote.sha,
       remoteState: remote.state,
       remoteUpdatedAt: ((_remote$envelope = remote.envelope) === null || _remote$envelope === void 0 ? void 0 : _remote$envelope.updatedAt) || "",
-      localState: state
+      localState: stateRef.current
     });
-    setSyncMetaState(function (prev) {
+    updateSyncMeta(function (prev) {
       return _objectSpread(_objectSpread({}, prev), {}, {
         conflict: true
       });
@@ -1202,6 +1216,10 @@ function AppStateProvider(_ref3) {
       state: "conflict",
       message: message
     });
+  };
+  var remoteWasWrittenByThisDevice = function remoteWasWrittenByThisDevice(remote, config) {
+    var _remote$envelope2;
+    return !!(remote !== null && remote !== void 0 && (_remote$envelope2 = remote.envelope) !== null && _remote$envelope2 !== void 0 && _remote$envelope2.updatedBy) && remote.envelope.updatedBy === config.clientId;
   };
   var pullRemoteState = function () {
     var _ref4 = _asyncToGenerator(_regenerator().m(function _callee() {
@@ -1246,19 +1264,37 @@ function AppStateProvider(_ref3) {
             });
             return _context.a(2, null);
           case 3:
-            latestMeta = loadSyncMeta();
+            latestMeta = syncMetaRef.current;
             remoteChanged = latestMeta.lastRemoteSha && remote.sha !== latestMeta.lastRemoteSha;
             if (!(latestMeta.dirty && (!latestMeta.lastRemoteSha || remoteChanged))) {
-              _context.n = 4;
+              _context.n = 6;
               break;
             }
-            createConflict(remote, "Remote data changed while this device has unsynced edits.");
-            return _context.a(2, remote);
+            if (!remoteWasWrittenByThisDevice(remote, config)) {
+              _context.n = 5;
+              break;
+            }
+            updateSyncMeta(function (prev) {
+              return _objectSpread(_objectSpread({}, prev), {}, {
+                lastRemoteSha: remote.sha
+              });
+            });
+            _context.n = 4;
+            return pushRemoteState({
+              config: config,
+              forceSha: remote.sha,
+              silent: true
+            });
           case 4:
-            setRemoteCleanState(remote.state, remote.sha, "Pulled GitHub state");
             return _context.a(2, remote);
           case 5:
-            _context.p = 5;
+            createConflict(remote, "Remote data changed while this device has unsynced edits.");
+            return _context.a(2, remote);
+          case 6:
+            setRemoteCleanState(remote.state, remote.sha, "Pulled GitHub state");
+            return _context.a(2, remote);
+          case 7:
+            _context.p = 7;
             _t = _context.v;
             setSyncStatus({
               state: "error",
@@ -1266,137 +1302,202 @@ function AppStateProvider(_ref3) {
             });
             return _context.a(2, null);
         }
-      }, _callee, null, [[1, 5]]);
+      }, _callee, null, [[1, 7]]);
     }));
     return function pullRemoteState() {
       return _ref4.apply(this, arguments);
     };
   }();
   var pushRemoteState = function () {
-    var _ref5 = _asyncToGenerator(_regenerator().m(function _callee2() {
+    var _ref5 = _asyncToGenerator(_regenerator().m(function _callee3() {
       var options,
         config,
-        remote,
-        remoteSha,
-        latestMeta,
-        remoteChanged,
-        nextSha,
-        _args2 = arguments,
-        _t2;
-      return _regenerator().w(function (_context2) {
-        while (1) switch (_context2.p = _context2.n) {
+        runPush,
+        promise,
+        _args3 = arguments,
+        _t3;
+      return _regenerator().w(function (_context3) {
+        while (1) switch (_context3.p = _context3.n) {
           case 0:
-            options = _args2.length > 0 && _args2[0] !== undefined ? _args2[0] : {};
+            options = _args3.length > 0 && _args3[0] !== undefined ? _args3[0] : {};
+            if (!options.silent && pushTimerRef.current) {
+              clearTimeout(pushTimerRef.current);
+              pushTimerRef.current = null;
+            }
+            if (!pushInFlightRef.current) {
+              _context3.n = 1;
+              break;
+            }
+            _context3.n = 1;
+            return pushInFlightRef.current.catch(function () {
+              return null;
+            });
+          case 1:
             config = options.config || syncConfig;
             if (config.token) {
-              _context2.n = 1;
+              _context3.n = 2;
               break;
             }
             if (!options.silent) setSyncStatus({
               state: "error",
               message: "Add a GitHub token before pushing."
             });
-            return _context2.a(2, null);
-          case 1:
+            return _context3.a(2, null);
+          case 2:
             if (!(syncConflict && !options.forceSha)) {
-              _context2.n = 2;
+              _context3.n = 3;
               break;
             }
             if (!options.silent) setSyncStatus({
               state: "conflict",
               message: "Resolve the conflict before pushing."
             });
-            return _context2.a(2, null);
-          case 2:
-            _context2.p = 2;
-            if (!options.silent) setSyncStatus({
-              state: "syncing",
-              message: "Checking GitHub state..."
-            });
-            _context2.n = 3;
-            return fetchGithubState(config);
+            return _context3.a(2, null);
           case 3:
-            remote = _context2.v;
-            remoteSha = (remote === null || remote === void 0 ? void 0 : remote.sha) || null;
-            latestMeta = loadSyncMeta();
-            remoteChanged = remoteSha && latestMeta.lastRemoteSha && remoteSha !== latestMeta.lastRemoteSha;
-            if (!(!options.forceSha && remoteSha && (!latestMeta.lastRemoteSha || remoteChanged) && latestMeta.dirty)) {
-              _context2.n = 4;
-              break;
-            }
-            createConflict(remote, "Remote data changed before this push.");
-            return _context2.a(2, null);
-          case 4:
-            if (!options.silent) setSyncStatus({
-              state: "syncing",
-              message: "Pushing GitHub state..."
-            });
-            _context2.n = 5;
-            return putGithubState(config, state, options.forceSha || remoteSha);
+            runPush = function () {
+              var _ref6 = _asyncToGenerator(_regenerator().m(function _callee2() {
+                var remote, remoteSha, latestMeta, remoteChanged, sameDeviceRemote, nextSha, isShaConflict, latestRemote, _t2;
+                return _regenerator().w(function (_context2) {
+                  while (1) switch (_context2.p = _context2.n) {
+                    case 0:
+                      if (!options.silent) setSyncStatus({
+                        state: "syncing",
+                        message: "Checking GitHub state..."
+                      });
+                      _context2.n = 1;
+                      return fetchGithubState(config);
+                    case 1:
+                      remote = _context2.v;
+                      remoteSha = (remote === null || remote === void 0 ? void 0 : remote.sha) || null;
+                      latestMeta = syncMetaRef.current;
+                      remoteChanged = remoteSha && latestMeta.lastRemoteSha && remoteSha !== latestMeta.lastRemoteSha;
+                      sameDeviceRemote = remoteWasWrittenByThisDevice(remote, config);
+                      if (!(!options.forceSha && remoteSha && (!latestMeta.lastRemoteSha || remoteChanged) && latestMeta.dirty && !sameDeviceRemote)) {
+                        _context2.n = 2;
+                        break;
+                      }
+                      createConflict(remote, "Remote data changed before this push.");
+                      return _context2.a(2, null);
+                    case 2:
+                      if (!options.silent) setSyncStatus({
+                        state: "syncing",
+                        message: "Pushing GitHub state..."
+                      });
+                      _context2.p = 3;
+                      _context2.n = 4;
+                      return putGithubState(config, stateRef.current, options.forceSha || remoteSha);
+                    case 4:
+                      nextSha = _context2.v;
+                      _context2.n = 10;
+                      break;
+                    case 5:
+                      _context2.p = 5;
+                      _t2 = _context2.v;
+                      isShaConflict = /\(409\)|does not match/i.test(String(_t2.message || ""));
+                      if (!(!isShaConflict || options.forceSha)) {
+                        _context2.n = 6;
+                        break;
+                      }
+                      throw _t2;
+                    case 6:
+                      _context2.n = 7;
+                      return fetchGithubState(config);
+                    case 7:
+                      latestRemote = _context2.v;
+                      if (remoteWasWrittenByThisDevice(latestRemote, config)) {
+                        _context2.n = 8;
+                        break;
+                      }
+                      createConflict(latestRemote, "Remote data changed before this push.");
+                      return _context2.a(2, null);
+                    case 8:
+                      _context2.n = 9;
+                      return putGithubState(config, stateRef.current, latestRemote.sha);
+                    case 9:
+                      nextSha = _context2.v;
+                    case 10:
+                      updateSyncMeta(function (prev) {
+                        return _objectSpread(_objectSpread({}, prev), {}, {
+                          lastRemoteSha: nextSha,
+                          lastSyncAt: new Date().toISOString(),
+                          dirty: false,
+                          conflict: false
+                        });
+                      });
+                      setSyncConflict(null);
+                      setSyncStatus({
+                        state: "ok",
+                        message: "Pushed GitHub state"
+                      });
+                      return _context2.a(2, nextSha);
+                  }
+                }, _callee2, null, [[3, 5]]);
+              }));
+              return function runPush() {
+                return _ref6.apply(this, arguments);
+              };
+            }();
+            promise = runPush();
+            pushInFlightRef.current = promise;
+            _context3.p = 4;
+            _context3.n = 5;
+            return promise;
           case 5:
-            nextSha = _context2.v;
-            setSyncMetaState(function (prev) {
-              return _objectSpread(_objectSpread({}, prev), {}, {
-                lastRemoteSha: nextSha,
-                lastSyncAt: new Date().toISOString(),
-                dirty: false,
-                conflict: false
-              });
-            });
-            setSyncConflict(null);
-            setSyncStatus({
-              state: "ok",
-              message: "Pushed GitHub state"
-            });
-            return _context2.a(2, nextSha);
+            return _context3.a(2, _context3.v);
           case 6:
-            _context2.p = 6;
-            _t2 = _context2.v;
+            _context3.p = 6;
+            _t3 = _context3.v;
             setSyncStatus({
               state: "error",
-              message: _t2.message || "GitHub push failed."
+              message: _t3.message || "GitHub push failed."
             });
-            return _context2.a(2, null);
+            return _context3.a(2, null);
+          case 7:
+            _context3.p = 7;
+            if (pushInFlightRef.current === promise) pushInFlightRef.current = null;
+            return _context3.f(7);
+          case 8:
+            return _context3.a(2);
         }
-      }, _callee2, null, [[2, 6]]);
+      }, _callee3, null, [[4, 6, 7, 8]]);
     }));
     return function pushRemoteState() {
       return _ref5.apply(this, arguments);
     };
   }();
   var resolveSyncConflict = function () {
-    var _ref6 = _asyncToGenerator(_regenerator().m(function _callee3(choice) {
-      return _regenerator().w(function (_context3) {
-        while (1) switch (_context3.n) {
+    var _ref7 = _asyncToGenerator(_regenerator().m(function _callee4(choice) {
+      return _regenerator().w(function (_context4) {
+        while (1) switch (_context4.n) {
           case 0:
             if (syncConflict) {
-              _context3.n = 1;
+              _context4.n = 1;
               break;
             }
-            return _context3.a(2);
+            return _context4.a(2);
           case 1:
             if (!(choice === "remote")) {
-              _context3.n = 2;
+              _context4.n = 2;
               break;
             }
             setRemoteCleanState(syncConflict.remoteState, syncConflict.remoteSha, "Resolved conflict with remote state");
-            return _context3.a(2);
+            return _context4.a(2);
           case 2:
             if (!(choice === "local")) {
-              _context3.n = 3;
+              _context4.n = 3;
               break;
             }
-            _context3.n = 3;
+            _context4.n = 3;
             return pushRemoteState({
               forceSha: syncConflict.remoteSha
             });
           case 3:
-            return _context3.a(2);
+            return _context4.a(2);
         }
-      }, _callee3);
+      }, _callee4);
     }));
     return function resolveSyncConflict(_x4) {
-      return _ref6.apply(this, arguments);
+      return _ref7.apply(this, arguments);
     };
   }();
   useEffect(function () {
@@ -1570,9 +1671,9 @@ function AppStateProvider(_ref3) {
     });
   };
   var editSession = function editSession(id, patch) {
-    var _ref7 = patch || {},
-      _clearSessionPlanDates = _ref7._clearSessionPlanDates,
-      sessionPatch = _objectWithoutProperties(_ref7, _excluded);
+    var _ref8 = patch || {},
+      _clearSessionPlanDates = _ref8._clearSessionPlanDates,
+      sessionPatch = _objectWithoutProperties(_ref8, _excluded);
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
@@ -1586,9 +1687,9 @@ function AppStateProvider(_ref3) {
           var previousPlannedDate = ((_id2 = (p.sessionEdits || {})[id]) === null || _id2 === void 0 ? void 0 : _id2.plannedDate) || (raw === null || raw === void 0 ? void 0 : raw.plannedDate);
           var nextPlannedDate = sessionPatch.plannedDate || previousPlannedDate;
           var datesToClear = new Set([raw === null || raw === void 0 ? void 0 : raw.date, previousEffectiveDate, nextEffectiveDate, previousPlannedDate, nextPlannedDate].concat(_toConsumableArray(_clearSessionPlanDates || [])).filter(Boolean));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref8) {
-            var _ref9 = _slicedToArray(_ref8, 1),
-              date = _ref9[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref9) {
+            var _ref0 = _slicedToArray(_ref9, 1),
+              date = _ref0[0];
             return !datesToClear.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
@@ -1604,9 +1705,9 @@ function AppStateProvider(_ref3) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref0) {
-              var _ref1 = _slicedToArray(_ref0, 1),
-                k = _ref1[0];
+            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref1) {
+              var _ref10 = _slicedToArray(_ref1, 1),
+                k = _ref10[0];
               return k !== id;
             }))
           }) : p;
@@ -1644,9 +1745,9 @@ function AppStateProvider(_ref3) {
           var current = (p.dailyOverrides || {})[date] || {};
           if (!field) {
             return _objectSpread(_objectSpread({}, p), {}, {
-              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref10) {
-                var _ref11 = _slicedToArray(_ref10, 1),
-                  k = _ref11[0];
+              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref11) {
+                var _ref12 = _slicedToArray(_ref11, 1),
+                  k = _ref12[0];
                 return k !== date;
               }))
             });
@@ -1698,9 +1799,9 @@ function AppStateProvider(_ref3) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref12) {
-              var _ref13 = _slicedToArray(_ref12, 1),
-                k = _ref13[0];
+            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref13) {
+              var _ref14 = _slicedToArray(_ref13, 1),
+                k = _ref14[0];
               return k !== date;
             }))
           }) : p;
@@ -12973,7 +13074,10 @@ function GitHubSyncPanel() {
       token: tokenDraft.trim(),
       enabled: enabled
     });
-    app.updateSyncConfig(next);
+    var changed = ["owner", "repo", "branch", "path", "token", "enabled"].some(function (key) {
+      return (app.syncConfig[key] || "") !== (next[key] || "");
+    });
+    if (changed) app.updateSyncConfig(next);
     return next;
   };
   var statusClass = app.syncStatus.state === "error" || app.syncStatus.state === "conflict" ? "warn" : app.syncStatus.state === "ok" ? "good" : "";

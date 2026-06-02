@@ -256,7 +256,9 @@ function GitHubSyncPanel() {
       token: tokenDraft.trim(),
       enabled
     };
-    app.updateSyncConfig(next);
+    const changed = ["owner", "repo", "branch", "path", "token", "enabled"]
+      .some(key => (app.syncConfig[key] || "") !== (next[key] || ""));
+    if (changed) app.updateSyncConfig(next);
     return next;
   };
   const statusClass =

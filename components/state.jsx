@@ -436,8 +436,21 @@ function AppStateProvider({ children }) {
   const didMountRef = useRef(false);
   const remoteApplyRef = useRef(false);
   const pushTimerRef = useRef(null);
+  const stateRef = useRef(state);
+  const syncMetaRef = useRef(syncMeta);
+  const pushInFlightRef = useRef(null);
+
+  const updateSyncMeta = (updater) => {
+    setSyncMetaState(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      syncMetaRef.current = next;
+      writeJsonStorage(SYNC_META_KEY, next);
+      return next;
+    });
+  };
 
   useEffect(() => {
+    stateRef.current = state;
     try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
     if (!didMountRef.current) {
       didMountRef.current = true;
@@ -447,7 +460,7 @@ function AppStateProvider({ children }) {
       remoteApplyRef.current = false;
       return;
     }
-    setSyncMetaState(prev => ({ ...prev, dirty: true, conflict: false }));
+    updateSyncMeta(prev => ({ ...prev, dirty: true, conflict: false }));
     if (syncConfig.enabled && syncConfig.token && !syncConflict) {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       pushTimerRef.current = setTimeout(() => {
@@ -461,6 +474,7 @@ function AppStateProvider({ children }) {
   }, [syncConfig]);
 
   useEffect(() => {
+    syncMetaRef.current = syncMeta;
     writeJsonStorage(SYNC_META_KEY, syncMeta);
   }, [syncMeta]);
 
@@ -477,7 +491,7 @@ function AppStateProvider({ children }) {
   const disableSync = () => {
     if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
     setSyncConfigState(prev => ({ ...prev, enabled: false, token: "" }));
-    setSyncMetaState(defaultSyncMeta());
+    updateSyncMeta(defaultSyncMeta());
     setSyncConflict(null);
     setSyncStatus({ state: "idle", message: "GitHub sync disabled" });
   };
@@ -487,7 +501,7 @@ function AppStateProvider({ children }) {
     if (options.remoteClean) remoteApplyRef.current = true;
     setState(next);
     if (options.remoteClean) {
-      setSyncMetaState(prev => ({ ...prev, dirty: false, conflict: false }));
+      updateSyncMeta(prev => ({ ...prev, dirty: false, conflict: false }));
       setSyncConflict(null);
     }
     return next;
@@ -497,8 +511,9 @@ function AppStateProvider({ children }) {
 
   const setRemoteCleanState = (nextState, sha, message = "Pulled GitHub state") => {
     remoteApplyRef.current = true;
+    stateRef.current = nextState;
     setState(nextState);
-    setSyncMetaState(prev => ({
+    updateSyncMeta(prev => ({
       ...prev,
       lastRemoteSha: sha,
       lastSyncAt: new Date().toISOString(),
@@ -514,11 +529,14 @@ function AppStateProvider({ children }) {
       remoteSha: remote.sha,
       remoteState: remote.state,
       remoteUpdatedAt: remote.envelope?.updatedAt || "",
-      localState: state
+      localState: stateRef.current
     });
-    setSyncMetaState(prev => ({ ...prev, conflict: true }));
+    updateSyncMeta(prev => ({ ...prev, conflict: true }));
     setSyncStatus({ state: "conflict", message });
   };
+
+  const remoteWasWrittenByThisDevice = (remote, config) =>
+    !!remote?.envelope?.updatedBy && remote.envelope.updatedBy === config.clientId;
 
   const pullRemoteState = async (options = {}) => {
     const config = options.config || syncConfig;
@@ -533,9 +551,14 @@ function AppStateProvider({ children }) {
         setSyncStatus({ state: "ok", message: "No remote state file yet. Push once to create it." });
         return null;
       }
-      const latestMeta = loadSyncMeta();
+      const latestMeta = syncMetaRef.current;
       const remoteChanged = latestMeta.lastRemoteSha && remote.sha !== latestMeta.lastRemoteSha;
       if (latestMeta.dirty && (!latestMeta.lastRemoteSha || remoteChanged)) {
+        if (remoteWasWrittenByThisDevice(remote, config)) {
+          updateSyncMeta(prev => ({ ...prev, lastRemoteSha: remote.sha }));
+          await pushRemoteState({ config, forceSha: remote.sha, silent: true });
+          return remote;
+        }
         createConflict(remote, "Remote data changed while this device has unsynced edits.");
         return remote;
       }
@@ -548,6 +571,13 @@ function AppStateProvider({ children }) {
   };
 
   const pushRemoteState = async (options = {}) => {
+    if (!options.silent && pushTimerRef.current) {
+      clearTimeout(pushTimerRef.current);
+      pushTimerRef.current = null;
+    }
+    if (pushInFlightRef.current) {
+      await pushInFlightRef.current.catch(() => null);
+    }
     const config = options.config || syncConfig;
     if (!config.token) {
       if (!options.silent) setSyncStatus({ state: "error", message: "Add a GitHub token before pushing." });
@@ -557,19 +587,32 @@ function AppStateProvider({ children }) {
       if (!options.silent) setSyncStatus({ state: "conflict", message: "Resolve the conflict before pushing." });
       return null;
     }
-    try {
+    const runPush = async () => {
       if (!options.silent) setSyncStatus({ state: "syncing", message: "Checking GitHub state..." });
       const remote = await fetchGithubState(config);
       const remoteSha = remote?.sha || null;
-      const latestMeta = loadSyncMeta();
+      const latestMeta = syncMetaRef.current;
       const remoteChanged = remoteSha && latestMeta.lastRemoteSha && remoteSha !== latestMeta.lastRemoteSha;
-      if (!options.forceSha && remoteSha && (!latestMeta.lastRemoteSha || remoteChanged) && latestMeta.dirty) {
+      const sameDeviceRemote = remoteWasWrittenByThisDevice(remote, config);
+      if (!options.forceSha && remoteSha && (!latestMeta.lastRemoteSha || remoteChanged) && latestMeta.dirty && !sameDeviceRemote) {
         createConflict(remote, "Remote data changed before this push.");
         return null;
       }
       if (!options.silent) setSyncStatus({ state: "syncing", message: "Pushing GitHub state..." });
-      const nextSha = await putGithubState(config, state, options.forceSha || remoteSha);
-      setSyncMetaState(prev => ({
+      let nextSha;
+      try {
+        nextSha = await putGithubState(config, stateRef.current, options.forceSha || remoteSha);
+      } catch (e) {
+        const isShaConflict = /\(409\)|does not match/i.test(String(e.message || ""));
+        if (!isShaConflict || options.forceSha) throw e;
+        const latestRemote = await fetchGithubState(config);
+        if (!remoteWasWrittenByThisDevice(latestRemote, config)) {
+          createConflict(latestRemote, "Remote data changed before this push.");
+          return null;
+        }
+        nextSha = await putGithubState(config, stateRef.current, latestRemote.sha);
+      }
+      updateSyncMeta(prev => ({
         ...prev,
         lastRemoteSha: nextSha,
         lastSyncAt: new Date().toISOString(),
@@ -579,9 +622,17 @@ function AppStateProvider({ children }) {
       setSyncConflict(null);
       setSyncStatus({ state: "ok", message: "Pushed GitHub state" });
       return nextSha;
+    };
+
+    const promise = runPush();
+    pushInFlightRef.current = promise;
+    try {
+      return await promise;
     } catch (e) {
       setSyncStatus({ state: "error", message: e.message || "GitHub push failed." });
       return null;
+    } finally {
+      if (pushInFlightRef.current === promise) pushInFlightRef.current = null;
     }
   };
 
