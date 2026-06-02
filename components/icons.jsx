@@ -18,6 +18,7 @@ I.Plus = () => <Icon d="M12 5v14M5 12h14" />;
 I.Chevron = () => <Icon d="M9 6l6 6-6 6" />;
 I.ChevronDown = () => <Icon d="M6 9l6 6 6-6" />;
 I.ChevronLeft = () => <Icon d="M15 6l-6 6 6 6" />;
+I.ChevronUp = () => <Icon d="M6 15l6-6 6 6" />;
 I.Calendar = () => <Icon d="M4 6h16v14H4zM4 10h16M8 4v4M16 4v4" />;
 I.Clock = () => <Icon d="M12 22a10 10 0 100-20 10 10 0 000 20zM12 7v5l3 2" />;
 I.Trend = () => <Icon d="M3 17l6-6 4 4 8-8M14 7h7v7" />;

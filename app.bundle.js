@@ -78,6 +78,11 @@ I.ChevronLeft = function () {
     d: "M15 6l-6 6 6 6"
   });
 };
+I.ChevronUp = function () {
+  return React.createElement(Icon, {
+    d: "M6 15l6-6 6 6"
+  });
+};
 I.Calendar = function () {
   return React.createElement(Icon, {
     d: "M4 6h16v14H4zM4 10h16M8 4v4M16 4v4"
@@ -4056,7 +4061,11 @@ function SetRow(_ref15) {
     onToggleSkipNextTargets = _ref15.onToggleSkipNextTargets,
     onDragStart = _ref15.onDragStart,
     onDragEnd = _ref15.onDragEnd,
-    onRemoveExercise = _ref15.onRemoveExercise;
+    onRemoveExercise = _ref15.onRemoveExercise,
+    onMoveUp = _ref15.onMoveUp,
+    onMoveDown = _ref15.onMoveDown,
+    canMoveUp = _ref15.canMoveUp,
+    canMoveDown = _ref15.canMoveDown;
   var durationMode = isDurationExercise(exercise);
   var isBW = !durationMode && set.unit === "bw";
   var _useState = useState(!!set.note),
@@ -4110,7 +4119,22 @@ function SetRow(_ref15) {
     className: "sheet-ex-title"
   }, exercise.name), React.createElement("div", {
     className: "sheet-ex-subline"
-  }, React.createElement("span", null, ruleLabel(exercise, progressionRules)), React.createElement("span", null, setsCount, " set", setsCount === 1 ? "" : "s"))), React.createElement("button", {
+  }, React.createElement("span", null, ruleLabel(exercise, progressionRules)), React.createElement("span", null, setsCount, " set", setsCount === 1 ? "" : "s"))), React.createElement("div", {
+    className: "sheet-mobile-move",
+    "aria-label": "Move ".concat(exercise.name)
+  }, React.createElement("button", {
+    type: "button",
+    onClick: onMoveUp,
+    disabled: !canMoveUp,
+    title: "Move up",
+    "aria-label": "Move ".concat(exercise.name, " up")
+  }, React.createElement(LIcons.ChevronUp, null)), React.createElement("button", {
+    type: "button",
+    onClick: onMoveDown,
+    disabled: !canMoveDown,
+    title: "Move down",
+    "aria-label": "Move ".concat(exercise.name, " down")
+  }, React.createElement(LIcons.ChevronDown, null))), React.createElement("button", {
     className: "sheet-skip-button ".concat(skipNextTargets ? "is-on" : ""),
     type: "button",
     "aria-pressed": !!skipNextTargets,
@@ -4232,6 +4256,7 @@ function ExerciseRow(_ref16) {
   var exercise = _ref16.exercise,
     sets = _ref16.sets,
     index = _ref16.index,
+    totalExercises = _ref16.totalExercises,
     onUpdateSets = _ref16.onUpdateSets,
     onRemove = _ref16.onRemove,
     avgBW = _ref16.avgBW,
@@ -4245,6 +4270,8 @@ function ExerciseRow(_ref16) {
     onDragOver = _ref16.onDragOver,
     onDrop = _ref16.onDrop,
     onDragEnd = _ref16.onDragEnd,
+    onMoveUp = _ref16.onMoveUp,
+    onMoveDown = _ref16.onMoveDown,
     progressionRules = _ref16.progressionRules;
   var durationMode = isDurationExercise(exercise);
   var lastEntry = (_window$RepsData$exer3 = (_window$RepsData0 = window.RepsData).exerciseLastWeek) === null || _window$RepsData$exer3 === void 0 ? void 0 : _window$RepsData$exer3.call(_window$RepsData0, exercise.name, beforeDate, {
@@ -4301,6 +4328,10 @@ function ExerciseRow(_ref16) {
       onToggleSkipNextTargets: onToggleSkipNextTargets,
       onDragStart: onDragStart,
       onDragEnd: onDragEnd,
+      onMoveUp: onMoveUp,
+      onMoveDown: onMoveDown,
+      canMoveUp: index > 0,
+      canMoveDown: index < totalExercises - 1,
       targetLabel: i === 0 ? nextSummary : "".concat(exercise.reps).concat(exercise.unit ? " \xB7 ".concat(exercise.unit) : ""),
       finished: finished,
       onChange: function onChange(patch) {
@@ -5222,15 +5253,7 @@ function LogView() {
       return next;
     });
   };
-  var moveExercise = function moveExercise(fromKey, toKey) {
-    if (!fromKey || !toKey || fromKey === toKey) return;
-    var keys = allExercises.map(function (ex) {
-      return ex._key;
-    });
-    var from = keys.indexOf(fromKey);
-    var to = keys.indexOf(toKey);
-    if (from < 0 || to < 0) return;
-    keys.splice(to, 0, keys.splice(from, 1)[0]);
+  var persistExerciseOrder = function persistExerciseOrder(keys) {
     setExerciseOrder(keys);
     var existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     var reorderedEntries = existingLogged ? reorderedLoggedEntriesForKeys(existingLogged, keys) : null;
@@ -5247,6 +5270,31 @@ function LogView() {
         _clearSessionPlanDates: [sessionDate, plannedDate]
       });
     }
+  };
+  var moveExercise = function moveExercise(fromKey, toKey) {
+    if (!fromKey || !toKey || fromKey === toKey) return;
+    var keys = allExercises.map(function (ex) {
+      return ex._key;
+    });
+    var from = keys.indexOf(fromKey);
+    var to = keys.indexOf(toKey);
+    if (from < 0 || to < 0) return;
+    keys.splice(to, 0, keys.splice(from, 1)[0]);
+    persistExerciseOrder(keys);
+  };
+  var moveExerciseByOffset = function moveExerciseByOffset(key, offset) {
+    var keys = allExercises.map(function (ex) {
+      return ex._key;
+    });
+    var from = keys.indexOf(key);
+    if (from < 0) return;
+    var to = Math.max(0, Math.min(keys.length - 1, from + offset));
+    if (from === to) return;
+    var _keys$splice = keys.splice(from, 1),
+      _keys$splice2 = _slicedToArray(_keys$splice, 1),
+      moved = _keys$splice2[0];
+    keys.splice(to, 0, moved);
+    persistExerciseOrder(keys);
   };
   var handleResetDay = function handleResetDay() {
     var _app$clearSessionPlan3;
@@ -5377,6 +5425,7 @@ function LogView() {
       exercise: ex,
       sets: setsByExercise[ex._key] || [],
       index: i,
+      totalExercises: allExercises.length,
       avgBW: avgBW,
       beforeDate: currentWeekStart,
       routineDay: selectedDay,
@@ -5411,6 +5460,12 @@ function LogView() {
       },
       onDragEnd: function onDragEnd() {
         return setDragKey(null);
+      },
+      onMoveUp: function onMoveUp() {
+        return moveExerciseByOffset(ex._key, -1);
+      },
+      onMoveDown: function onMoveDown() {
+        return moveExerciseByOffset(ex._key, 1);
       },
       progressionRules: progressionRules
     });

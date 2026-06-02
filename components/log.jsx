@@ -591,7 +591,7 @@ function routineSessionMovedAwayFromDate(profile = {}, plannedDate, routineDay) 
   });
 }
 
-function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, targetLabel, finished, canRemoveSet, first, setsCount, suggestion, progressionRules, skipNextTargets, onToggleSkipNextTargets, onDragStart, onDragEnd, onRemoveExercise }) {
+function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, targetLabel, finished, canRemoveSet, first, setsCount, suggestion, progressionRules, skipNextTargets, onToggleSkipNextTargets, onDragStart, onDragEnd, onRemoveExercise, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const durationMode = isDurationExercise(exercise);
   const isBW = !durationMode && set.unit === "bw";
   const [noteOpen, setNoteOpen] = useState(!!set.note);
@@ -632,6 +632,14 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
                 <span>{ruleLabel(exercise, progressionRules)}</span>
                 <span>{setsCount} set{setsCount === 1 ? "" : "s"}</span>
               </div>
+            </div>
+            <div className="sheet-mobile-move" aria-label={`Move ${exercise.name}`}>
+              <button type="button" onClick={onMoveUp} disabled={!canMoveUp} title="Move up" aria-label={`Move ${exercise.name} up`}>
+                <LIcons.ChevronUp />
+              </button>
+              <button type="button" onClick={onMoveDown} disabled={!canMoveDown} title="Move down" aria-label={`Move ${exercise.name} down`}>
+                <LIcons.ChevronDown />
+              </button>
             </div>
             <button
               className={`sheet-skip-button ${skipNextTargets ? "is-on" : ""}`}
@@ -745,7 +753,7 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
   );
 }
 
-function ExerciseRow({ exercise, sets, index, onUpdateSets, onRemove, avgBW, beforeDate, routineDay, finished, skipNextTargets, onToggleSkipNextTargets, dragging, onDragStart, onDragOver, onDrop, onDragEnd, progressionRules }) {
+function ExerciseRow({ exercise, sets, index, totalExercises, onUpdateSets, onRemove, avgBW, beforeDate, routineDay, finished, skipNextTargets, onToggleSkipNextTargets, dragging, onDragStart, onDragOver, onDrop, onDragEnd, onMoveUp, onMoveDown, progressionRules }) {
   const durationMode = isDurationExercise(exercise);
   const lastEntry = window.RepsData.exerciseLastWeek?.(exercise.name, beforeDate, { exercise, routineDay });
   const suggestion = window.RepsData.progressionSuggestion?.(exercise, lastEntry, { rules: progressionRules });
@@ -794,6 +802,10 @@ function ExerciseRow({ exercise, sets, index, onUpdateSets, onRemove, avgBW, bef
           onToggleSkipNextTargets={onToggleSkipNextTargets}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          canMoveUp={index > 0}
+          canMoveDown={index < totalExercises - 1}
           targetLabel={i === 0 ? nextSummary : `${exercise.reps}${exercise.unit ? ` · ${exercise.unit}` : ""}`}
           finished={finished}
           onChange={(patch) => updateSet(set.id, patch)}
@@ -1512,13 +1524,7 @@ function LogView() {
     });
   };
 
-  const moveExercise = (fromKey, toKey) => {
-    if (!fromKey || !toKey || fromKey === toKey) return;
-    const keys = allExercises.map(ex => ex._key);
-    const from = keys.indexOf(fromKey);
-    const to = keys.indexOf(toKey);
-    if (from < 0 || to < 0) return;
-    keys.splice(to, 0, keys.splice(from, 1)[0]);
+  const persistExerciseOrder = (keys) => {
     setExerciseOrder(keys);
     const existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     const reorderedEntries = existingLogged ? reorderedLoggedEntriesForKeys(existingLogged, keys) : null;
@@ -1535,6 +1541,27 @@ function LogView() {
         _clearSessionPlanDates: [sessionDate, plannedDate]
       });
     }
+  };
+
+  const moveExercise = (fromKey, toKey) => {
+    if (!fromKey || !toKey || fromKey === toKey) return;
+    const keys = allExercises.map(ex => ex._key);
+    const from = keys.indexOf(fromKey);
+    const to = keys.indexOf(toKey);
+    if (from < 0 || to < 0) return;
+    keys.splice(to, 0, keys.splice(from, 1)[0]);
+    persistExerciseOrder(keys);
+  };
+
+  const moveExerciseByOffset = (key, offset) => {
+    const keys = allExercises.map(ex => ex._key);
+    const from = keys.indexOf(key);
+    if (from < 0) return;
+    const to = Math.max(0, Math.min(keys.length - 1, from + offset));
+    if (from === to) return;
+    const [moved] = keys.splice(from, 1);
+    keys.splice(to, 0, moved);
+    persistExerciseOrder(keys);
   };
 
   const handleResetDay = () => {
@@ -1655,6 +1682,7 @@ function LogView() {
                   exercise={ex}
                   sets={setsByExercise[ex._key] || []}
                   index={i}
+                  totalExercises={allExercises.length}
                   avgBW={avgBW}
                   beforeDate={currentWeekStart}
                   routineDay={selectedDay}
@@ -1680,6 +1708,8 @@ function LogView() {
                     setDragKey(null);
                   }}
                   onDragEnd={() => setDragKey(null)}
+                  onMoveUp={() => moveExerciseByOffset(ex._key, -1)}
+                  onMoveDown={() => moveExerciseByOffset(ex._key, 1)}
                   progressionRules={progressionRules}
                 />
               ))}

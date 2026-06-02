@@ -3637,6 +3637,9 @@ table { border-collapse: collapse; }
   background: var(--accent-soft);
   color: var(--accent-ink);
 }
+.sheet-mobile-move {
+  display: none;
+}
 .sheet-target-cell {
   display: flex;
   flex-direction: column;
@@ -3925,7 +3928,7 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-set-row,
   .log-sheet .sheet-set-row {
     display: grid;
-    grid-template-columns: 34px minmax(0, 1fr) 56px 38px;
+    grid-template-columns: 28px minmax(0, 1fr) 48px 36px 56px;
     min-height: 0;
     border-bottom: 1px solid var(--hairline);
   }
@@ -3944,13 +3947,13 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-set-row.is-first .sheet-exercise-cell,
   .log-sheet .sheet-set-row.is-first .sheet-exercise-cell {
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) 36px;
+    grid-template-columns: 30px minmax(0, 1fr) 38px 32px;
     align-items: stretch;
   }
   .classic-log-sheet .sheet-exercise-copy,
   .log-sheet .sheet-exercise-copy {
     min-width: 0;
-    padding: 10px 8px;
+    padding: 8px 8px;
   }
   .classic-log-sheet .sheet-ex-title,
   .log-sheet .sheet-ex-title {
@@ -3964,9 +3967,40 @@ table { border-collapse: collapse; }
     flex-wrap: wrap;
     gap: 4px 8px;
   }
+  .classic-log-sheet .sheet-mobile-move,
+  .log-sheet .sheet-mobile-move {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    align-self: center;
+    justify-items: center;
+    padding: 4px 3px;
+  }
+  .classic-log-sheet .sheet-mobile-move button,
+  .log-sheet .sheet-mobile-move button {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    width: 28px;
+    height: 22px;
+    padding: 0;
+    border: var(--hair);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+    color: var(--muted);
+  }
+  .classic-log-sheet .sheet-mobile-move svg,
+  .log-sheet .sheet-mobile-move svg {
+    width: 13px;
+    height: 13px;
+  }
+  .classic-log-sheet .sheet-mobile-move button:disabled,
+  .log-sheet .sheet-mobile-move button:disabled {
+    opacity: 0.35;
+  }
   .classic-log-sheet .sheet-skip-button,
   .log-sheet .sheet-skip-button {
-    width: 36px;
+    width: 32px;
     height: 100%;
     justify-content: center;
     border-width: 0 0 0 1px;
@@ -3974,34 +4008,45 @@ table { border-collapse: collapse; }
   }
   .classic-log-sheet .sheet-target-cell,
   .log-sheet .sheet-target-cell {
-    grid-column: 1 / -1;
+    grid-column: 1 / 4;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px 8px;
     min-height: 0;
-    padding: 8px 10px;
+    padding: 6px 8px;
     border-bottom: 1px solid var(--hairline);
     background: color-mix(in oklab, var(--accent-soft) 34%, var(--surface));
+  }
+  .classic-log-sheet .sheet-set-row:not(.is-first) .sheet-target-cell,
+  .log-sheet .sheet-set-row:not(.is-first) .sheet-target-cell {
+    display: none;
   }
   .classic-log-sheet .sheet-target-cell strong,
   .log-sheet .sheet-target-cell strong,
   .classic-log-sheet .sheet-target-cell span,
   .log-sheet .sheet-target-cell span {
+    flex: 0 1 auto;
     white-space: normal;
   }
   .classic-log-sheet .sheet-last-cell,
   .log-sheet .sheet-last-cell {
-    grid-column: 1 / -1;
-    min-height: 30px;
-    padding: 7px 10px;
+    grid-column: 4 / -1;
+    min-height: 26px;
+    padding: 5px 8px;
+    border-left: 1px solid var(--hairline);
     border-bottom: 1px solid var(--hairline);
     color: var(--muted);
     background: var(--surface);
   }
+  .classic-log-sheet .sheet-set-row:not(.is-first) .sheet-last-cell,
+  .log-sheet .sheet-set-row:not(.is-first) .sheet-last-cell {
+    display: none;
+  }
   .classic-log-sheet .sheet-last-cell::before,
   .log-sheet .sheet-last-cell::before {
     content: "Last";
-    margin-right: 8px;
+    margin-right: 6px;
     color: var(--faint);
     font-family: var(--font-mono);
     font-size: 9px;
@@ -4012,7 +4057,7 @@ table { border-collapse: collapse; }
   .log-sheet .sheet-set-index {
     grid-column: 1;
     grid-row: auto;
-    min-height: 44px;
+    min-height: 38px;
     padding: 0;
   }
   .classic-log-sheet .sheet-note-panel,
@@ -4022,15 +4067,25 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-actual-group,
   .log-sheet .sheet-actual-group {
     grid-column: 2;
-    min-height: 44px;
-    grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
+    min-height: 38px;
+    grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr);
     border-left: 1px solid var(--hairline);
     border-right: 1px solid var(--hairline);
+  }
+  .classic-log-sheet .sheet-actual-group input,
+  .classic-log-sheet .sheet-actual-group select,
+  .classic-log-sheet .sheet-rpe-cell input,
+  .log-sheet .sheet-actual-group input,
+  .log-sheet .sheet-actual-group select,
+  .log-sheet .sheet-rpe-cell input {
+    min-height: 38px;
+    padding: 0 6px;
+    font-size: 13px;
   }
   .classic-log-sheet .sheet-rpe-cell,
   .log-sheet .sheet-rpe-cell {
     grid-column: 3;
-    min-height: 44px;
+    min-height: 38px;
   }
   .classic-log-sheet .sheet-rpe-cell input,
   .log-sheet .sheet-rpe-cell input {
@@ -4039,16 +4094,23 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-done-toggle,
   .log-sheet .sheet-done-toggle {
     grid-column: 4;
-    min-height: 44px;
+    min-height: 38px;
     border-left: 1px solid var(--hairline);
   }
   .classic-log-sheet .sheet-row-actions,
   .log-sheet .sheet-row-actions {
-    grid-column: 1 / -1;
+    grid-column: 5;
     min-height: 38px;
-    justify-content: flex-end;
-    border-top: 1px solid var(--hairline);
+    justify-content: center;
+    padding: 0 3px;
+    border-left: 1px solid var(--hairline);
     background: var(--surface);
+  }
+  .classic-log-sheet .sheet-row-actions .btn,
+  .log-sheet .sheet-row-actions .btn {
+    width: 24px;
+    height: 28px;
+    opacity: 0.82;
   }
   .classic-log-sheet .drag-grip,
   .log-sheet .drag-grip {
@@ -4060,7 +4122,7 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-note-panel,
   .log-sheet .sheet-note-panel {
     grid-template-columns: 46px minmax(0, 1fr);
-    min-height: 40px;
+    min-height: 36px;
   }
   .classic-sheet-head {
     align-items: flex-start;
