@@ -1,0 +1,7 @@
+.DS_Store
+reps-backup-*.json
+reps-effective-state-*.json
+Reps-migration.html
+.github/workflows/pages.yml
+data/*data*.js
+uploads/
