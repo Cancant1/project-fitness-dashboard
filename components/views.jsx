@@ -653,10 +653,10 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
   const [qSaveToLog, setQSaveToLog] = useS(false); // save as custom food item
 
   const hidden = activeProfile?.hiddenFoodItems || [];
-  const customs = activeProfile?.customFoodItems || [];
-  const items = [...customs, ...RepsData.foodItems];
+  const items = allFoodCatalogItems(activeProfile, RepsData.foodItems);
+  const hiddenKeys = new Set(hidden.map(foodProductKey));
   const filtered = items.filter(f => {
-    if (!showHidden && hidden.includes(f.product)) return false;
+    if (!showHidden && hiddenKeys.has(foodProductKey(f.product))) return false;
     if (q && !f.product.toLowerCase().includes(q.toLowerCase()) && !(f.category || "").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
@@ -755,7 +755,7 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
                       <span>{cat}</span><span style={{color:"var(--faint)"}}>{list.length}</span>
                     </div>
                     {list.map((f, i) => {
-                      const isHidden = hidden.includes(f.product);
+                      const isHidden = hiddenKeys.has(foodProductKey(f.product));
                       return (
                         <div key={f.product + "-" + i} onClick={() => setPicked(f)}
                           style={{display:"grid", gridTemplateColumns:"1fr auto auto auto", gap:10, alignItems:"center", padding:"5px 14px", cursor:"pointer", background:picked?.product === f.product ? "var(--accent-soft)" : "transparent", borderBottom:"1px solid var(--hairline)", opacity:isHidden ? 0.5 : 1}}>
@@ -1533,7 +1533,7 @@ function foodUsageStats(foodByDate = {}) {
   return stats;
 }
 
-function quickFoodSuggestions(profile = {}, catalogItems = [], limit = 10) {
+function allFoodCatalogItems(profile = {}, catalogItems = []) {
   const hidden = new Set((profile.hiddenFoodItems || []).map(foodProductKey));
   const usage = foodUsageStats(profile.foodByDate || {});
   const source = [...(profile.customFoodItems || []), ...(catalogItems || [])];
@@ -1579,8 +1579,11 @@ function quickFoodSuggestions(profile = {}, catalogItems = [], limit = 10) {
       const lastDiff = String(b._quickLastDate || "").localeCompare(String(a._quickLastDate || ""));
       if (lastDiff) return lastDiff;
       return (a._quickIndex || 0) - (b._quickIndex || 0);
-    })
-    .slice(0, limit);
+    });
+}
+
+function quickFoodSuggestions(profile = {}, catalogItems = [], limit = 10) {
+  return allFoodCatalogItems(profile, catalogItems).slice(0, limit);
 }
 
 function TodayRailBand({

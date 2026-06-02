@@ -986,6 +986,30 @@ function blockNameFromSheet() {
   var sheet = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : "";
   return String(sheet || "Workbook block").replace(/[()]/g, "").replace(/^Block\s+/i, "B").trim() || "Workbook block";
 }
+function foodCatalogKey(product) {
+  return String(product || "").trim().toLowerCase();
+}
+function finiteCatalogNumber(value) {
+  var n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+function normalizedCatalogFoodItem() {
+  var _item$kcalPerUnit, _item$proteinPerUnit;
+  var item = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var index = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var product = String(item.product || item.name || "").trim();
+  if (!product) return null;
+  var slug = product.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "item";
+  return {
+    id: item.id || "migrated-food-".concat(slug, "-").concat(index),
+    product: product,
+    kcalPerUnit: finiteCatalogNumber((_item$kcalPerUnit = item.kcalPerUnit) !== null && _item$kcalPerUnit !== void 0 ? _item$kcalPerUnit : item.kcal),
+    proteinPerUnit: finiteCatalogNumber((_item$proteinPerUnit = item.proteinPerUnit) !== null && _item$proteinPerUnit !== void 0 ? _item$proteinPerUnit : item.protein),
+    carbs: finiteCatalogNumber(item.carbs),
+    fat: finiteCatalogNumber(item.fat),
+    category: item.category || "Migrated"
+  };
+}
 function materializeEffectiveState(rawState, activeProfileId) {
   var _find, _profile$routines, _routines$2, _window$RepsData$allS, _window$RepsData, _window$RepsData$merg, _window$RepsData2, _window$RepsData$merg2, _window$RepsData3, _window$RepsData$merg3, _window$RepsData4, _window$RepsData$bloc, _window$RepsData5;
   var next = migrateState(clone(rawState));
@@ -1030,6 +1054,17 @@ function materializeEffectiveState(rawState, activeProfileId) {
   (((_window$RepsData$merg3 = (_window$RepsData4 = window.RepsData).mergedNutritionData) === null || _window$RepsData$merg3 === void 0 ? void 0 : _window$RepsData$merg3.call(_window$RepsData4, profile, "protein", null, false)) || []).forEach(function (row) {
     return addMacroOverride(row, "protein");
   });
+  var customFoodItems = clone(profile.customFoodItems || []);
+  var foodKeys = new Set(customFoodItems.map(function (item) {
+    return foodCatalogKey(item.product);
+  }));
+  (window.RepsData.foodItems || []).forEach(function (item, index) {
+    var normalized = normalizedCatalogFoodItem(item, index);
+    var key = foodCatalogKey(normalized === null || normalized === void 0 ? void 0 : normalized.product);
+    if (!normalized || !key || foodKeys.has(key)) return;
+    customFoodItems.push(normalized);
+    foodKeys.add(key);
+  });
   var existingBlockIds = new Set((profile.customBlocks || []).map(function (b) {
     return b.id;
   }));
@@ -1057,6 +1092,7 @@ function materializeEffectiveState(rawState, activeProfileId) {
     sessionEdits: {},
     weightEntries: weightEntries,
     dailyOverrides: dailyOverrides,
+    customFoodItems: customFoodItems,
     customBlocks: [].concat(_toConsumableArray(profile.customBlocks || []), _toConsumableArray(migratedBlocks)),
     hiddenBlockSheets: [],
     blockNames: {},
@@ -6868,10 +6904,10 @@ function AddFoodModal(_ref5) {
     qSaveToLog = _useS20[0],
     setQSaveToLog = _useS20[1];
   var hidden = (activeProfile === null || activeProfile === void 0 ? void 0 : activeProfile.hiddenFoodItems) || [];
-  var customs = (activeProfile === null || activeProfile === void 0 ? void 0 : activeProfile.customFoodItems) || [];
-  var items = [].concat(_toConsumableArray(customs), _toConsumableArray(RepsData.foodItems));
+  var items = allFoodCatalogItems(activeProfile, RepsData.foodItems);
+  var hiddenKeys = new Set(hidden.map(foodProductKey));
   var filtered = items.filter(function (f) {
-    if (!showHidden && hidden.includes(f.product)) return false;
+    if (!showHidden && hiddenKeys.has(foodProductKey(f.product))) return false;
     if (q && !f.product.toLowerCase().includes(q.toLowerCase()) && !(f.category || "").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
@@ -7065,7 +7101,7 @@ function AddFoodModal(_ref5) {
         color: "var(--faint)"
       }
     }, list.length)), list.map(function (f, i) {
-      var isHidden = hidden.includes(f.product);
+      var isHidden = hiddenKeys.has(foodProductKey(f.product));
       return React.createElement("div", {
         key: f.product + "-" + i,
         onClick: function onClick() {
@@ -8446,10 +8482,9 @@ function foodUsageStats() {
   });
   return stats;
 }
-function quickFoodSuggestions() {
+function allFoodCatalogItems() {
   var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var catalogItems = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-  var limit = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 10;
   var hidden = new Set((profile.hiddenFoodItems || []).map(foodProductKey));
   var usage = foodUsageStats(profile.foodByDate || {});
   var source = [].concat(_toConsumableArray(profile.customFoodItems || []), _toConsumableArray(catalogItems || []));
@@ -8491,7 +8526,13 @@ function quickFoodSuggestions() {
     var lastDiff = String(b._quickLastDate || "").localeCompare(String(a._quickLastDate || ""));
     if (lastDiff) return lastDiff;
     return (a._quickIndex || 0) - (b._quickIndex || 0);
-  }).slice(0, limit);
+  });
+}
+function quickFoodSuggestions() {
+  var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var catalogItems = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  var limit = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 10;
+  return allFoodCatalogItems(profile, catalogItems).slice(0, limit);
 }
 function TodayRailBand(_ref24) {
   var selectedDate = _ref24.selectedDate,

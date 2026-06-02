@@ -349,6 +349,30 @@ function blockNameFromSheet(sheet = "") {
     .trim() || "Workbook block";
 }
 
+function foodCatalogKey(product) {
+  return String(product || "").trim().toLowerCase();
+}
+
+function finiteCatalogNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function normalizedCatalogFoodItem(item = {}, index = 0) {
+  const product = String(item.product || item.name || "").trim();
+  if (!product) return null;
+  const slug = product.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "item";
+  return {
+    id: item.id || `migrated-food-${slug}-${index}`,
+    product,
+    kcalPerUnit: finiteCatalogNumber(item.kcalPerUnit ?? item.kcal),
+    proteinPerUnit: finiteCatalogNumber(item.proteinPerUnit ?? item.protein),
+    carbs: finiteCatalogNumber(item.carbs),
+    fat: finiteCatalogNumber(item.fat),
+    category: item.category || "Migrated"
+  };
+}
+
 function materializeEffectiveState(rawState, activeProfileId) {
   const next = migrateState(clone(rawState));
   const idx = next.profiles.findIndex(p => p.id === activeProfileId);
@@ -388,6 +412,16 @@ function materializeEffectiveState(rawState, activeProfileId) {
   (window.RepsData.mergedNutritionData?.(profile, "kcal", null, false) || []).forEach(row => addMacroOverride(row, "kcal"));
   (window.RepsData.mergedNutritionData?.(profile, "protein", null, false) || []).forEach(row => addMacroOverride(row, "protein"));
 
+  const customFoodItems = clone(profile.customFoodItems || []);
+  const foodKeys = new Set(customFoodItems.map(item => foodCatalogKey(item.product)));
+  (window.RepsData.foodItems || []).forEach((item, index) => {
+    const normalized = normalizedCatalogFoodItem(item, index);
+    const key = foodCatalogKey(normalized?.product);
+    if (!normalized || !key || foodKeys.has(key)) return;
+    customFoodItems.push(normalized);
+    foodKeys.add(key);
+  });
+
   const existingBlockIds = new Set((profile.customBlocks || []).map(b => b.id));
   const migratedBlocks = (window.RepsData.blockSummary?.(profile) || []).map(block => {
     const sheet = block.sheet || block.name || "workbook-block";
@@ -412,6 +446,7 @@ function materializeEffectiveState(rawState, activeProfileId) {
     sessionEdits: {},
     weightEntries,
     dailyOverrides,
+    customFoodItems,
     customBlocks: [...(profile.customBlocks || []), ...migratedBlocks],
     hiddenBlockSheets: [],
     blockNames: {},
