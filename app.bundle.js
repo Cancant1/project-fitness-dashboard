@@ -3856,14 +3856,16 @@ function savedPlanHasContent() {
 function shouldHydrateSavedPlan(savedPlan, existingLogged) {
   if (!savedPlan || !savedPlanHasContent(savedPlan)) return false;
   if (!existingLogged) return true;
-  var planTime = dateMs(savedPlan.updatedAt || savedPlan.savedAt);
-  var sessionTime = dateMs(existingLogged.updatedAt || existingLogged.savedAt || existingLogged.createdAt);
-  if (planTime && sessionTime) return planTime >= sessionTime;
   var draftSets = savedPlanSetCount(savedPlan);
   var loggedSets = loggedSessionSetCount(existingLogged);
   var draftExercises = savedPlanExerciseCount(savedPlan);
   var loggedExercises = (existingLogged.entries || []).length;
-  return draftSets >= loggedSets || draftExercises >= loggedExercises;
+  if (draftSets < loggedSets || draftExercises < loggedExercises) return false;
+  if (draftSets > loggedSets || draftExercises > loggedExercises) return true;
+  var planTime = dateMs(savedPlan.updatedAt || savedPlan.savedAt);
+  var sessionTime = dateMs(existingLogged.updatedAt || existingLogged.savedAt || existingLogged.createdAt);
+  if (planTime && sessionTime) return planTime >= sessionTime;
+  return true;
 }
 function htmlEscape(value) {
   return String(value !== null && value !== void 0 ? value : "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -4732,15 +4734,18 @@ function LogView() {
     var existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     var movedAway = routineSessionMovedAwayFromDate(app.activeProfile, plannedDate, selectedDay);
     var planMap = app.activeProfile.sessionPlansByDate || {};
-    var savedPlanRaw = planMap[sessionDate] || (sessionDate !== plannedDate ? planMap[plannedDate] : null);
+    var savedPlanDate = planMap[sessionDate] ? sessionDate : sessionDate !== plannedDate && planMap[plannedDate] ? plannedDate : null;
+    var savedPlanRaw = savedPlanDate ? planMap[savedPlanDate] : null;
     var savedPlan = movedAway ? null : savedPlanRaw;
     if (movedAway && savedPlanRaw) {
       var _app$clearSessionPlan;
-      (_app$clearSessionPlan = app.clearSessionPlan) === null || _app$clearSessionPlan === void 0 || _app$clearSessionPlan.call(app, sessionDate);
+      (_app$clearSessionPlan = app.clearSessionPlan) === null || _app$clearSessionPlan === void 0 || _app$clearSessionPlan.call(app, savedPlanDate);
     }
     if (shouldHydrateSavedPlan(savedPlan, existingLogged)) {
       hydrateSavedPlan(savedPlan);
     } else if (existingLogged) {
+      var _app$clearSessionPlan2;
+      if (savedPlanDate && savedPlan) (_app$clearSessionPlan2 = app.clearSessionPlan) === null || _app$clearSessionPlan2 === void 0 || _app$clearSessionPlan2.call(app, savedPlanDate);
       hydrateLoggedSession(existingLogged);
     } else {
       setExtraExercises([]);
@@ -4853,8 +4858,8 @@ function LogView() {
         status: "performed"
       });
     } else if (hasSavedPlan) {
-      var _app$clearSessionPlan2;
-      (_app$clearSessionPlan2 = app.clearSessionPlan) === null || _app$clearSessionPlan2 === void 0 || _app$clearSessionPlan2.call(app, sessionDate);
+      var _app$clearSessionPlan3;
+      (_app$clearSessionPlan3 = app.clearSessionPlan) === null || _app$clearSessionPlan3 === void 0 || _app$clearSessionPlan3.call(app, sessionDate);
     }
   }, [extraExercises, removedKeys, exerciseOrder, setsByExercise, rpe, notes, skipProgressionKeys, sessionDate, plannedDate, selectedDay, baseExerciseKeys.join("|"), hydratedPlanKey, planHydrationKey]);
   var handleSelectDay = function handleSelectDay(day) {
@@ -5430,9 +5435,9 @@ function LogView() {
     persistExerciseOrder(keys);
   };
   var handleResetDay = function handleResetDay() {
-    var _app$clearSessionPlan3;
+    var _app$clearSessionPlan4;
     if (!confirm("Reset this day back to the routine? This clears your overrides for this date.")) return;
-    (_app$clearSessionPlan3 = app.clearSessionPlan) === null || _app$clearSessionPlan3 === void 0 || _app$clearSessionPlan3.call(app, sessionDate);
+    (_app$clearSessionPlan4 = app.clearSessionPlan) === null || _app$clearSessionPlan4 === void 0 || _app$clearSessionPlan4.call(app, sessionDate);
     var existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     if (existingLogged) {
       hydrateLoggedSession(existingLogged);

@@ -414,15 +414,19 @@ function shouldHydrateSavedPlan(savedPlan, existingLogged) {
   if (!savedPlan || !savedPlanHasContent(savedPlan)) return false;
   if (!existingLogged) return true;
 
-  const planTime = dateMs(savedPlan.updatedAt || savedPlan.savedAt);
-  const sessionTime = dateMs(existingLogged.updatedAt || existingLogged.savedAt || existingLogged.createdAt);
-  if (planTime && sessionTime) return planTime >= sessionTime;
-
   const draftSets = savedPlanSetCount(savedPlan);
   const loggedSets = loggedSessionSetCount(existingLogged);
   const draftExercises = savedPlanExerciseCount(savedPlan);
   const loggedExercises = (existingLogged.entries || []).length;
-  return draftSets >= loggedSets || draftExercises >= loggedExercises;
+
+  if (draftSets < loggedSets || draftExercises < loggedExercises) return false;
+  if (draftSets > loggedSets || draftExercises > loggedExercises) return true;
+
+  const planTime = dateMs(savedPlan.updatedAt || savedPlan.savedAt);
+  const sessionTime = dateMs(existingLogged.updatedAt || existingLogged.savedAt || existingLogged.createdAt);
+  if (planTime && sessionTime) return planTime >= sessionTime;
+
+  return true;
 }
 
 function htmlEscape(value) {
@@ -1058,15 +1062,19 @@ function LogView() {
     const existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     const movedAway = routineSessionMovedAwayFromDate(app.activeProfile, plannedDate, selectedDay);
     const planMap = app.activeProfile.sessionPlansByDate || {};
-    const savedPlanRaw = planMap[sessionDate] || (sessionDate !== plannedDate ? planMap[plannedDate] : null);
+    const savedPlanDate = planMap[sessionDate]
+      ? sessionDate
+      : (sessionDate !== plannedDate && planMap[plannedDate] ? plannedDate : null);
+    const savedPlanRaw = savedPlanDate ? planMap[savedPlanDate] : null;
     const savedPlan = movedAway ? null : savedPlanRaw;
     if (movedAway && savedPlanRaw) {
-      app.clearSessionPlan?.(sessionDate);
+      app.clearSessionPlan?.(savedPlanDate);
     }
 
     if (shouldHydrateSavedPlan(savedPlan, existingLogged)) {
       hydrateSavedPlan(savedPlan);
     } else if (existingLogged) {
+      if (savedPlanDate && savedPlan) app.clearSessionPlan?.(savedPlanDate);
       hydrateLoggedSession(existingLogged);
     } else {
       setExtraExercises([]);
