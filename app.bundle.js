@@ -1134,6 +1134,212 @@ function sameLoggedSessionSlot() {
   if (a.date && b.date && a.date === b.date && (!aDay || !bDay || aDay === bDay)) return true;
   return false;
 }
+function stateLoggedSetCount() {
+  var sets = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+  return (sets || []).filter(function (set) {
+    return set.weight != null || set.repsNumber != null || set.reps != null || set.durationMinutes || set.duration || set.rpe || set.note;
+  }).length;
+}
+function stateSessionSetCount() {
+  var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var explicit = Number(session.performedSetCount);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return (session.entries || []).reduce(function (sum, entry) {
+    return sum + stateLoggedSetCount(entry.sets || []);
+  }, 0);
+}
+function stateSessionScore() {
+  var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return stateSessionSetCount(session) * 1000 + (session.entries || []).length * 10 + (session.status === "performed" ? 1 : 0);
+}
+function betterLoggedSession(current, candidate) {
+  if (!current) return candidate;
+  if (!candidate) return current;
+  var currentScore = stateSessionScore(current);
+  var candidateScore = stateSessionScore(candidate);
+  if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
+  var currentTime = Date.parse(current.updatedAt || current.savedAt || current.createdAt || "") || 0;
+  var candidateTime = Date.parse(candidate.updatedAt || candidate.savedAt || candidate.createdAt || "") || 0;
+  return candidateTime > currentTime ? candidate : current;
+}
+function routineDaysForProfile() {
+  var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var routines = profile.routines || [];
+  var active = routines.find(function (r) {
+    return r.id === profile.activeRoutineId;
+  }) || routines[0];
+  return (active === null || active === void 0 ? void 0 : active.days) || [];
+}
+function plannedExercisesForDay() {
+  var _routineDaysForProfil;
+  var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var routineDay = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "";
+  var day = normalizeSessionDay(routineDay);
+  return ((_routineDaysForProfil = routineDaysForProfile(profile).find(function (d) {
+    return d.day === day;
+  })) === null || _routineDaysForProfil === void 0 ? void 0 : _routineDaysForProfil.exercises) || [];
+}
+function planSetCount() {
+  var plan = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return Object.values(plan.setsByExercise || {}).reduce(function (sum, sets) {
+    return sum + (Array.isArray(sets) ? sets.filter(function (set) {
+      var _set$weight, _set$reps, _set$duration, _set$rpe, _set$note;
+      return set._edited || set._done === true || set._done === false || String((_set$weight = set.weight) !== null && _set$weight !== void 0 ? _set$weight : "").trim() !== "" || String((_set$reps = set.reps) !== null && _set$reps !== void 0 ? _set$reps : "").trim() !== "" || String((_set$duration = set.duration) !== null && _set$duration !== void 0 ? _set$duration : "").trim() !== "" || String((_set$rpe = set.rpe) !== null && _set$rpe !== void 0 ? _set$rpe : "").trim() !== "" || String((_set$note = set.note) !== null && _set$note !== void 0 ? _set$note : "").trim() !== "";
+    }).length : 0);
+  }, 0);
+}
+function planVisibleExerciseCount() {
+  var _window$RepsData8, _window$RepsData8$day;
+  var plan = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var profile = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var date = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "";
+  var routineDay = normalizeSessionDay(plan.routineDay) || (date ? (_window$RepsData8 = window.RepsData) === null || _window$RepsData8 === void 0 || (_window$RepsData8$day = _window$RepsData8.dayName) === null || _window$RepsData8$day === void 0 ? void 0 : _window$RepsData8$day.call(_window$RepsData8, date) : null) || "";
+  var removed = new Set(plan.removedKeys || []);
+  var planned = plannedExercisesForDay(profile, routineDay).map(function (ex, i) {
+    return _objectSpread(_objectSpread({}, ex), {}, {
+      _key: "p-".concat(routineDay, "-").concat(i)
+    });
+  }).filter(function (ex) {
+    return !removed.has(ex._key);
+  });
+  var extra = (plan.extraExercises || []).map(function (ex, i) {
+    return _objectSpread(_objectSpread({}, ex), {}, {
+      _key: ex._key || "e-".concat(i)
+    });
+  }).filter(function (ex) {
+    return !removed.has(ex._key);
+  });
+  return planned.length + extra.length;
+}
+function bestLoggedSessionForPlan() {
+  var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var date = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "";
+  var plan = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  var plannedDate = plan.plannedDate || date;
+  var routineDay = normalizeSessionDay(plan.routineDay);
+  return (profile.loggedSessions || []).reduce(function (best, session) {
+    var sameDate = sessionSlotPlannedDate(session) === plannedDate || session.date === date;
+    var sessionDay = normalizeSessionDay(session.routineDay || session.nominalDay || session.day);
+    var sameDay = !routineDay || !sessionDay || routineDay === sessionDay;
+    if (!sameDate || !sameDay || session.status === "skipped" || stateSessionSetCount(session) <= 0) return best;
+    return betterLoggedSession(best, session);
+  }, null);
+}
+function sanitizeProfileForPush() {
+  var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var nextPlans = {};
+  for (var _i = 0, _Object$entries = Object.entries(profile.sessionPlansByDate || {}); _i < _Object$entries.length; _i++) {
+    var _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
+      date = _Object$entries$_i[0],
+      plan = _Object$entries$_i[1];
+    var logged = bestLoggedSessionForPlan(profile, date, plan);
+    if (logged) {
+      var visibleExercises = planVisibleExerciseCount(plan, profile, date);
+      var loggedExercises = (logged.entries || []).length;
+      var sets = planSetCount(plan);
+      var loggedSets = stateSessionSetCount(logged);
+      if (visibleExercises < loggedExercises || sets < loggedSets) continue;
+    }
+    nextPlans[date] = plan;
+  }
+  return _objectSpread(_objectSpread({}, profile), {}, {
+    sessionPlansByDate: nextPlans
+  });
+}
+function sanitizeStateForPush() {
+  var rawState = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var next = migrateState(clone(rawState));
+  return _objectSpread(_objectSpread({}, next), {}, {
+    profiles: (next.profiles || []).map(sanitizeProfileForPush)
+  });
+}
+function mergeByKey() {
+  var remoteItems = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+  var localItems = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  var keyFn = arguments.length > 2 ? arguments[2] : undefined;
+  var choose = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : function (_remote, local) {
+    return local;
+  };
+  var map = new Map();
+  (remoteItems || []).forEach(function (item, index) {
+    var key = keyFn(item, index);
+    if (key) map.set(key, item);
+  });
+  (localItems || []).forEach(function (item, index) {
+    var key = keyFn(item, index);
+    if (!key) return;
+    map.set(key, map.has(key) ? choose(map.get(key), item) : item);
+  });
+  return Array.from(map.values());
+}
+function mergeFoodByDate() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var dates = new Set([].concat(_toConsumableArray(Object.keys(remote || {})), _toConsumableArray(Object.keys(local || {}))));
+  var out = {};
+  dates.forEach(function (date) {
+    out[date] = mergeByKey(remote[date] || [], local[date] || [], function (item, index) {
+      var _item$id, _item$kcal, _item$protein, _item$amount;
+      return String((_item$id = item.id) !== null && _item$id !== void 0 ? _item$id : "".concat(item.product || item.name || "food", ":").concat((_item$kcal = item.kcal) !== null && _item$kcal !== void 0 ? _item$kcal : "", ":").concat((_item$protein = item.protein) !== null && _item$protein !== void 0 ? _item$protein : "", ":").concat((_item$amount = item.amount) !== null && _item$amount !== void 0 ? _item$amount : "", ":").concat(index));
+    });
+  });
+  return out;
+}
+function mergeLoggedSessions() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  return [].concat(_toConsumableArray(remote || []), _toConsumableArray(local || [])).reduce(function (list, session) {
+    var index = list.findIndex(function (existing) {
+      return sameLoggedSessionSlot(existing, session);
+    });
+    if (index < 0) return [session].concat(_toConsumableArray(list));
+    var next = _toConsumableArray(list);
+    next[index] = betterLoggedSession(next[index], session);
+    return next;
+  }, []);
+}
+function mergeProfiles() {
+  var remoteProfile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var localProfile = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var merged = _objectSpread(_objectSpread({}, remoteProfile), localProfile);
+  merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {});
+  merged.dailyOverrides = _objectSpread(_objectSpread({}, remoteProfile.dailyOverrides || {}), localProfile.dailyOverrides || {});
+  merged.sessionPlansByDate = _objectSpread(_objectSpread({}, remoteProfile.sessionPlansByDate || {}), localProfile.sessionPlansByDate || {});
+  merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
+  merged.weightEntries = mergeByKey(remoteProfile.weightEntries || [], localProfile.weightEntries || [], function (item) {
+    var _item$id2;
+    return String((_item$id2 = item.id) !== null && _item$id2 !== void 0 ? _item$id2 : "".concat(item.date, ":").concat(item.weight, ":").concat(item.note || ""));
+  });
+  merged.customFoodItems = mergeByKey(remoteProfile.customFoodItems || [], localProfile.customFoodItems || [], function (item) {
+    return String(item.id || foodCatalogKey(item.product || item.name));
+  });
+  merged.customExercises = mergeByKey(remoteProfile.customExercises || [], localProfile.customExercises || [], function (item) {
+    return String(item.id || item.name);
+  });
+  merged.hiddenExercises = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfile.hiddenExercises || []), _toConsumableArray(localProfile.hiddenExercises || []))));
+  merged.hiddenFoodItems = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfile.hiddenFoodItems || []), _toConsumableArray(localProfile.hiddenFoodItems || []))));
+  return sanitizeProfileForPush(merged);
+}
+function mergeRemoteAndLocalState() {
+  var remoteState = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var localState = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var remote = migrateState(clone(remoteState));
+  var local = sanitizeStateForPush(localState);
+  var remoteProfiles = new Map((remote.profiles || []).map(function (profile) {
+    return [profile.id, profile];
+  }));
+  var localProfiles = new Map((local.profiles || []).map(function (profile) {
+    return [profile.id, profile];
+  }));
+  var profileIds = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfiles.keys()), _toConsumableArray(localProfiles.keys()))));
+  return migrateState(_objectSpread(_objectSpread(_objectSpread({}, remote), local), {}, {
+    profiles: profileIds.map(function (id) {
+      var r = remoteProfiles.get(id);
+      var l = localProfiles.get(id);
+      return r && l ? mergeProfiles(r, l) : sanitizeProfileForPush(l || r);
+    })
+  }));
+}
 function load() {
   try {
     var raw = localStorage.getItem(STORE_KEY);
@@ -1288,11 +1494,33 @@ function AppStateProvider(_ref3) {
       message: message
     });
   };
+  var setRemoteMergedDirtyState = function setRemoteMergedDirtyState(nextState, sha) {
+    var message = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "Pulled GitHub state and kept local edits";
+    remoteApplyRef.current = true;
+    stateRef.current = nextState;
+    setState(nextState);
+    updateSyncMeta(function (prev) {
+      return _objectSpread(_objectSpread({}, prev), {}, {
+        lastRemoteSha: sha,
+        lastSyncAt: new Date().toISOString(),
+        dirty: true,
+        conflict: false
+      });
+    });
+    setSyncConflict(null);
+    setSyncStatus({
+      state: "ok",
+      message: message
+    });
+  };
   var pullRemoteState = function () {
     var _ref4 = _asyncToGenerator(_regenerator().m(function _callee() {
       var options,
         config,
+        _syncMetaRef$current,
         remote,
+        remoteState,
+        mergedState,
         _args = arguments,
         _t;
       return _regenerator().w(function (_context) {
@@ -1329,7 +1557,13 @@ function AppStateProvider(_ref3) {
             });
             return _context.a(2, null);
           case 3:
-            setRemoteCleanState(remote.state, remote.sha, "Pull complete. GitHub wins.");
+            remoteState = sanitizeStateForPush(remote.state);
+            if ((_syncMetaRef$current = syncMetaRef.current) !== null && _syncMetaRef$current !== void 0 && _syncMetaRef$current.dirty && !options.preferRemote) {
+              mergedState = mergeRemoteAndLocalState(remoteState, stateRef.current);
+              setRemoteMergedDirtyState(mergedState, remote.sha, "Pull complete. Local changes kept; push to update GitHub.");
+            } else {
+              setRemoteCleanState(remoteState, remote.sha, "Pull complete. GitHub applied.");
+            }
             return _context.a(2, remote);
           case 4:
             _context.p = 4;
@@ -1384,7 +1618,7 @@ function AppStateProvider(_ref3) {
           case 2:
             runPush = function () {
               var _ref6 = _asyncToGenerator(_regenerator().m(function _callee2() {
-                var remote, remoteSha, nextSha, attempt, isShaConflict, latestRemote, _t2;
+                var remote, remoteSha, pushState, nextSha, attempt, isShaConflict, latestRemote, _t2;
                 return _regenerator().w(function (_context2) {
                   while (1) switch (_context2.p = _context2.n) {
                     case 0:
@@ -1397,9 +1631,10 @@ function AppStateProvider(_ref3) {
                     case 1:
                       remote = _context2.v;
                       remoteSha = (remote === null || remote === void 0 ? void 0 : remote.sha) || null;
+                      pushState = remote !== null && remote !== void 0 && remote.state ? mergeRemoteAndLocalState(remote.state, stateRef.current) : sanitizeStateForPush(stateRef.current);
                       if (!options.silent) setSyncStatus({
                         state: "syncing",
-                        message: "Pushing GitHub state..."
+                        message: remote !== null && remote !== void 0 && remote.state ? "Merging local changes with GitHub..." : "Pushing GitHub state..."
                       });
                       attempt = 0;
                     case 2:
@@ -1409,7 +1644,7 @@ function AppStateProvider(_ref3) {
                       }
                       _context2.p = 3;
                       _context2.n = 4;
-                      return putGithubState(config, stateRef.current, remoteSha);
+                      return putGithubState(config, pushState, remoteSha);
                     case 4:
                       nextSha = _context2.v;
                       return _context2.a(3, 9);
@@ -1428,6 +1663,7 @@ function AppStateProvider(_ref3) {
                     case 7:
                       latestRemote = _context2.v;
                       remoteSha = (latestRemote === null || latestRemote === void 0 ? void 0 : latestRemote.sha) || null;
+                      pushState = latestRemote !== null && latestRemote !== void 0 && latestRemote.state ? mergeRemoteAndLocalState(latestRemote.state, pushState) : sanitizeStateForPush(pushState);
                     case 8:
                       attempt += 1;
                       _context2.n = 2;
@@ -1439,6 +1675,9 @@ function AppStateProvider(_ref3) {
                       }
                       throw new Error("GitHub push failed: no updated file SHA returned.");
                     case 10:
+                      remoteApplyRef.current = true;
+                      stateRef.current = pushState;
+                      setState(pushState);
                       updateSyncMeta(function (prev) {
                         return _objectSpread(_objectSpread({}, prev), {}, {
                           lastRemoteSha: nextSha,
@@ -1450,7 +1689,7 @@ function AppStateProvider(_ref3) {
                       setSyncConflict(null);
                       setSyncStatus({
                         state: "ok",
-                        message: "Push complete. This browser wins."
+                        message: "Push complete. Local changes merged with GitHub."
                       });
                       return _context2.a(2, nextSha);
                   }
@@ -1504,7 +1743,9 @@ function AppStateProvider(_ref3) {
               break;
             }
             _context4.n = 2;
-            return pullRemoteState();
+            return pullRemoteState({
+              preferRemote: true
+            });
           case 2:
             if (!(choice === "local")) {
               _context4.n = 3;
@@ -2017,10 +2258,10 @@ function AppStateProvider(_ref3) {
         profiles: s.profiles.map(function (p) {
           if (p.id !== s.activeProfileId) return p;
           var renames = _objectSpread({}, p.exerciseRenames || {});
-          for (var _i = 0, _Object$entries = Object.entries(renames); _i < _Object$entries.length; _i++) {
-            var _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
-              k = _Object$entries$_i[0],
-              v = _Object$entries$_i[1];
+          for (var _i2 = 0, _Object$entries2 = Object.entries(renames); _i2 < _Object$entries2.length; _i2++) {
+            var _Object$entries2$_i = _slicedToArray(_Object$entries2[_i2], 2),
+              k = _Object$entries2$_i[0],
+              v = _Object$entries2$_i[1];
             if (k === from || v === from) renames[k] = to;
           }
           renames[from] = to;
@@ -2101,14 +2342,14 @@ function useApp() {
   return useContext(AppContext);
 }
 function todayDayKey() {
-  var _window$RepsData8, _window$RepsData9;
-  var today = ((_window$RepsData8 = window.RepsData) === null || _window$RepsData8 === void 0 ? void 0 : _window$RepsData8.TODAY) || "2026-05-21";
-  return ((_window$RepsData9 = window.RepsData) === null || _window$RepsData9 === void 0 ? void 0 : _window$RepsData9.dayName(today)) || "Thu";
+  var _window$RepsData9, _window$RepsData0;
+  var today = ((_window$RepsData9 = window.RepsData) === null || _window$RepsData9 === void 0 ? void 0 : _window$RepsData9.TODAY) || "2026-05-21";
+  return ((_window$RepsData0 = window.RepsData) === null || _window$RepsData0 === void 0 ? void 0 : _window$RepsData0.dayName(today)) || "Thu";
 }
 function ageFrom(birthday) {
-  var _window$RepsData0;
+  var _window$RepsData1;
   if (!birthday) return null;
-  var today = ((_window$RepsData0 = window.RepsData) === null || _window$RepsData0 === void 0 ? void 0 : _window$RepsData0.TODAY) || new Date().toISOString().slice(0, 10);
+  var today = ((_window$RepsData1 = window.RepsData) === null || _window$RepsData1 === void 0 ? void 0 : _window$RepsData1.TODAY) || new Date().toISOString().slice(0, 10);
   var _birthday$split$map = birthday.split("-").map(Number),
     _birthday$split$map2 = _slicedToArray(_birthday$split$map, 3),
     by = _birthday$split$map2[0],
@@ -2198,7 +2439,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "03 Jun 2026 19:38";
+var BUILD_LABEL = "03 Jun 2026 19:53";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -13581,7 +13822,7 @@ function GitHubSyncPanel() {
     style: {
       lineHeight: 1.6
     }
-  }, "Sync uses one private repo file and one token per device. Use a fine-grained GitHub token with Contents read/write for your private data repository. Manual sync is last-click-wins: Pull replaces this browser with GitHub, Push replaces GitHub with this browser."), React.createElement("div", {
+  }, "Sync uses one private repo file and one token per device. Use a fine-grained GitHub token with Contents read/write for your private data repository. Push first merges this browser with GitHub and retries SHA conflicts. Pull applies GitHub; if this browser has unsynced edits, it keeps them and leaves the app marked unsynced until you push."), React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "repeat(2, minmax(0, 1fr))",

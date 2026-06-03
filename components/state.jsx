@@ -479,6 +479,186 @@ function sameLoggedSessionSlot(a = {}, b = {}) {
   return false;
 }
 
+function stateLoggedSetCount(sets = []) {
+  return (sets || []).filter(set =>
+    set.weight != null ||
+    set.repsNumber != null ||
+    set.reps != null ||
+    set.durationMinutes ||
+    set.duration ||
+    set.rpe ||
+    set.note
+  ).length;
+}
+
+function stateSessionSetCount(session = {}) {
+  const explicit = Number(session.performedSetCount);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return (session.entries || []).reduce((sum, entry) => sum + stateLoggedSetCount(entry.sets || []), 0);
+}
+
+function stateSessionScore(session = {}) {
+  return (stateSessionSetCount(session) * 1000) +
+    (((session.entries || []).length) * 10) +
+    (session.status === "performed" ? 1 : 0);
+}
+
+function betterLoggedSession(current, candidate) {
+  if (!current) return candidate;
+  if (!candidate) return current;
+  const currentScore = stateSessionScore(current);
+  const candidateScore = stateSessionScore(candidate);
+  if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
+  const currentTime = Date.parse(current.updatedAt || current.savedAt || current.createdAt || "") || 0;
+  const candidateTime = Date.parse(candidate.updatedAt || candidate.savedAt || candidate.createdAt || "") || 0;
+  return candidateTime > currentTime ? candidate : current;
+}
+
+function routineDaysForProfile(profile = {}) {
+  const routines = profile.routines || [];
+  const active = routines.find(r => r.id === profile.activeRoutineId) || routines[0];
+  return active?.days || [];
+}
+
+function plannedExercisesForDay(profile = {}, routineDay = "") {
+  const day = normalizeSessionDay(routineDay);
+  return (routineDaysForProfile(profile).find(d => d.day === day)?.exercises || []);
+}
+
+function planSetCount(plan = {}) {
+  return Object.values(plan.setsByExercise || {}).reduce((sum, sets) =>
+    sum + (Array.isArray(sets) ? sets.filter(set =>
+      set._edited ||
+      set._done === true ||
+      set._done === false ||
+      String(set.weight ?? "").trim() !== "" ||
+      String(set.reps ?? "").trim() !== "" ||
+      String(set.duration ?? "").trim() !== "" ||
+      String(set.rpe ?? "").trim() !== "" ||
+      String(set.note ?? "").trim() !== ""
+    ).length : 0), 0);
+}
+
+function planVisibleExerciseCount(plan = {}, profile = {}, date = "") {
+  const routineDay = normalizeSessionDay(plan.routineDay) || (date ? window.RepsData?.dayName?.(date) : null) || "";
+  const removed = new Set(plan.removedKeys || []);
+  const planned = plannedExercisesForDay(profile, routineDay)
+    .map((ex, i) => ({ ...ex, _key: `p-${routineDay}-${i}` }))
+    .filter(ex => !removed.has(ex._key));
+  const extra = (plan.extraExercises || [])
+    .map((ex, i) => ({ ...ex, _key: ex._key || `e-${i}` }))
+    .filter(ex => !removed.has(ex._key));
+  return planned.length + extra.length;
+}
+
+function bestLoggedSessionForPlan(profile = {}, date = "", plan = {}) {
+  const plannedDate = plan.plannedDate || date;
+  const routineDay = normalizeSessionDay(plan.routineDay);
+  return (profile.loggedSessions || []).reduce((best, session) => {
+    const sameDate = sessionSlotPlannedDate(session) === plannedDate || session.date === date;
+    const sessionDay = normalizeSessionDay(session.routineDay || session.nominalDay || session.day);
+    const sameDay = !routineDay || !sessionDay || routineDay === sessionDay;
+    if (!sameDate || !sameDay || session.status === "skipped" || stateSessionSetCount(session) <= 0) return best;
+    return betterLoggedSession(best, session);
+  }, null);
+}
+
+function sanitizeProfileForPush(profile = {}) {
+  const nextPlans = {};
+  for (const [date, plan] of Object.entries(profile.sessionPlansByDate || {})) {
+    const logged = bestLoggedSessionForPlan(profile, date, plan);
+    if (logged) {
+      const visibleExercises = planVisibleExerciseCount(plan, profile, date);
+      const loggedExercises = (logged.entries || []).length;
+      const sets = planSetCount(plan);
+      const loggedSets = stateSessionSetCount(logged);
+      if (visibleExercises < loggedExercises || sets < loggedSets) continue;
+    }
+    nextPlans[date] = plan;
+  }
+  return { ...profile, sessionPlansByDate: nextPlans };
+}
+
+function sanitizeStateForPush(rawState = {}) {
+  const next = migrateState(clone(rawState));
+  return {
+    ...next,
+    profiles: (next.profiles || []).map(sanitizeProfileForPush)
+  };
+}
+
+function mergeByKey(remoteItems = [], localItems = [], keyFn, choose = (_remote, local) => local) {
+  const map = new Map();
+  (remoteItems || []).forEach((item, index) => {
+    const key = keyFn(item, index);
+    if (key) map.set(key, item);
+  });
+  (localItems || []).forEach((item, index) => {
+    const key = keyFn(item, index);
+    if (!key) return;
+    map.set(key, map.has(key) ? choose(map.get(key), item) : item);
+  });
+  return Array.from(map.values());
+}
+
+function mergeFoodByDate(remote = {}, local = {}) {
+  const dates = new Set([...Object.keys(remote || {}), ...Object.keys(local || {})]);
+  const out = {};
+  dates.forEach(date => {
+    out[date] = mergeByKey(remote[date] || [], local[date] || [], (item, index) =>
+      String(item.id ?? `${item.product || item.name || "food"}:${item.kcal ?? ""}:${item.protein ?? ""}:${item.amount ?? ""}:${index}`)
+    );
+  });
+  return out;
+}
+
+function mergeLoggedSessions(remote = [], local = []) {
+  return [...(remote || []), ...(local || [])].reduce((list, session) => {
+    const index = list.findIndex(existing => sameLoggedSessionSlot(existing, session));
+    if (index < 0) return [session, ...list];
+    const next = [...list];
+    next[index] = betterLoggedSession(next[index], session);
+    return next;
+  }, []);
+}
+
+function mergeProfiles(remoteProfile = {}, localProfile = {}) {
+  const merged = { ...remoteProfile, ...localProfile };
+  merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {});
+  merged.dailyOverrides = { ...(remoteProfile.dailyOverrides || {}), ...(localProfile.dailyOverrides || {}) };
+  merged.sessionPlansByDate = { ...(remoteProfile.sessionPlansByDate || {}), ...(localProfile.sessionPlansByDate || {}) };
+  merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
+  merged.weightEntries = mergeByKey(remoteProfile.weightEntries || [], localProfile.weightEntries || [], item =>
+    String(item.id ?? `${item.date}:${item.weight}:${item.note || ""}`)
+  );
+  merged.customFoodItems = mergeByKey(remoteProfile.customFoodItems || [], localProfile.customFoodItems || [], item =>
+    String(item.id || foodCatalogKey(item.product || item.name))
+  );
+  merged.customExercises = mergeByKey(remoteProfile.customExercises || [], localProfile.customExercises || [], item =>
+    String(item.id || item.name)
+  );
+  merged.hiddenExercises = [...new Set([...(remoteProfile.hiddenExercises || []), ...(localProfile.hiddenExercises || [])])];
+  merged.hiddenFoodItems = [...new Set([...(remoteProfile.hiddenFoodItems || []), ...(localProfile.hiddenFoodItems || [])])];
+  return sanitizeProfileForPush(merged);
+}
+
+function mergeRemoteAndLocalState(remoteState = {}, localState = {}) {
+  const remote = migrateState(clone(remoteState));
+  const local = sanitizeStateForPush(localState);
+  const remoteProfiles = new Map((remote.profiles || []).map(profile => [profile.id, profile]));
+  const localProfiles = new Map((local.profiles || []).map(profile => [profile.id, profile]));
+  const profileIds = [...new Set([...remoteProfiles.keys(), ...localProfiles.keys()])];
+  return migrateState({
+    ...remote,
+    ...local,
+    profiles: profileIds.map(id => {
+      const r = remoteProfiles.get(id);
+      const l = localProfiles.get(id);
+      return r && l ? mergeProfiles(r, l) : sanitizeProfileForPush(l || r);
+    })
+  });
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
@@ -592,6 +772,21 @@ function AppStateProvider({ children }) {
     setSyncStatus({ state: "ok", message });
   };
 
+  const setRemoteMergedDirtyState = (nextState, sha, message = "Pulled GitHub state and kept local edits") => {
+    remoteApplyRef.current = true;
+    stateRef.current = nextState;
+    setState(nextState);
+    updateSyncMeta(prev => ({
+      ...prev,
+      lastRemoteSha: sha,
+      lastSyncAt: new Date().toISOString(),
+      dirty: true,
+      conflict: false
+    }));
+    setSyncConflict(null);
+    setSyncStatus({ state: "ok", message });
+  };
+
   const pullRemoteState = async (options = {}) => {
     const config = options.config || syncConfig;
     if (!config.token) {
@@ -605,7 +800,13 @@ function AppStateProvider({ children }) {
         setSyncStatus({ state: "ok", message: "No remote state file yet. Push once to create it." });
         return null;
       }
-      setRemoteCleanState(remote.state, remote.sha, "Pull complete. GitHub wins.");
+      const remoteState = sanitizeStateForPush(remote.state);
+      if (syncMetaRef.current?.dirty && !options.preferRemote) {
+        const mergedState = mergeRemoteAndLocalState(remoteState, stateRef.current);
+        setRemoteMergedDirtyState(mergedState, remote.sha, "Pull complete. Local changes kept; push to update GitHub.");
+      } else {
+        setRemoteCleanState(remoteState, remote.sha, "Pull complete. GitHub applied.");
+      }
       return remote;
     } catch (e) {
       setSyncStatus({ state: "error", message: e.message || "GitHub pull failed." });
@@ -630,22 +831,31 @@ function AppStateProvider({ children }) {
       if (!options.silent) setSyncStatus({ state: "syncing", message: "Checking GitHub state..." });
       const remote = await fetchGithubState(config);
       let remoteSha = remote?.sha || null;
-      if (!options.silent) setSyncStatus({ state: "syncing", message: "Pushing GitHub state..." });
+      let pushState = remote?.state
+        ? mergeRemoteAndLocalState(remote.state, stateRef.current)
+        : sanitizeStateForPush(stateRef.current);
+      if (!options.silent) setSyncStatus({ state: "syncing", message: remote?.state ? "Merging local changes with GitHub..." : "Pushing GitHub state..." });
       let nextSha;
       for (let attempt = 0; attempt < 3; attempt += 1) {
         try {
-          nextSha = await putGithubState(config, stateRef.current, remoteSha);
+          nextSha = await putGithubState(config, pushState, remoteSha);
           break;
         } catch (e) {
           const isShaConflict = isGithubShaWriteError(e.message);
           if (!isShaConflict || attempt === 2) throw e;
           const latestRemote = await fetchGithubState(config);
           remoteSha = latestRemote?.sha || null;
+          pushState = latestRemote?.state
+            ? mergeRemoteAndLocalState(latestRemote.state, pushState)
+            : sanitizeStateForPush(pushState);
         }
       }
       if (!nextSha) {
         throw new Error("GitHub push failed: no updated file SHA returned.");
       }
+      remoteApplyRef.current = true;
+      stateRef.current = pushState;
+      setState(pushState);
       updateSyncMeta(prev => ({
         ...prev,
         lastRemoteSha: nextSha,
@@ -654,7 +864,7 @@ function AppStateProvider({ children }) {
         conflict: false
       }));
       setSyncConflict(null);
-      setSyncStatus({ state: "ok", message: "Push complete. This browser wins." });
+      setSyncStatus({ state: "ok", message: "Push complete. Local changes merged with GitHub." });
       return nextSha;
     };
 
@@ -672,7 +882,7 @@ function AppStateProvider({ children }) {
 
   const resolveSyncConflict = async (choice) => {
     if (!syncConflict) return;
-    if (choice === "remote") await pullRemoteState();
+    if (choice === "remote") await pullRemoteState({ preferRemote: true });
     if (choice === "local") await pushRemoteState();
   };
   const updateProfile = (id, patch) => {

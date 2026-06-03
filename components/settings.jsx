@@ -288,7 +288,7 @@ function GitHubSyncPanel() {
       <div className="panel-body" style={{display:"flex", flexDirection:"column", gap: 12}}>
         <div className="kpi-label" style={{lineHeight: 1.6}}>
           Sync uses one private repo file and one token per device. Use a fine-grained GitHub token with Contents read/write for your private data repository.
-          Manual sync is last-click-wins: Pull replaces this browser with GitHub, Push replaces GitHub with this browser.
+          Push first merges this browser with GitHub and retries SHA conflicts. Pull applies GitHub; if this browser has unsynced edits, it keeps them and leaves the app marked unsynced until you push.
         </div>
         <div style={{display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap: 8}}>
           <label>
