@@ -3928,7 +3928,7 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-set-row,
   .log-sheet .sheet-set-row {
     display: grid;
-    grid-template-columns: 28px minmax(0, 1fr) 48px 36px 56px;
+    grid-template-columns: 28px minmax(138px, 1fr) 42px 34px 54px;
     min-height: 0;
     border-bottom: 1px solid var(--hairline);
   }
@@ -3939,6 +3939,7 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-exercise-cell,
   .log-sheet .sheet-exercise-cell {
     grid-column: 1 / -1;
+    grid-row: 1;
     display: none;
     min-height: 0;
     border-bottom: 1px solid var(--hairline);
@@ -4009,6 +4010,7 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-target-cell,
   .log-sheet .sheet-target-cell {
     grid-column: 1 / 4;
+    grid-row: 2;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
@@ -4032,6 +4034,7 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-last-cell,
   .log-sheet .sheet-last-cell {
     grid-column: 4 / -1;
+    grid-row: 2;
     min-height: 26px;
     padding: 5px 8px;
     border-left: 1px solid var(--hairline);
@@ -4056,21 +4059,35 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-set-index,
   .log-sheet .sheet-set-index {
     grid-column: 1;
-    grid-row: auto;
-    min-height: 38px;
+    grid-row: 1;
+    min-height: 40px;
     padding: 0;
+  }
+  .classic-log-sheet .sheet-set-row.is-first .sheet-set-index,
+  .log-sheet .sheet-set-row.is-first .sheet-set-index {
+    grid-row: 3;
   }
   .classic-log-sheet .sheet-note-panel,
   .log-sheet .sheet-note-panel {
     grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .classic-log-sheet .sheet-set-row.is-first .sheet-note-panel,
+  .log-sheet .sheet-set-row.is-first .sheet-note-panel {
+    grid-row: 4;
   }
   .classic-log-sheet .sheet-actual-group,
   .log-sheet .sheet-actual-group {
     grid-column: 2;
-    min-height: 38px;
-    grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr);
+    grid-row: 1;
+    min-height: 40px;
+    grid-template-columns: minmax(42px, 1fr) 42px minmax(48px, 1fr);
     border-left: 1px solid var(--hairline);
     border-right: 1px solid var(--hairline);
+  }
+  .classic-log-sheet .sheet-set-row.is-first .sheet-actual-group,
+  .log-sheet .sheet-set-row.is-first .sheet-actual-group {
+    grid-row: 3;
   }
   .classic-log-sheet .sheet-actual-group input,
   .classic-log-sheet .sheet-actual-group select,
@@ -4078,14 +4095,19 @@ table { border-collapse: collapse; }
   .log-sheet .sheet-actual-group input,
   .log-sheet .sheet-actual-group select,
   .log-sheet .sheet-rpe-cell input {
-    min-height: 38px;
+    min-height: 40px;
     padding: 0 6px;
     font-size: 13px;
   }
   .classic-log-sheet .sheet-rpe-cell,
   .log-sheet .sheet-rpe-cell {
     grid-column: 3;
-    min-height: 38px;
+    grid-row: 1;
+    min-height: 40px;
+  }
+  .classic-log-sheet .sheet-set-row.is-first .sheet-rpe-cell,
+  .log-sheet .sheet-set-row.is-first .sheet-rpe-cell {
+    grid-row: 3;
   }
   .classic-log-sheet .sheet-rpe-cell input,
   .log-sheet .sheet-rpe-cell input {
@@ -4094,17 +4116,27 @@ table { border-collapse: collapse; }
   .classic-log-sheet .sheet-done-toggle,
   .log-sheet .sheet-done-toggle {
     grid-column: 4;
-    min-height: 38px;
+    grid-row: 1;
+    min-height: 40px;
     border-left: 1px solid var(--hairline);
+  }
+  .classic-log-sheet .sheet-set-row.is-first .sheet-done-toggle,
+  .log-sheet .sheet-set-row.is-first .sheet-done-toggle {
+    grid-row: 3;
   }
   .classic-log-sheet .sheet-row-actions,
   .log-sheet .sheet-row-actions {
     grid-column: 5;
-    min-height: 38px;
+    grid-row: 1;
+    min-height: 40px;
     justify-content: center;
     padding: 0 3px;
     border-left: 1px solid var(--hairline);
     background: var(--surface);
+  }
+  .classic-log-sheet .sheet-set-row.is-first .sheet-row-actions,
+  .log-sheet .sheet-set-row.is-first .sheet-row-actions {
+    grid-row: 3;
   }
   .classic-log-sheet .sheet-row-actions .btn,
   .log-sheet .sheet-row-actions .btn {
