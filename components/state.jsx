@@ -456,6 +456,29 @@ function materializeEffectiveState(rawState, activeProfileId) {
   return next;
 }
 
+function normalizeSessionDay(value) {
+  if (window.RepsData?.normalizeDayKey) return window.RepsData.normalizeDayKey(value);
+  const key = String(value || "").trim().toLowerCase().slice(0, 3);
+  return { mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu", fri: "Fri", sat: "Sat", sun: "Sun" }[key] || null;
+}
+
+function sessionSlotPlannedDate(session = {}) {
+  if (window.RepsData?.plannedDateForSession) return window.RepsData.plannedDateForSession(session);
+  return session.plannedDate || session.date || null;
+}
+
+function sameLoggedSessionSlot(a = {}, b = {}) {
+  if (!a || !b) return false;
+  if (a.id && b.id && a.id === b.id) return true;
+  const aPlanned = sessionSlotPlannedDate(a);
+  const bPlanned = sessionSlotPlannedDate(b);
+  const aDay = normalizeSessionDay(a.routineDay || a.nominalDay || a.day);
+  const bDay = normalizeSessionDay(b.routineDay || b.nominalDay || b.day);
+  if (aPlanned && bPlanned && aPlanned === bPlanned && (!aDay || !bDay || aDay === bDay)) return true;
+  if (a.date && b.date && a.date === b.date && (!aDay || !bDay || aDay === bDay)) return true;
+  return false;
+}
+
 function load() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
@@ -467,7 +490,7 @@ function load() {
 }
 
 function AppStateProvider({ children }) {
-  const [state, setState] = useState(load);
+  const [state, setStateRaw] = useState(load);
   const [syncConfig, setSyncConfigState] = useState(loadSyncConfig);
   const [syncMeta, setSyncMetaState] = useState(loadSyncMeta);
   const [syncStatus, setSyncStatus] = useState({ state: "idle", message: "Sync idle" });
@@ -478,6 +501,15 @@ function AppStateProvider({ children }) {
   const stateRef = useRef(state);
   const syncMetaRef = useRef(syncMeta);
   const pushInFlightRef = useRef(null);
+
+  const setState = (updater) => {
+    const base = stateRef.current || state;
+    const nextRaw = typeof updater === "function" ? updater(base) : updater;
+    const next = migrateState(nextRaw);
+    stateRef.current = next;
+    setStateRaw(next);
+    return next;
+  };
 
   const updateSyncMeta = (updater) => {
     setSyncMetaState(prev => {
@@ -829,13 +861,14 @@ function AppStateProvider({ children }) {
 
   // Per-date Log adjustments (persisted overrides on the planned routine)
   const updateSessionPlan = (date, patch) => {
+    const stampedPatch = { ...(patch || {}), updatedAt: patch?.updatedAt || new Date().toISOString() };
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
         ...p,
         sessionPlansByDate: {
           ...(p.sessionPlansByDate || {}),
-          [date]: { ...((p.sessionPlansByDate || {})[date] || {}), ...patch }
+          [date]: { ...((p.sessionPlansByDate || {})[date] || {}), ...stampedPatch }
         }
       } : p)
     }));
@@ -937,6 +970,42 @@ function AppStateProvider({ children }) {
         ...p,
         loggedSessions: (p.loggedSessions || []).filter(x => x.id !== id)
       } : p)
+    }));
+  };
+
+  const upsertLoggedSession = (session, options = {}) => {
+    const stampedSession = {
+      ...session,
+      updatedAt: session.updatedAt || new Date().toISOString()
+    };
+    const clearDates = new Set([
+      stampedSession.date,
+      stampedSession.plannedDate,
+      ...(options.clearPlanDates || [])
+    ].filter(Boolean));
+    setState(s => ({
+      ...s,
+      profiles: s.profiles.map(p => {
+        if (p.id !== s.activeProfileId) return p;
+        const removedIds = new Set();
+        const keptSessions = (p.loggedSessions || []).filter(existing => {
+          const remove = sameLoggedSessionSlot(existing, stampedSession);
+          if (remove && existing.id) removedIds.add(existing.id);
+          return !remove;
+        });
+        const nextEdits = Object.fromEntries(
+          Object.entries(p.sessionEdits || {}).filter(([id]) => !removedIds.has(id) && id !== stampedSession.id)
+        );
+        const nextPlans = Object.fromEntries(
+          Object.entries(p.sessionPlansByDate || {}).filter(([date]) => !clearDates.has(date))
+        );
+        return {
+          ...p,
+          loggedSessions: [stampedSession, ...keptSessions],
+          sessionEdits: nextEdits,
+          sessionPlansByDate: nextPlans
+        };
+      })
     }));
   };
 
@@ -1069,7 +1138,7 @@ function AppStateProvider({ children }) {
     addCustomFoodItem, removeCustomFoodItem,
     addCustomExercise, hideExercise, unhideExercise,
     deleteSession, restoreSession, editSession, clearSessionEdit,
-    addLoggedSession, removeLoggedSession,
+    addLoggedSession, removeLoggedSession, upsertLoggedSession,
     updateSessionPlan, clearSessionPlan,
     updateDailyOverride, clearDailyOverride,
     setExerciseAnnotation, clearExerciseAnnotation,

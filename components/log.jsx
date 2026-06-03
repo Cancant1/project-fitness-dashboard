@@ -360,6 +360,71 @@ function normalizeDraftSetsForExercise(sets = [], exercise = {}, lastEntry = nul
   });
 }
 
+function draftSetHasValue(set = {}) {
+  return !!set._edited ||
+    set._done === true ||
+    set._done === false ||
+    String(set.weight ?? "").trim() !== "" ||
+    String(set.reps ?? "").trim() !== "" ||
+    String(set.duration ?? "").trim() !== "" ||
+    String(set.rpe ?? "").trim() !== "" ||
+    String(set.note ?? "").trim() !== "";
+}
+
+function savedPlanSetCount(plan = {}) {
+  return Object.values(plan.setsByExercise || {}).reduce((sum, sets) =>
+    sum + (Array.isArray(sets) ? sets.filter(draftSetHasValue).length : 0), 0);
+}
+
+function savedPlanExerciseCount(plan = {}) {
+  const keys = new Set(Object.keys(plan.setsByExercise || {}));
+  (plan.extraExercises || []).forEach((ex, i) => keys.add(ex._key || `e-${i}`));
+  return keys.size;
+}
+
+function loggedSessionSetCount(session = {}) {
+  return (session.entries || []).reduce((sum, entry) =>
+    sum + (entry.sets || []).filter(set =>
+      set.weight != null ||
+      set.repsNumber != null ||
+      set.reps != null ||
+      set.durationMinutes ||
+      set.duration ||
+      set.rpe ||
+      set.note
+    ).length, 0);
+}
+
+function dateMs(value) {
+  const ms = Date.parse(value || "");
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function savedPlanHasContent(plan = {}) {
+  return savedPlanSetCount(plan) > 0 ||
+    (plan.extraExercises || []).length > 0 ||
+    (plan.removedKeys || []).length > 0 ||
+    (plan.exerciseOrder || []).length > 0 ||
+    (plan.skipProgressionKeys || []).length > 0 ||
+    String(plan.rpe || "").trim() !== "" ||
+    String(plan.notes || "").trim() !== "";
+}
+
+function shouldHydrateSavedPlan(savedPlan, existingLogged) {
+  if (!savedPlan || !savedPlanHasContent(savedPlan)) return false;
+  if (!existingLogged) return true;
+
+  const planTime = dateMs(savedPlan.updatedAt || savedPlan.savedAt);
+  const sessionTime = dateMs(existingLogged.updatedAt || existingLogged.savedAt || existingLogged.createdAt);
+  if (planTime && sessionTime) return planTime >= sessionTime;
+
+  const draftSets = savedPlanSetCount(savedPlan);
+  const loggedSets = loggedSessionSetCount(existingLogged);
+  const draftExercises = savedPlanExerciseCount(savedPlan);
+  const loggedExercises = (existingLogged.entries || []).length;
+  return draftSets >= loggedSets || draftExercises >= loggedExercises;
+}
+
 function htmlEscape(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -967,6 +1032,26 @@ function LogView() {
     setSkipProgressionKeys(skipped);
   };
 
+  const hydrateSavedPlan = (savedPlan) => {
+    const savedRoutineDay = window.RepsData.normalizeDayKey?.(savedPlan.routineDay) || selectedDay;
+    const plannedForSavedDay = (window.PLANNED_ROUTINE || []).find(s => s.day === savedRoutineDay) || planned;
+    const savedExercises = [
+      ...(plannedForSavedDay.exercises || []).map((e, i) => ({ ...e, name: window.RepsData.renamedExercise(e.name), _key: `p-${savedRoutineDay}-${i}` })),
+      ...(savedPlan.extraExercises || []).map((e, i) => ({ ...e, _key: e._key || `e-${i}` }))
+    ];
+    setExtraExercises(savedPlan.extraExercises || []);
+    setRemovedKeys(new Set(savedPlan.removedKeys || []));
+    setExerciseOrder(savedPlan.exerciseOrder || []);
+    setSetsByExercise(normalizeSavedSetsByExercise(savedPlan.setsByExercise || {}, savedExercises, currentWeekStart, savedRoutineDay));
+    setRpe(savedPlan.rpe || "");
+    setNotes(savedPlan.notes || "");
+    const legacySkipKeys = [
+      ...(plannedForSavedDay.exercises || []).map((_, i) => `p-${savedRoutineDay}-${i}`),
+      ...(savedPlan.extraExercises || []).map((e, i) => e._key || `e-${i}`)
+    ];
+    setSkipProgressionKeys(new Set(savedPlan.skipProgressionKeys || (savedPlan.ignoreForProgression ? legacySkipKeys : [])));
+  };
+
   // Hydrate from persisted per-date plan + any logged session at this date
   React.useEffect(() => {
     setHydratedPlanKey("");
@@ -979,24 +1064,10 @@ function LogView() {
       app.clearSessionPlan?.(sessionDate);
     }
 
-    if (existingLogged) {
+    if (shouldHydrateSavedPlan(savedPlan, existingLogged)) {
+      hydrateSavedPlan(savedPlan);
+    } else if (existingLogged) {
       hydrateLoggedSession(existingLogged);
-    } else if (savedPlan) {
-      const savedExercises = [
-        ...(planned.exercises || []).map((e, i) => ({ ...e, name: window.RepsData.renamedExercise(e.name), _key: `p-${selectedDay}-${i}` })),
-        ...(savedPlan.extraExercises || []).map((e, i) => ({ ...e, _key: e._key || `e-${i}` }))
-      ];
-      setExtraExercises(savedPlan.extraExercises || []);
-      setRemovedKeys(new Set(savedPlan.removedKeys || []));
-      setExerciseOrder(savedPlan.exerciseOrder || []);
-      setSetsByExercise(normalizeSavedSetsByExercise(savedPlan.setsByExercise || {}, savedExercises, currentWeekStart, selectedDay));
-      setRpe(savedPlan.rpe || "");
-      setNotes(savedPlan.notes || "");
-      const legacySkipKeys = [
-        ...(planned.exercises || []).map((_, i) => `p-${selectedDay}-${i}`),
-        ...(savedPlan.extraExercises || []).map((e, i) => e._key || `e-${i}`)
-      ];
-      setSkipProgressionKeys(new Set(savedPlan.skipProgressionKeys || (savedPlan.ignoreForProgression ? legacySkipKeys : [])));
     } else {
       setExtraExercises([]);
       setRemovedKeys(new Set());
@@ -1438,10 +1509,6 @@ function LogView() {
     // Replace any previously-saved logged session for this routine slot (idempotent finish/move)
     const existing = window.RepsData.sessionForRoutineSlot?.(plannedDate, selectedDay) ||
       loggedSessionForDate(sessionDate, selectedDay);
-    if (existing) {
-      app.removeLoggedSession?.(existing.id);
-      app.clearSessionEdit?.(existing.id);
-    }
     const session = {
       id: existing?.id || `local:${app.activeProfile.id}:${plannedDate}:${planned.day}:${Date.now()}`,
       block: "Local",
@@ -1459,14 +1526,23 @@ function LogView() {
       performedSetCount: totalSets,
       plannedExerciseCount: entries.length,
       status: "performed",
-      source: "local"
+      source: "local",
+      updatedAt: new Date().toISOString()
     };
 
-    app.addLoggedSession?.(session);
+    if (app.upsertLoggedSession) {
+      app.upsertLoggedSession(session, { clearPlanDates: [sessionDate, plannedDate] });
+    } else {
+      if (existing) {
+        app.removeLoggedSession?.(existing.id);
+        app.clearSessionEdit?.(existing.id);
+      }
+      app.addLoggedSession?.(session);
+    }
 
     setFinishStatus("saved");
     setTimeout(() => setFinishStatus(""), 2400);
-    // FIX: do NOT reset extras/removals/sets — the user's adjustments to this day should stick.
+    // The logged session is now the canonical copy for this routine slot.
   };
 
   const handleAddExercise = () => {
