@@ -240,6 +240,7 @@ function GitHubSyncPanel() {
   const app = RepsState.useApp();
   const [form, setForm] = useS(app.syncConfig);
   const [tokenDraft, setTokenDraft] = useS(app.syncConfig.token || "");
+  const [tokenCopied, setTokenCopied] = useS(false);
   useE(() => {
     setForm(app.syncConfig);
     setTokenDraft(app.syncConfig.token || "");
@@ -260,6 +261,17 @@ function GitHubSyncPanel() {
       .some(key => (app.syncConfig[key] || "") !== (next[key] || ""));
     if (changed) app.updateSyncConfig(next);
     return next;
+  };
+  const copyToken = async () => {
+    if (!tokenDraft) return;
+    try {
+      await navigator.clipboard.writeText(tokenDraft);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 1800);
+    } catch (e) {
+      setTokenCopied(false);
+      alert("Copy failed. Select the visible token field and copy it manually.");
+    }
   };
   const statusClass =
     app.syncStatus.state === "error" ? "warn" :
@@ -302,9 +314,15 @@ function GitHubSyncPanel() {
         </div>
         <label>
           <div className="kpi-label">Fine-grained token for this device</div>
-          <input type="password" value={tokenDraft} onChange={e => setTokenDraft(e.target.value)}
-            placeholder="github_pat_..."
-            style={{width:"100%", height:32, padding:"0 8px", border:"var(--hair)", borderRadius:"var(--r-sm)", background:"var(--bg)", fontFamily:"var(--font-mono)"}} />
+          <div style={{display:"flex", gap: 6}}>
+            <input type="text" value={tokenDraft} onChange={e => setTokenDraft(e.target.value)}
+              placeholder="github_pat_..."
+              spellCheck="false"
+              style={{flex:1, minWidth:0, height:32, padding:"0 8px", border:"var(--hair)", borderRadius:"var(--r-sm)", background:"var(--bg)", fontFamily:"var(--font-mono)"}} />
+            <button className="btn sm" type="button" onClick={copyToken} disabled={!tokenDraft}>
+              <SI.Download /> {tokenCopied ? "Copied" : "Copy token"}
+            </button>
+          </div>
         </label>
         <div style={{display:"flex", gap: 6, flexWrap:"wrap", alignItems:"center"}}>
           <button className="btn primary sm" onClick={() => saveConfig(true)}><SI.Check /> Save & enable</button>

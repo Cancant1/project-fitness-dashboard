@@ -13458,6 +13458,10 @@ function GitHubSyncPanel() {
     _useS0 = _slicedToArray(_useS9, 2),
     tokenDraft = _useS0[0],
     setTokenDraft = _useS0[1];
+  var _useS1 = useS(false),
+    _useS10 = _slicedToArray(_useS1, 2),
+    tokenCopied = _useS10[0],
+    setTokenCopied = _useS10[1];
   useE(function () {
     setForm(app.syncConfig);
     setTokenDraft(app.syncConfig.token || "");
@@ -13483,6 +13487,42 @@ function GitHubSyncPanel() {
     if (changed) app.updateSyncConfig(next);
     return next;
   };
+  var copyToken = function () {
+    var _ref4 = _asyncToGenerator(_regenerator().m(function _callee3() {
+      var _t3;
+      return _regenerator().w(function (_context3) {
+        while (1) switch (_context3.p = _context3.n) {
+          case 0:
+            if (tokenDraft) {
+              _context3.n = 1;
+              break;
+            }
+            return _context3.a(2);
+          case 1:
+            _context3.p = 1;
+            _context3.n = 2;
+            return navigator.clipboard.writeText(tokenDraft);
+          case 2:
+            setTokenCopied(true);
+            setTimeout(function () {
+              return setTokenCopied(false);
+            }, 1800);
+            _context3.n = 4;
+            break;
+          case 3:
+            _context3.p = 3;
+            _t3 = _context3.v;
+            setTokenCopied(false);
+            alert("Copy failed. Select the visible token field and copy it manually.");
+          case 4:
+            return _context3.a(2);
+        }
+      }, _callee3, null, [[1, 3]]);
+    }));
+    return function copyToken() {
+      return _ref4.apply(this, arguments);
+    };
+  }();
   var statusClass = app.syncStatus.state === "error" ? "warn" : app.syncStatus.state === "ok" ? "good" : "";
   return React.createElement("div", {
     className: "panel"
@@ -13578,15 +13618,22 @@ function GitHubSyncPanel() {
     }
   }))), React.createElement("label", null, React.createElement("div", {
     className: "kpi-label"
-  }, "Fine-grained token for this device"), React.createElement("input", {
-    type: "password",
+  }, "Fine-grained token for this device"), React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, React.createElement("input", {
+    type: "text",
     value: tokenDraft,
     onChange: function onChange(e) {
       return setTokenDraft(e.target.value);
     },
     placeholder: "github_pat_...",
+    spellCheck: "false",
     style: {
-      width: "100%",
+      flex: 1,
+      minWidth: 0,
       height: 32,
       padding: "0 8px",
       border: "var(--hair)",
@@ -13594,7 +13641,12 @@ function GitHubSyncPanel() {
       background: "var(--bg)",
       fontFamily: "var(--font-mono)"
     }
-  })), React.createElement("div", {
+  }), React.createElement("button", {
+    className: "btn sm",
+    type: "button",
+    onClick: copyToken,
+    disabled: !tokenDraft
+  }, React.createElement(SI.Download, null), " ", tokenCopied ? "Copied" : "Copy token"))), React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
