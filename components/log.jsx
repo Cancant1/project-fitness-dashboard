@@ -600,6 +600,10 @@ function loggedEntryKey(entry = {}, index = 0, date = "") {
   return entry.logKey || entry._key || `l-${date}-${index}`;
 }
 
+function loggedEntryDisplayKey(index = 0, date = "") {
+  return `l-${date}-${index}`;
+}
+
 function setsFromLoggedEntry(entry = {}) {
   return (entry.sets || []).map((s) => ({
     id: nextSetId(),
@@ -1028,13 +1032,14 @@ function LogView() {
     const dayForSession = window.RepsData.normalizeDayKey?.(session?.routineDay || session?.nominalDay) || selectedDay;
     const plannedForDate = (window.PLANNED_ROUTINE || []).find(s => s.day === dayForSession)
       || { exercises: [] };
-    const loggedExercises = (session.entries || []).map((entry, i) =>
-      exerciseFromLoggedEntry(entry, i, logDate)
-    );
+    const loggedExercises = (session.entries || []).map((entry, i) => ({
+      ...exerciseFromLoggedEntry(entry, i, logDate),
+      _key: loggedEntryDisplayKey(i, logDate)
+    }));
     const loggedSets = {};
     const skipped = new Set();
     (session.entries || []).forEach((entry, i) => {
-      const key = loggedEntryKey(entry, i, logDate);
+      const key = loggedEntryDisplayKey(i, logDate);
       loggedSets[key] = setsFromLoggedEntry(entry);
       if (session.ignoreForProgression || entry.ignoreForProgression) skipped.add(key);
     });

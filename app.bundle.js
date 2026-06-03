@@ -2198,7 +2198,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "03 Jun 2026 19:29";
+var BUILD_LABEL = "03 Jun 2026 19:38";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -4084,6 +4084,11 @@ function loggedEntryKey() {
   var date = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "";
   return entry.logKey || entry._key || "l-".concat(date, "-").concat(index);
 }
+function loggedEntryDisplayKey() {
+  var index = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 0;
+  var date = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "";
+  return "l-".concat(date, "-").concat(index);
+}
 function setsFromLoggedEntry() {
   var entry = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return (entry.sets || []).map(function (s) {
@@ -4702,12 +4707,14 @@ function LogView() {
       exercises: []
     };
     var loggedExercises = (session.entries || []).map(function (entry, i) {
-      return exerciseFromLoggedEntry(entry, i, logDate);
+      return _objectSpread(_objectSpread({}, exerciseFromLoggedEntry(entry, i, logDate)), {}, {
+        _key: loggedEntryDisplayKey(i, logDate)
+      });
     });
     var loggedSets = {};
     var skipped = new Set();
     (session.entries || []).forEach(function (entry, i) {
-      var key = loggedEntryKey(entry, i, logDate);
+      var key = loggedEntryDisplayKey(i, logDate);
       loggedSets[key] = setsFromLoggedEntry(entry);
       if (session.ignoreForProgression || entry.ignoreForProgression) skipped.add(key);
     });
