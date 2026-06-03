@@ -118,15 +118,61 @@
     };
   }
 
+  function loggedSetCount(sets = []) {
+    return (sets || []).filter(x =>
+      x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null
+    ).length;
+  }
+
+  function sessionSetCount(session = {}) {
+    const explicit = Number(session.performedSetCount);
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    return (session.entries || []).reduce((sum, entry) => sum + loggedSetCount(entry.sets || []), 0);
+  }
+
+  function sessionUpdatedMs(session = {}) {
+    const ms = Date.parse(session.updatedAt || session.savedAt || session.createdAt || "");
+    return Number.isFinite(ms) ? ms : 0;
+  }
+
+  function sessionDataScore(session = {}) {
+    const performed = session.status === "performed" ? 1 : 0;
+    return (sessionSetCount(session) * 1000) + (((session.entries || []).length) * 10) + performed;
+  }
+
+  function betterSession(current, candidate) {
+    if (!current) return candidate;
+    if (!candidate) return current;
+    const currentScore = sessionDataScore(current);
+    const candidateScore = sessionDataScore(candidate);
+    if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
+    const currentTime = sessionUpdatedMs(current);
+    const candidateTime = sessionUpdatedMs(candidate);
+    if (candidateTime !== currentTime) return candidateTime > currentTime ? candidate : current;
+    return current;
+  }
+
+  function localSessionKey(session = {}) {
+    const plannedDate = plannedDateForSession(session);
+    const routineDay = routineDayForSession(session);
+    if (plannedDate && routineDay) return `slot:${plannedDate}:${routineDay}`;
+    if (session.id) return `id:${session.id}`;
+    return `date:${session.date || ""}:${session.split || session.nominalDay || ""}`;
+  }
+
   function uniqueLocalSessions(local, deleted, includeDeleted) {
-    const byId = new Map();
+    const bySlot = new Map();
     for (const s of local || []) {
       if (!s?.date) continue;
       if (!includeDeleted && deleted.has(s.id)) continue;
-      const key = s.id || `${s.date}:${s.routineDay || s.nominalDay || s.split || ""}`;
-      byId.set(key, s);
+      const key = localSessionKey(s);
+      bySlot.set(key, betterSession(bySlot.get(key), s));
     }
-    return Array.from(byId.values());
+    return Array.from(bySlot.values());
+  }
+
+  function bestSession(sessions = []) {
+    return (sessions || []).reduce((best, session) => betterSession(best, session), null);
   }
 
   const allSessions = (options = {}) => {
@@ -147,18 +193,6 @@
       .map(applyExerciseRenames)
       .sort((a,b) => a.date.localeCompare(b.date));
   };
-
-  function loggedSetCount(sets = []) {
-    return (sets || []).filter(x =>
-      x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null
-    ).length;
-  }
-
-  function sessionSetCount(session = {}) {
-    const explicit = Number(session.performedSetCount);
-    if (Number.isFinite(explicit) && explicit > 0) return explicit;
-    return (session.entries || []).reduce((sum, entry) => sum + loggedSetCount(entry.sets || []), 0);
-  }
 
   function isPerformedSession(session = {}) {
     return session.date <= TODAY && session.status !== "skipped" && sessionSetCount(session) > 0;
@@ -880,9 +914,9 @@
     );
     if (!sessions.length) return null;
     const sameRoutine = routineDay
-      ? sessions.find(s => routineDayForSession(s) === routineDay)
+      ? bestSession(sessions.filter(s => routineDayForSession(s) === routineDay))
       : null;
-    return sameRoutine || sessions.find(s => s.status === "performed") || sessions[0] || null;
+    return sameRoutine || bestSession(sessions.filter(s => s.status === "performed")) || bestSession(sessions);
   }
 
   function sessionForRoutineSlot(plannedDate, routineDay) {
@@ -893,7 +927,7 @@
       s.status !== "skipped" &&
       sessionSetCount(s) > 0
     );
-    return matches.find(s => s.status === "performed") || matches[0] || null;
+    return bestSession(matches.filter(s => s.status === "performed")) || bestSession(matches);
   }
 
   function sessionStatusForDay(date) {
