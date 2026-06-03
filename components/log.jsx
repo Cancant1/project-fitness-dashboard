@@ -382,6 +382,17 @@ function savedPlanExerciseCount(plan = {}) {
   return keys.size;
 }
 
+function savedPlanVisibleExerciseCount(plan = {}, plannedExercises = [], routineDay = "") {
+  const removed = new Set(plan.removedKeys || []);
+  const plannedVisible = (plannedExercises || [])
+    .map((e, i) => ({ ...e, _key: `p-${routineDay}-${i}` }))
+    .filter(ex => !removed.has(ex._key));
+  const extraVisible = (plan.extraExercises || [])
+    .map((e, i) => ({ ...e, _key: e._key || `e-${i}` }))
+    .filter(ex => !removed.has(ex._key));
+  return plannedVisible.length + extraVisible.length;
+}
+
 function loggedSessionSetCount(session = {}) {
   return (session.entries || []).reduce((sum, entry) =>
     sum + (entry.sets || []).filter(set =>
@@ -410,13 +421,14 @@ function savedPlanHasContent(plan = {}) {
     String(plan.notes || "").trim() !== "";
 }
 
-function shouldHydrateSavedPlan(savedPlan, existingLogged) {
+function shouldHydrateSavedPlan(savedPlan, existingLogged, options = {}) {
   if (!savedPlan || !savedPlanHasContent(savedPlan)) return false;
   if (!existingLogged) return true;
 
   const draftSets = savedPlanSetCount(savedPlan);
   const loggedSets = loggedSessionSetCount(existingLogged);
-  const draftExercises = savedPlanExerciseCount(savedPlan);
+  const visibleCount = Number(options.visibleExerciseCount);
+  const draftExercises = Number.isFinite(visibleCount) ? visibleCount : savedPlanExerciseCount(savedPlan);
   const loggedExercises = (existingLogged.entries || []).length;
 
   if (draftSets < loggedSets || draftExercises < loggedExercises) return false;
@@ -1067,11 +1079,16 @@ function LogView() {
       : (sessionDate !== plannedDate && planMap[plannedDate] ? plannedDate : null);
     const savedPlanRaw = savedPlanDate ? planMap[savedPlanDate] : null;
     const savedPlan = movedAway ? null : savedPlanRaw;
+    const savedPlanRoutineDay = window.RepsData.normalizeDayKey?.(savedPlan?.routineDay) || selectedDay;
+    const plannedForSavedPlan = (window.PLANNED_ROUTINE || []).find(s => s.day === savedPlanRoutineDay) || planned;
+    const savedPlanVisibleCount = savedPlan
+      ? savedPlanVisibleExerciseCount(savedPlan, plannedForSavedPlan.exercises || [], savedPlanRoutineDay)
+      : 0;
     if (movedAway && savedPlanRaw) {
       app.clearSessionPlan?.(savedPlanDate);
     }
 
-    if (shouldHydrateSavedPlan(savedPlan, existingLogged)) {
+    if (shouldHydrateSavedPlan(savedPlan, existingLogged, { visibleExerciseCount: savedPlanVisibleCount })) {
       hydrateSavedPlan(savedPlan);
     } else if (existingLogged) {
       if (savedPlanDate && savedPlan) app.clearSessionPlan?.(savedPlanDate);

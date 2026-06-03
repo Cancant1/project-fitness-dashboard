@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { id: "plan",      label: "Plan",      icon: I.Plan,      kbd: "8" },
   { id: "export",    label: "AI Export", icon: I.Export,    kbd: "9" }
 ];
+const BUILD_LABEL = "03 Jun 2026 19:29";
 
 function SyncQuickActions({ onAfterAction }) {
   const app = window.RepsState?.useApp?.();
@@ -55,7 +56,7 @@ function Sidebar({ view, setView }) {
       <div className="brand">
         <span className="brand-mark">R</span>
         <span className="brand-name">Reps<span className="dot">.</span></span>
-        <span className="brand-meta">v0.3</span>
+        <span className="brand-meta">{BUILD_LABEL}</span>
       </div>
       <SyncQuickActions />
       <nav className="nav">
@@ -226,7 +227,7 @@ function MobileNav({ view, setView }) {
         </button>
         <div className="m-appbar-title">
           <span className="m-appbar-brand">Reps<span className="dot">.</span></span>
-          <span className="m-appbar-here">{labels[view]}</span>
+          <span className="m-appbar-here">{BUILD_LABEL}</span>
         </div>
         <button className="m-icon-btn m-appbar-log" aria-label="Log workout" onClick={() => go("log")}>
           <I.Plus />
@@ -243,7 +244,7 @@ function MobileNav({ view, setView }) {
           <div className="brand m-drawer-brand">
             <span className="brand-mark">R</span>
             <span className="brand-name">Reps<span className="dot">.</span></span>
-            <span className="brand-meta">v0.3</span>
+            <span className="brand-meta">{BUILD_LABEL}</span>
           </div>
           <button className="m-icon-btn" aria-label="Close menu" onClick={() => setOpen(false)}><I.X /></button>
         </div>

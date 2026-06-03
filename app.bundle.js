@@ -2198,6 +2198,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
+var BUILD_LABEL = "03 Jun 2026 19:29";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -2285,7 +2286,7 @@ function Sidebar(_ref3) {
     className: "dot"
   }, ".")), React.createElement("span", {
     className: "brand-meta"
-  }, "v0.3")), React.createElement(SyncQuickActions, null), React.createElement("nav", {
+  }, BUILD_LABEL)), React.createElement(SyncQuickActions, null), React.createElement("nav", {
     className: "nav"
   }, NAV_ITEMS.map(function (item) {
     var Ico = item.icon;
@@ -2527,7 +2528,7 @@ function MobileNav(_ref6) {
     className: "dot"
   }, ".")), React.createElement("span", {
     className: "m-appbar-here"
-  }, labels[view])), React.createElement("button", {
+  }, BUILD_LABEL)), React.createElement("button", {
     className: "m-icon-btn m-appbar-log",
     "aria-label": "Log workout",
     onClick: function onClick() {
@@ -2556,7 +2557,7 @@ function MobileNav(_ref6) {
     className: "dot"
   }, ".")), React.createElement("span", {
     className: "brand-meta"
-  }, "v0.3")), React.createElement("button", {
+  }, BUILD_LABEL)), React.createElement("button", {
     className: "m-icon-btn",
     "aria-label": "Close menu",
     onClick: function onClick() {
@@ -3837,6 +3838,27 @@ function savedPlanExerciseCount() {
   });
   return keys.size;
 }
+function savedPlanVisibleExerciseCount() {
+  var plan = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var plannedExercises = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  var routineDay = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : "";
+  var removed = new Set(plan.removedKeys || []);
+  var plannedVisible = (plannedExercises || []).map(function (e, i) {
+    return _objectSpread(_objectSpread({}, e), {}, {
+      _key: "p-".concat(routineDay, "-").concat(i)
+    });
+  }).filter(function (ex) {
+    return !removed.has(ex._key);
+  });
+  var extraVisible = (plan.extraExercises || []).map(function (e, i) {
+    return _objectSpread(_objectSpread({}, e), {}, {
+      _key: e._key || "e-".concat(i)
+    });
+  }).filter(function (ex) {
+    return !removed.has(ex._key);
+  });
+  return plannedVisible.length + extraVisible.length;
+}
 function loggedSessionSetCount() {
   var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return (session.entries || []).reduce(function (sum, entry) {
@@ -3854,11 +3876,13 @@ function savedPlanHasContent() {
   return savedPlanSetCount(plan) > 0 || (plan.extraExercises || []).length > 0 || (plan.removedKeys || []).length > 0 || (plan.exerciseOrder || []).length > 0 || (plan.skipProgressionKeys || []).length > 0 || String(plan.rpe || "").trim() !== "" || String(plan.notes || "").trim() !== "";
 }
 function shouldHydrateSavedPlan(savedPlan, existingLogged) {
+  var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
   if (!savedPlan || !savedPlanHasContent(savedPlan)) return false;
   if (!existingLogged) return true;
   var draftSets = savedPlanSetCount(savedPlan);
   var loggedSets = loggedSessionSetCount(existingLogged);
-  var draftExercises = savedPlanExerciseCount(savedPlan);
+  var visibleCount = Number(options.visibleExerciseCount);
+  var draftExercises = Number.isFinite(visibleCount) ? visibleCount : savedPlanExerciseCount(savedPlan);
   var loggedExercises = (existingLogged.entries || []).length;
   if (draftSets < loggedSets || draftExercises < loggedExercises) return false;
   if (draftSets > loggedSets || draftExercises > loggedExercises) return true;
@@ -4730,6 +4754,7 @@ function LogView() {
     setSkipProgressionKeys(new Set(savedPlan.skipProgressionKeys || (savedPlan.ignoreForProgression ? legacySkipKeys : [])));
   };
   React.useEffect(function () {
+    var _window$RepsData$norm7, _window$RepsData12;
     setHydratedPlanKey("");
     var existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     var movedAway = routineSessionMovedAwayFromDate(app.activeProfile, plannedDate, selectedDay);
@@ -4737,11 +4762,18 @@ function LogView() {
     var savedPlanDate = planMap[sessionDate] ? sessionDate : sessionDate !== plannedDate && planMap[plannedDate] ? plannedDate : null;
     var savedPlanRaw = savedPlanDate ? planMap[savedPlanDate] : null;
     var savedPlan = movedAway ? null : savedPlanRaw;
+    var savedPlanRoutineDay = ((_window$RepsData$norm7 = (_window$RepsData12 = window.RepsData).normalizeDayKey) === null || _window$RepsData$norm7 === void 0 ? void 0 : _window$RepsData$norm7.call(_window$RepsData12, savedPlan === null || savedPlan === void 0 ? void 0 : savedPlan.routineDay)) || selectedDay;
+    var plannedForSavedPlan = (window.PLANNED_ROUTINE || []).find(function (s) {
+      return s.day === savedPlanRoutineDay;
+    }) || planned;
+    var savedPlanVisibleCount = savedPlan ? savedPlanVisibleExerciseCount(savedPlan, plannedForSavedPlan.exercises || [], savedPlanRoutineDay) : 0;
     if (movedAway && savedPlanRaw) {
       var _app$clearSessionPlan;
       (_app$clearSessionPlan = app.clearSessionPlan) === null || _app$clearSessionPlan === void 0 || _app$clearSessionPlan.call(app, savedPlanDate);
     }
-    if (shouldHydrateSavedPlan(savedPlan, existingLogged)) {
+    if (shouldHydrateSavedPlan(savedPlan, existingLogged, {
+      visibleExerciseCount: savedPlanVisibleCount
+    })) {
       hydrateSavedPlan(savedPlan);
     } else if (existingLogged) {
       var _app$clearSessionPlan2;
@@ -4812,8 +4844,8 @@ function LogView() {
         for (_iterator2.s(); !(_step2 = _iterator2.n()).done;) {
           var ex = _step2.value;
           if (!next[ex._key]) {
-            var _window$RepsData$exer4, _window$RepsData12;
-            var lastWeek = (_window$RepsData$exer4 = (_window$RepsData12 = window.RepsData).exerciseLastWeek) === null || _window$RepsData$exer4 === void 0 ? void 0 : _window$RepsData$exer4.call(_window$RepsData12, ex.name, currentWeekStart, {
+            var _window$RepsData$exer4, _window$RepsData13;
+            var lastWeek = (_window$RepsData$exer4 = (_window$RepsData13 = window.RepsData).exerciseLastWeek) === null || _window$RepsData$exer4 === void 0 ? void 0 : _window$RepsData$exer4.call(_window$RepsData13, ex.name, currentWeekStart, {
               exercise: ex,
               routineDay: selectedDay
             });
@@ -4868,10 +4900,10 @@ function LogView() {
     if (idx >= 0) setSessionDate(window.RepsData.addDays(currentWeekStart, idx));
   };
   var handleDateChange = function handleDateChange(date) {
-    var _window$RepsData$norm7, _window$RepsData13;
+    var _window$RepsData$norm8, _window$RepsData14;
     var status = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
     setSessionDate(date);
-    var routineDay = (_window$RepsData$norm7 = (_window$RepsData13 = window.RepsData).normalizeDayKey) === null || _window$RepsData$norm7 === void 0 ? void 0 : _window$RepsData$norm7.call(_window$RepsData13, status === null || status === void 0 ? void 0 : status.routineDay);
+    var routineDay = (_window$RepsData$norm8 = (_window$RepsData14 = window.RepsData).normalizeDayKey) === null || _window$RepsData$norm8 === void 0 ? void 0 : _window$RepsData$norm8.call(_window$RepsData14, status === null || status === void 0 ? void 0 : status.routineDay);
     if (routineDay) setSelectedDay(routineDay);
   };
   var handleWeekShift = function handleWeekShift(offset) {
@@ -4911,8 +4943,8 @@ function LogView() {
     }
     var existingLogged = loggedSessionForDate(date);
     if (existingLogged) {
-      var _window$RepsData$norm8, _window$RepsData14, _existingLogged$daily, _existingLogged$daily2;
-      var routineDay = ((_window$RepsData$norm8 = (_window$RepsData14 = window.RepsData).normalizeDayKey) === null || _window$RepsData$norm8 === void 0 ? void 0 : _window$RepsData$norm8.call(_window$RepsData14, existingLogged.routineDay || existingLogged.nominalDay)) || dayName;
+      var _window$RepsData$norm9, _window$RepsData15, _existingLogged$daily, _existingLogged$daily2;
+      var routineDay = ((_window$RepsData$norm9 = (_window$RepsData15 = window.RepsData).normalizeDayKey) === null || _window$RepsData$norm9 === void 0 ? void 0 : _window$RepsData$norm9.call(_window$RepsData15, existingLogged.routineDay || existingLogged.nominalDay)) || dayName;
       var routinePlanned = (window.PLANNED_ROUTINE || []).find(function (s) {
         return s.day === routineDay;
       }) || plannedForDate;
@@ -4968,9 +5000,9 @@ function LogView() {
     });
     var setsByKey = {};
     exercises.forEach(function (ex) {
-      var _savedPlan$setsByExer, _window$RepsData$exer5, _window$RepsData15;
+      var _savedPlan$setsByExer, _window$RepsData$exer5, _window$RepsData16;
       var savedSets = savedPlan === null || savedPlan === void 0 || (_savedPlan$setsByExer = savedPlan.setsByExercise) === null || _savedPlan$setsByExer === void 0 ? void 0 : _savedPlan$setsByExer[ex._key];
-      var last = (_window$RepsData$exer5 = (_window$RepsData15 = window.RepsData).exerciseLastWeek) === null || _window$RepsData$exer5 === void 0 ? void 0 : _window$RepsData$exer5.call(_window$RepsData15, ex.name, currentWeekStart, {
+      var last = (_window$RepsData$exer5 = (_window$RepsData16 = window.RepsData).exerciseLastWeek) === null || _window$RepsData$exer5 === void 0 ? void 0 : _window$RepsData$exer5.call(_window$RepsData16, ex.name, currentWeekStart, {
         exercise: ex,
         routineDay: dayName
       });
@@ -5083,13 +5115,13 @@ function LogView() {
         return;
       }
       model.exercises.forEach(function (ex) {
-        var _window$RepsData$exer6, _window$RepsData16, _window$RepsData$prog3, _window$RepsData17, _model$setsByKey$ex$_, _ex$sets, _ex$reps, _model$skipKeys;
+        var _window$RepsData$exer6, _window$RepsData17, _window$RepsData$prog3, _window$RepsData18, _model$setsByKey$ex$_, _ex$sets, _ex$reps, _model$skipKeys;
         var durationMode = isDurationExercise(ex);
-        var lastEntry = (_window$RepsData$exer6 = (_window$RepsData16 = window.RepsData).exerciseLastWeek) === null || _window$RepsData$exer6 === void 0 ? void 0 : _window$RepsData$exer6.call(_window$RepsData16, ex.name, currentWeekStart, {
+        var lastEntry = (_window$RepsData$exer6 = (_window$RepsData17 = window.RepsData).exerciseLastWeek) === null || _window$RepsData$exer6 === void 0 ? void 0 : _window$RepsData$exer6.call(_window$RepsData17, ex.name, currentWeekStart, {
           exercise: ex,
           routineDay: model.routineDay || model.day
         });
-        var suggestion = (_window$RepsData$prog3 = (_window$RepsData17 = window.RepsData).progressionSuggestion) === null || _window$RepsData$prog3 === void 0 ? void 0 : _window$RepsData$prog3.call(_window$RepsData17, ex, lastEntry, {
+        var suggestion = (_window$RepsData$prog3 = (_window$RepsData18 = window.RepsData).progressionSuggestion) === null || _window$RepsData$prog3 === void 0 ? void 0 : _window$RepsData$prog3.call(_window$RepsData18, ex, lastEntry, {
           rules: progressionRules
         });
         var progressionNote = progressionNoteLine(ex, lastEntry, suggestion);
@@ -5242,7 +5274,7 @@ function LogView() {
     };
   }();
   var handleFinish = function handleFinish() {
-    var _window$RepsData$sess2, _window$RepsData18;
+    var _window$RepsData$sess2, _window$RepsData19;
     var entries = allExercises.map(function (ex) {
       var durationMode = isDurationExercise(ex);
       var sets = (setsByExercise[ex._key] || []).filter(function (s) {
@@ -5286,7 +5318,7 @@ function LogView() {
     var totalSets = entries.reduce(function (s, e) {
       return s + e.sets.length;
     }, 0);
-    var existing = ((_window$RepsData$sess2 = (_window$RepsData18 = window.RepsData).sessionForRoutineSlot) === null || _window$RepsData$sess2 === void 0 ? void 0 : _window$RepsData$sess2.call(_window$RepsData18, plannedDate, selectedDay)) || loggedSessionForDate(sessionDate, selectedDay);
+    var existing = ((_window$RepsData$sess2 = (_window$RepsData19 = window.RepsData).sessionForRoutineSlot) === null || _window$RepsData$sess2 === void 0 ? void 0 : _window$RepsData$sess2.call(_window$RepsData19, plannedDate, selectedDay)) || loggedSessionForDate(sessionDate, selectedDay);
     var session = {
       id: (existing === null || existing === void 0 ? void 0 : existing.id) || "local:".concat(app.activeProfile.id, ":").concat(plannedDate, ":").concat(planned.day, ":").concat(Date.now()),
       block: "Local",
