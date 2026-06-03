@@ -3729,7 +3729,7 @@ function normalizeDraftSetsForExercise() {
   return normalizeSetIds(sets).map(function (set, i) {
     if (!set._prefilled || set._done === true) return set;
     var hasManualDetail = !!String(set.rpe || "").trim() || !!String(set.note || "").trim();
-    var isOldPrefill = !set._edited || setMatchesLastSet(set, lastSets[i] || null, durationMode);
+    var isOldPrefill = !set._edited && setMatchesLastSet(set, lastSets[i] || null, durationMode);
     return !hasManualDetail && isOldPrefill ? _objectSpread(_objectSpread({}, set), {}, {
       weight: "",
       reps: "",

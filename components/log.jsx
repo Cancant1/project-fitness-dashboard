@@ -353,7 +353,7 @@ function normalizeDraftSetsForExercise(sets = [], exercise = {}, lastEntry = nul
   return normalizeSetIds(sets).map((set, i) => {
     if (!set._prefilled || set._done === true) return set;
     const hasManualDetail = !!String(set.rpe || "").trim() || !!String(set.note || "").trim();
-    const isOldPrefill = !set._edited || setMatchesLastSet(set, lastSets[i] || null, durationMode);
+    const isOldPrefill = !set._edited && setMatchesLastSet(set, lastSets[i] || null, durationMode);
     return !hasManualDetail && isOldPrefill
       ? { ...set, weight: "", reps: "", duration: "", _edited: false }
       : set;

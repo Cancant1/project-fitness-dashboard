@@ -4342,8 +4342,9 @@ table { border-collapse: collapse; }
   .page-title { font-size: 24px; }
   .page-sub { font-size: var(--t-sm); }
 
-  /* Prevent iOS Safari from zooming in when focusing a form field. */
-  input, select, textarea { font-size: 16px; }
+  /* Prevent iOS Safari from zooming in when focusing a form field.
+     Use !important because dense sheet controls carry more specific selectors. */
+  input, select, textarea { font-size: 16px !important; }
 
   /* Comfortable taps on roomy controls (dense table/sheet controls untouched). */
   .page-actions .btn,
