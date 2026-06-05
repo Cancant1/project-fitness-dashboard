@@ -205,8 +205,45 @@ function loadSyncMeta() {
 
 const AppContext = createContext(null);
 
+function normalizeDeletedFoodEntries(value = {}) {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value.filter(Boolean).map(id => [String(id), true]));
+  }
+  return Object.fromEntries(
+    Object.entries(value || {})
+      .filter(([id]) => id != null && String(id).trim())
+      .map(([id, deletedAt]) => [String(id), deletedAt || true])
+  );
+}
+
+function foodEntryIdentity(date, item = {}) {
+  if (item.id !== undefined && item.id !== null && String(item.id).trim()) return String(item.id);
+  return [
+    date || "",
+    String(item.product || item.name || "food").trim().toLowerCase(),
+    item.amount ?? "",
+    item.kcal ?? "",
+    item.protein ?? "",
+    item.carbs ?? "",
+    item.fat ?? ""
+  ].join(":");
+}
+
+function removeDeletedFoodRows(foodByDate = {}, deletedFoodEntries = {}) {
+  const deleted = new Set(Object.keys(normalizeDeletedFoodEntries(deletedFoodEntries)));
+  if (deleted.size === 0) return foodByDate || {};
+  const out = {};
+  for (const [date, entries] of Object.entries(foodByDate || {})) {
+    const kept = (entries || []).filter(item => !deleted.has(foodEntryIdentity(date, item)));
+    if (kept.length) out[date] = kept;
+  }
+  return out;
+}
+
 function migrateProfile(p) {
   const defaultMacros = PRESETS.maintain.macros;
+  const deletedFoodEntries = normalizeDeletedFoodEntries(p.deletedFoodEntries || p.deletedFoodEntryIds || {});
+  const foodByDate = removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries);
   const routines = p.routines && p.routines.length ? p.routines : [];
   const activeRoutineId = p.activeRoutineId && routines.some(r => r.id === p.activeRoutineId)
     ? p.activeRoutineId
@@ -223,7 +260,8 @@ function migrateProfile(p) {
     targetWeight: p.targetWeight ?? null,
     maintenanceKcal: p.maintenanceKcal ?? 2700,
     progressionRules: progressionRulesWithDefaults(p.progressionRules),
-    foodByDate: p.foodByDate || {},
+    foodByDate,
+    deletedFoodEntries,
     customExercises: p.customExercises || [],
     hiddenExercises: p.hiddenExercises || [],
     hiddenFoodItems: p.hiddenFoodItems || [],
@@ -576,7 +614,13 @@ function sanitizeProfileForPush(profile = {}) {
     }
     nextPlans[date] = plan;
   }
-  return { ...profile, sessionPlansByDate: nextPlans };
+  const deletedFoodEntries = normalizeDeletedFoodEntries(profile.deletedFoodEntries || {});
+  return {
+    ...profile,
+    foodByDate: removeDeletedFoodRows(profile.foodByDate || {}, deletedFoodEntries),
+    deletedFoodEntries,
+    sessionPlansByDate: nextPlans
+  };
 }
 
 function sanitizeStateForPush(rawState = {}) {
@@ -601,13 +645,21 @@ function mergeByKey(remoteItems = [], localItems = [], keyFn, choose = (_remote,
   return Array.from(map.values());
 }
 
-function mergeFoodByDate(remote = {}, local = {}) {
+function mergeDeletedFoodEntries(remote = {}, local = {}) {
+  return {
+    ...normalizeDeletedFoodEntries(remote),
+    ...normalizeDeletedFoodEntries(local)
+  };
+}
+
+function mergeFoodByDate(remote = {}, local = {}, deletedFoodEntries = {}) {
   const dates = new Set([...Object.keys(remote || {}), ...Object.keys(local || {})]);
+  const deleted = new Set(Object.keys(normalizeDeletedFoodEntries(deletedFoodEntries)));
   const out = {};
   dates.forEach(date => {
-    out[date] = mergeByKey(remote[date] || [], local[date] || [], (item, index) =>
-      String(item.id ?? `${item.product || item.name || "food"}:${item.kcal ?? ""}:${item.protein ?? ""}:${item.amount ?? ""}:${index}`)
-    );
+    const entries = mergeByKey(remote[date] || [], local[date] || [], item => foodEntryIdentity(date, item))
+      .filter(item => !deleted.has(foodEntryIdentity(date, item)));
+    if (entries.length) out[date] = entries;
   });
   return out;
 }
@@ -624,7 +676,8 @@ function mergeLoggedSessions(remote = [], local = []) {
 
 function mergeProfiles(remoteProfile = {}, localProfile = {}) {
   const merged = { ...remoteProfile, ...localProfile };
-  merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {});
+  merged.deletedFoodEntries = mergeDeletedFoodEntries(remoteProfile.deletedFoodEntries || {}, localProfile.deletedFoodEntries || {});
+  merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {}, merged.deletedFoodEntries);
   merged.dailyOverrides = { ...(remoteProfile.dailyOverrides || {}), ...(localProfile.dailyOverrides || {}) };
   merged.sessionPlansByDate = { ...(remoteProfile.sessionPlansByDate || {}), ...(localProfile.sessionPlansByDate || {}) };
   merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
@@ -952,13 +1005,17 @@ function AppStateProvider({ children }) {
   const addFoodEntry = (date, entry) => {
     setState(s => ({
       ...s,
-      profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
-        ...p,
-        foodByDate: {
-          ...p.foodByDate,
-          [date]: [{ ...entry, id: Date.now() + Math.random() }, ...(p.foodByDate[date] || [])]
-        }
-      } : p)
+      profiles: s.profiles.map(p => {
+        if (p.id !== s.activeProfileId) return p;
+        const id = entry.id || `food-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        return {
+          ...p,
+          foodByDate: {
+            ...(p.foodByDate || {}),
+            [date]: [{ ...entry, id, createdAt: entry.createdAt || new Date().toISOString() }, ...((p.foodByDate || {})[date] || [])]
+          }
+        };
+      })
     }));
   };
 
@@ -968,10 +1025,21 @@ function AppStateProvider({ children }) {
       profiles: s.profiles.map(p => {
         if (p.id !== s.activeProfileId) return p;
         const foodByDate = { ...(p.foodByDate || {}) };
-        const entries = (foodByDate[date] || []).filter(f => f.id !== id);
+        const existing = foodByDate[date] || [];
+        const removed = existing.find(f => foodEntryIdentity(date, f) === String(id));
+        const deleteKey = removed ? foodEntryIdentity(date, removed) : String(id || "");
+        if (!deleteKey) return p;
+        const entries = existing.filter(f => foodEntryIdentity(date, f) !== deleteKey);
         if (entries.length) foodByDate[date] = entries;
         else delete foodByDate[date];
-        return { ...p, foodByDate };
+        return {
+          ...p,
+          foodByDate,
+          deletedFoodEntries: {
+            ...normalizeDeletedFoodEntries(p.deletedFoodEntries || {}),
+            [deleteKey]: new Date().toISOString()
+          }
+        };
       })
     }));
   };

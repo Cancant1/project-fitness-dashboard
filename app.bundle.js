@@ -799,9 +799,55 @@ function loadSyncMeta() {
   return readJsonStorage(SYNC_META_KEY, defaultSyncMeta());
 }
 var AppContext = createContext(null);
+function normalizeDeletedFoodEntries() {
+  var value = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value.filter(Boolean).map(function (id) {
+      return [String(id), true];
+    }));
+  }
+  return Object.fromEntries(Object.entries(value || {}).filter(function (_ref3) {
+    var _ref4 = _slicedToArray(_ref3, 1),
+      id = _ref4[0];
+    return id != null && String(id).trim();
+  }).map(function (_ref5) {
+    var _ref6 = _slicedToArray(_ref5, 2),
+      id = _ref6[0],
+      deletedAt = _ref6[1];
+    return [String(id), deletedAt || true];
+  }));
+}
+function foodEntryIdentity(date) {
+  var _item$amount, _item$kcal, _item$protein, _item$carbs, _item$fat;
+  var item = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  if (item.id !== undefined && item.id !== null && String(item.id).trim()) return String(item.id);
+  return [date || "", String(item.product || item.name || "food").trim().toLowerCase(), (_item$amount = item.amount) !== null && _item$amount !== void 0 ? _item$amount : "", (_item$kcal = item.kcal) !== null && _item$kcal !== void 0 ? _item$kcal : "", (_item$protein = item.protein) !== null && _item$protein !== void 0 ? _item$protein : "", (_item$carbs = item.carbs) !== null && _item$carbs !== void 0 ? _item$carbs : "", (_item$fat = item.fat) !== null && _item$fat !== void 0 ? _item$fat : ""].join(":");
+}
+function removeDeletedFoodRows() {
+  var foodByDate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var deletedFoodEntries = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var deleted = new Set(Object.keys(normalizeDeletedFoodEntries(deletedFoodEntries)));
+  if (deleted.size === 0) return foodByDate || {};
+  var out = {};
+  var _loop = function _loop() {
+    var _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
+      date = _Object$entries$_i[0],
+      entries = _Object$entries$_i[1];
+    var kept = (entries || []).filter(function (item) {
+      return !deleted.has(foodEntryIdentity(date, item));
+    });
+    if (kept.length) out[date] = kept;
+  };
+  for (var _i = 0, _Object$entries = Object.entries(foodByDate || {}); _i < _Object$entries.length; _i++) {
+    _loop();
+  }
+  return out;
+}
 function migrateProfile(p) {
   var _routines$, _p$targetWeight, _p$maintenanceKcal;
   var defaultMacros = PRESETS.maintain.macros;
+  var deletedFoodEntries = normalizeDeletedFoodEntries(p.deletedFoodEntries || p.deletedFoodEntryIds || {});
+  var foodByDate = removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries);
   var routines = p.routines && p.routines.length ? p.routines : [];
   var activeRoutineId = p.activeRoutineId && routines.some(function (r) {
     return r.id === p.activeRoutineId;
@@ -818,7 +864,8 @@ function migrateProfile(p) {
     targetWeight: (_p$targetWeight = p.targetWeight) !== null && _p$targetWeight !== void 0 ? _p$targetWeight : null,
     maintenanceKcal: (_p$maintenanceKcal = p.maintenanceKcal) !== null && _p$maintenanceKcal !== void 0 ? _p$maintenanceKcal : 2700,
     progressionRules: progressionRulesWithDefaults(p.progressionRules),
-    foodByDate: p.foodByDate || {},
+    foodByDate: foodByDate,
+    deletedFoodEntries: deletedFoodEntries,
     customExercises: p.customExercises || [],
     hiddenExercises: p.hiddenExercises || [],
     hiddenFoodItems: p.hiddenFoodItems || [],
@@ -1228,10 +1275,10 @@ function bestLoggedSessionForPlan() {
 function sanitizeProfileForPush() {
   var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var nextPlans = {};
-  for (var _i = 0, _Object$entries = Object.entries(profile.sessionPlansByDate || {}); _i < _Object$entries.length; _i++) {
-    var _Object$entries$_i = _slicedToArray(_Object$entries[_i], 2),
-      date = _Object$entries$_i[0],
-      plan = _Object$entries$_i[1];
+  for (var _i2 = 0, _Object$entries2 = Object.entries(profile.sessionPlansByDate || {}); _i2 < _Object$entries2.length; _i2++) {
+    var _Object$entries2$_i = _slicedToArray(_Object$entries2[_i2], 2),
+      date = _Object$entries2$_i[0],
+      plan = _Object$entries2$_i[1];
     var logged = bestLoggedSessionForPlan(profile, date, plan);
     if (logged) {
       var visibleExercises = planVisibleExerciseCount(plan, profile, date);
@@ -1242,7 +1289,10 @@ function sanitizeProfileForPush() {
     }
     nextPlans[date] = plan;
   }
+  var deletedFoodEntries = normalizeDeletedFoodEntries(profile.deletedFoodEntries || {});
   return _objectSpread(_objectSpread({}, profile), {}, {
+    foodByDate: removeDeletedFoodRows(profile.foodByDate || {}, deletedFoodEntries),
+    deletedFoodEntries: deletedFoodEntries,
     sessionPlansByDate: nextPlans
   });
 }
@@ -1272,16 +1322,25 @@ function mergeByKey() {
   });
   return Array.from(map.values());
 }
+function mergeDeletedFoodEntries() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  return _objectSpread(_objectSpread({}, normalizeDeletedFoodEntries(remote)), normalizeDeletedFoodEntries(local));
+}
 function mergeFoodByDate() {
   var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var deletedFoodEntries = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
   var dates = new Set([].concat(_toConsumableArray(Object.keys(remote || {})), _toConsumableArray(Object.keys(local || {}))));
+  var deleted = new Set(Object.keys(normalizeDeletedFoodEntries(deletedFoodEntries)));
   var out = {};
   dates.forEach(function (date) {
-    out[date] = mergeByKey(remote[date] || [], local[date] || [], function (item, index) {
-      var _item$id, _item$kcal, _item$protein, _item$amount;
-      return String((_item$id = item.id) !== null && _item$id !== void 0 ? _item$id : "".concat(item.product || item.name || "food", ":").concat((_item$kcal = item.kcal) !== null && _item$kcal !== void 0 ? _item$kcal : "", ":").concat((_item$protein = item.protein) !== null && _item$protein !== void 0 ? _item$protein : "", ":").concat((_item$amount = item.amount) !== null && _item$amount !== void 0 ? _item$amount : "", ":").concat(index));
+    var entries = mergeByKey(remote[date] || [], local[date] || [], function (item) {
+      return foodEntryIdentity(date, item);
+    }).filter(function (item) {
+      return !deleted.has(foodEntryIdentity(date, item));
     });
+    if (entries.length) out[date] = entries;
   });
   return out;
 }
@@ -1302,13 +1361,14 @@ function mergeProfiles() {
   var remoteProfile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var localProfile = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   var merged = _objectSpread(_objectSpread({}, remoteProfile), localProfile);
-  merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {});
+  merged.deletedFoodEntries = mergeDeletedFoodEntries(remoteProfile.deletedFoodEntries || {}, localProfile.deletedFoodEntries || {});
+  merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {}, merged.deletedFoodEntries);
   merged.dailyOverrides = _objectSpread(_objectSpread({}, remoteProfile.dailyOverrides || {}), localProfile.dailyOverrides || {});
   merged.sessionPlansByDate = _objectSpread(_objectSpread({}, remoteProfile.sessionPlansByDate || {}), localProfile.sessionPlansByDate || {});
   merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
   merged.weightEntries = mergeByKey(remoteProfile.weightEntries || [], localProfile.weightEntries || [], function (item) {
-    var _item$id2;
-    return String((_item$id2 = item.id) !== null && _item$id2 !== void 0 ? _item$id2 : "".concat(item.date, ":").concat(item.weight, ":").concat(item.note || ""));
+    var _item$id;
+    return String((_item$id = item.id) !== null && _item$id !== void 0 ? _item$id : "".concat(item.date, ":").concat(item.weight, ":").concat(item.note || ""));
   });
   merged.customFoodItems = mergeByKey(remoteProfile.customFoodItems || [], localProfile.customFoodItems || [], function (item) {
     return String(item.id || foodCatalogKey(item.product || item.name));
@@ -1351,8 +1411,8 @@ function load() {
   }
   return migrateState(DEFAULT_STATE);
 }
-function AppStateProvider(_ref3) {
-  var children = _ref3.children;
+function AppStateProvider(_ref7) {
+  var children = _ref7.children;
   var _useState = useState(load),
     _useState2 = _slicedToArray(_useState, 2),
     state = _useState2[0],
@@ -1514,7 +1574,7 @@ function AppStateProvider(_ref3) {
     });
   };
   var pullRemoteState = function () {
-    var _ref4 = _asyncToGenerator(_regenerator().m(function _callee() {
+    var _ref8 = _asyncToGenerator(_regenerator().m(function _callee() {
       var options,
         config,
         _syncMetaRef$current,
@@ -1577,11 +1637,11 @@ function AppStateProvider(_ref3) {
       }, _callee, null, [[1, 4]]);
     }));
     return function pullRemoteState() {
-      return _ref4.apply(this, arguments);
+      return _ref8.apply(this, arguments);
     };
   }();
   var pushRemoteState = function () {
-    var _ref5 = _asyncToGenerator(_regenerator().m(function _callee3() {
+    var _ref9 = _asyncToGenerator(_regenerator().m(function _callee3() {
       var options,
         config,
         runPush,
@@ -1617,7 +1677,7 @@ function AppStateProvider(_ref3) {
             return _context3.a(2, null);
           case 2:
             runPush = function () {
-              var _ref6 = _asyncToGenerator(_regenerator().m(function _callee2() {
+              var _ref0 = _asyncToGenerator(_regenerator().m(function _callee2() {
                 var remote, remoteSha, pushState, nextSha, attempt, isShaConflict, latestRemote, _t2;
                 return _regenerator().w(function (_context2) {
                   while (1) switch (_context2.p = _context2.n) {
@@ -1696,7 +1756,7 @@ function AppStateProvider(_ref3) {
                 }, _callee2, null, [[3, 5]]);
               }));
               return function runPush() {
-                return _ref6.apply(this, arguments);
+                return _ref0.apply(this, arguments);
               };
             }();
             promise = runPush();
@@ -1724,11 +1784,11 @@ function AppStateProvider(_ref3) {
       }, _callee3, null, [[3, 5, 6, 7]]);
     }));
     return function pushRemoteState() {
-      return _ref5.apply(this, arguments);
+      return _ref9.apply(this, arguments);
     };
   }();
   var resolveSyncConflict = function () {
-    var _ref7 = _asyncToGenerator(_regenerator().m(function _callee4(choice) {
+    var _ref1 = _asyncToGenerator(_regenerator().m(function _callee4(choice) {
       return _regenerator().w(function (_context4) {
         while (1) switch (_context4.n) {
           case 0:
@@ -1759,7 +1819,7 @@ function AppStateProvider(_ref3) {
       }, _callee4);
     }));
     return function resolveSyncConflict(_x4) {
-      return _ref7.apply(this, arguments);
+      return _ref1.apply(this, arguments);
     };
   }();
   var updateProfile = function updateProfile(id, patch) {
@@ -1842,11 +1902,14 @@ function AppStateProvider(_ref3) {
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
-          return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            foodByDate: _objectSpread(_objectSpread({}, p.foodByDate), {}, _defineProperty({}, date, [_objectSpread(_objectSpread({}, entry), {}, {
-              id: Date.now() + Math.random()
-            })].concat(_toConsumableArray(p.foodByDate[date] || []))))
-          }) : p;
+          if (p.id !== s.activeProfileId) return p;
+          var id = entry.id || "food-".concat(Date.now(), "-").concat(Math.random().toString(36).slice(2));
+          return _objectSpread(_objectSpread({}, p), {}, {
+            foodByDate: _objectSpread(_objectSpread({}, p.foodByDate || {}), {}, _defineProperty({}, date, [_objectSpread(_objectSpread({}, entry), {}, {
+              id: id,
+              createdAt: entry.createdAt || new Date().toISOString()
+            })].concat(_toConsumableArray((p.foodByDate || {})[date] || []))))
+          });
         })
       });
     });
@@ -1857,12 +1920,19 @@ function AppStateProvider(_ref3) {
         profiles: s.profiles.map(function (p) {
           if (p.id !== s.activeProfileId) return p;
           var foodByDate = _objectSpread({}, p.foodByDate || {});
-          var entries = (foodByDate[date] || []).filter(function (f) {
-            return f.id !== id;
+          var existing = foodByDate[date] || [];
+          var removed = existing.find(function (f) {
+            return foodEntryIdentity(date, f) === String(id);
+          });
+          var deleteKey = removed ? foodEntryIdentity(date, removed) : String(id || "");
+          if (!deleteKey) return p;
+          var entries = existing.filter(function (f) {
+            return foodEntryIdentity(date, f) !== deleteKey;
           });
           if (entries.length) foodByDate[date] = entries;else delete foodByDate[date];
           return _objectSpread(_objectSpread({}, p), {}, {
-            foodByDate: foodByDate
+            foodByDate: foodByDate,
+            deletedFoodEntries: _objectSpread(_objectSpread({}, normalizeDeletedFoodEntries(p.deletedFoodEntries || {})), {}, _defineProperty({}, deleteKey, new Date().toISOString()))
           });
         })
       });
@@ -1930,9 +2000,9 @@ function AppStateProvider(_ref3) {
     });
   };
   var editSession = function editSession(id, patch) {
-    var _ref8 = patch || {},
-      _clearSessionPlanDates = _ref8._clearSessionPlanDates,
-      sessionPatch = _objectWithoutProperties(_ref8, _excluded);
+    var _ref10 = patch || {},
+      _clearSessionPlanDates = _ref10._clearSessionPlanDates,
+      sessionPatch = _objectWithoutProperties(_ref10, _excluded);
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
@@ -1946,9 +2016,9 @@ function AppStateProvider(_ref3) {
           var previousPlannedDate = ((_id2 = (p.sessionEdits || {})[id]) === null || _id2 === void 0 ? void 0 : _id2.plannedDate) || (raw === null || raw === void 0 ? void 0 : raw.plannedDate);
           var nextPlannedDate = sessionPatch.plannedDate || previousPlannedDate;
           var datesToClear = new Set([raw === null || raw === void 0 ? void 0 : raw.date, previousEffectiveDate, nextEffectiveDate, previousPlannedDate, nextPlannedDate].concat(_toConsumableArray(_clearSessionPlanDates || [])).filter(Boolean));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref9) {
-            var _ref0 = _slicedToArray(_ref9, 1),
-              date = _ref0[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref11) {
+            var _ref12 = _slicedToArray(_ref11, 1),
+              date = _ref12[0];
             return !datesToClear.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
@@ -1964,9 +2034,9 @@ function AppStateProvider(_ref3) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref1) {
-              var _ref10 = _slicedToArray(_ref1, 1),
-                k = _ref10[0];
+            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref13) {
+              var _ref14 = _slicedToArray(_ref13, 1),
+                k = _ref14[0];
               return k !== id;
             }))
           }) : p;
@@ -2007,9 +2077,9 @@ function AppStateProvider(_ref3) {
           var current = (p.dailyOverrides || {})[date] || {};
           if (!field) {
             return _objectSpread(_objectSpread({}, p), {}, {
-              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref11) {
-                var _ref12 = _slicedToArray(_ref11, 1),
-                  k = _ref12[0];
+              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref15) {
+                var _ref16 = _slicedToArray(_ref15, 1),
+                  k = _ref16[0];
                 return k !== date;
               }))
             });
@@ -2061,9 +2131,9 @@ function AppStateProvider(_ref3) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref13) {
-              var _ref14 = _slicedToArray(_ref13, 1),
-                k = _ref14[0];
+            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref17) {
+              var _ref18 = _slicedToArray(_ref17, 1),
+                k = _ref18[0];
               return k !== date;
             }))
           }) : p;
@@ -2111,14 +2181,14 @@ function AppStateProvider(_ref3) {
             if (remove && existing.id) removedIds.add(existing.id);
             return !remove;
           });
-          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref15) {
-            var _ref16 = _slicedToArray(_ref15, 1),
-              id = _ref16[0];
+          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref19) {
+            var _ref20 = _slicedToArray(_ref19, 1),
+              id = _ref20[0];
             return !removedIds.has(id) && id !== stampedSession.id;
           }));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref17) {
-            var _ref18 = _slicedToArray(_ref17, 1),
-              date = _ref18[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref21) {
+            var _ref22 = _slicedToArray(_ref21, 1),
+              date = _ref22[0];
             return !clearDates.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
@@ -2262,10 +2332,10 @@ function AppStateProvider(_ref3) {
         profiles: s.profiles.map(function (p) {
           if (p.id !== s.activeProfileId) return p;
           var renames = _objectSpread({}, p.exerciseRenames || {});
-          for (var _i2 = 0, _Object$entries2 = Object.entries(renames); _i2 < _Object$entries2.length; _i2++) {
-            var _Object$entries2$_i = _slicedToArray(_Object$entries2[_i2], 2),
-              k = _Object$entries2$_i[0],
-              v = _Object$entries2$_i[1];
+          for (var _i3 = 0, _Object$entries3 = Object.entries(renames); _i3 < _Object$entries3.length; _i3++) {
+            var _Object$entries3$_i = _slicedToArray(_Object$entries3[_i3], 2),
+              k = _Object$entries3$_i[0],
+              v = _Object$entries3$_i[1];
             if (k === from || v === from) renames[k] = to;
           }
           renames[from] = to;
@@ -2443,7 +2513,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "05 Jun 2026 09:24";
+var BUILD_LABEL = "05 Jun 2026 09:30";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -8425,6 +8495,10 @@ function DailyLogTable(_ref15) {
     return Object.prototype.hasOwnProperty.call(overrides[date] || {}, field);
   };
   var selectDateWithFoods = function selectDateWithFoods(date) {
+    if (selectedDate === date) {
+      onFoodsOpenChange === null || onFoodsOpenChange === void 0 || onFoodsOpenChange(!foodsOpen);
+      return;
+    }
     onSelectDate === null || onSelectDate === void 0 || onSelectDate(date);
     if (!foodsOpen) onFoodsOpenChange === null || onFoodsOpenChange === void 0 || onFoodsOpenChange(true);
   };
@@ -8528,6 +8602,7 @@ function DailyLogTable(_ref15) {
     var hasOverride = !!overrides[date];
     var foods = foodByDate[date] || [];
     var isSelected = selectedDate === date;
+    var dateFoodTitle = isSelected && foodsOpen ? "Hide logged foods for this date" : "Show logged foods for this date";
     return React.createElement(React.Fragment, {
       key: date
     }, React.createElement("tr", {
@@ -8538,14 +8613,14 @@ function DailyLogTable(_ref15) {
         return selectDateWithFoods(date);
       },
       type: "button",
-      title: "Show logged foods for this date"
+      title: dateFoodTitle
     }, RepsData.shortDate(date))), React.createElement("td", null, React.createElement("button", {
       className: "ledger-date-btn muted",
       onClick: function onClick() {
         return selectDateWithFoods(date);
       },
       type: "button",
-      title: "Show logged foods for this date"
+      title: dateFoodTitle
     }, RepsData.dayName(date))), React.createElement(EditableNumberCell, {
       value: w != null ? w.toFixed(1) : null,
       placeholder: "kg",

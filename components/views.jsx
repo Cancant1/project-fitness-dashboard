@@ -1130,6 +1130,10 @@ function DailyLogTable({ bodyD, kcal, protein, activeProfile, updateProfile, upd
   const clearField = (date, field) => clearDailyOverride(date, field);
   const overrideHas = (date, field) => Object.prototype.hasOwnProperty.call(overrides[date] || {}, field);
   const selectDateWithFoods = (date) => {
+    if (selectedDate === date) {
+      onFoodsOpenChange?.(!foodsOpen);
+      return;
+    }
     onSelectDate?.(date);
     if (!foodsOpen) onFoodsOpenChange?.(true);
   };
@@ -1205,16 +1209,17 @@ function DailyLogTable({ bodyD, kcal, protein, activeProfile, updateProfile, upd
               const hasOverride = !!overrides[date];
               const foods = foodByDate[date] || [];
               const isSelected = selectedDate === date;
+              const dateFoodTitle = isSelected && foodsOpen ? "Hide logged foods for this date" : "Show logged foods for this date";
               return (
                 <React.Fragment key={date}>
                   <tr className={`ledger-row ${isSelected ? "is-selected" : ""}`.trim()}>
                     <td>
-                      <button className="ledger-date-btn mono" onClick={() => selectDateWithFoods(date)} type="button" title="Show logged foods for this date">
+                      <button className="ledger-date-btn mono" onClick={() => selectDateWithFoods(date)} type="button" title={dateFoodTitle}>
                         {RepsData.shortDate(date)}
                       </button>
                     </td>
                     <td>
-                      <button className="ledger-date-btn muted" onClick={() => selectDateWithFoods(date)} type="button" title="Show logged foods for this date">
+                      <button className="ledger-date-btn muted" onClick={() => selectDateWithFoods(date)} type="button" title={dateFoodTitle}>
                         {RepsData.dayName(date)}
                       </button>
                     </td>

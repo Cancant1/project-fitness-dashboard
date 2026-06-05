@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { id: "plan",      label: "Plan",      icon: I.Plan,      kbd: "8" },
   { id: "export",    label: "AI Export", icon: I.Export,    kbd: "9" }
 ];
-const BUILD_LABEL = "05 Jun 2026 09:24";
+const BUILD_LABEL = "05 Jun 2026 09:30";
 
 function SyncQuickActions({ onAfterAction }) {
   const app = window.RepsState?.useApp?.();
