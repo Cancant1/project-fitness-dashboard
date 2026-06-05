@@ -86,6 +86,10 @@ const STARTER_RECIPE = {
           label: "Jumbo Classic Burger Rundvlees",
           item: "Jumbo Classic Burger Rundvlees 2 Stuks",
           sourceUrl: "https://www.jumbo.com/producten/jumbo-classic-burger-rundvlees-2-stuks-95544TRA",
+          packAmount: 220,
+          packUnit: "g",
+          packPrice: 4.05,
+          currency: "EUR",
           amount: 220,
           amountUnit: "g",
           displayAmount: "2 burgers",
@@ -100,6 +104,10 @@ const STARTER_RECIPE = {
           label: "Jumbo Ambachtelijke Slavink",
           item: "Jumbo Ambachtelijke Slavinken 2 Stuks",
           sourceUrl: "https://www.jumbo.com/producten/jumbo-ambachtelijke-slavinken-2-stuks-201573TRA",
+          packAmount: 220,
+          packUnit: "g",
+          packPrice: 2.79,
+          currency: "EUR",
           amount: 110,
           amountUnit: "g",
           displayAmount: "1 slavink",
@@ -114,6 +122,10 @@ const STARTER_RECIPE = {
           label: "Jumbo Varken Saucijs",
           item: "Jumbo Varkens Saucijzen 10 Stuks",
           sourceUrl: "https://www.jumbo.com/producten/jumbo-varkens-saucijzen-10-stuks-163322TRA",
+          packAmount: 800,
+          packUnit: "g",
+          packPrice: 6.19,
+          currency: "EUR",
           amount: 120,
           amountUnit: "g",
           displayAmount: "1.5 saucijzen",
@@ -135,14 +147,18 @@ const STARTER_RECIPE = {
           label: "Jumbo Vastkokende Aardappelen",
           item: "Jumbo Vastkokende Aardappelen 1 kg",
           sourceUrl: "https://www.jumbo.com/producten/jumbo-vastkokende-aardappelen-1kg-74155ZK",
+          packAmount: 1000,
+          packUnit: "g",
+          packPrice: 1.29,
+          currency: "EUR",
           amount: 200,
           amountUnit: "g",
           displayAmount: "200 g",
           nutritionBasis: "per 100 g",
-          kcalPer100: 88,
-          proteinPer100: 2,
-          carbsPer100: 19,
-          fatPer100: 0
+          kcalPer100: 86,
+          proteinPer100: 1.7,
+          carbsPer100: 17.9,
+          fatPer100: 0.4
         }
       ]
     },
@@ -156,6 +172,10 @@ const STARTER_RECIPE = {
           label: "Jumbo Biologische Broccoliroosjes",
           item: "Jumbo Biologische Broccoliroosjes 450 g",
           sourceUrl: "https://www.jumbo.com/producten/jumbo-biologische-broccoliroosjes-450-g-620066ZK",
+          packAmount: 450,
+          packUnit: "g",
+          packPrice: 2.58,
+          currency: "EUR",
           amount: 225,
           amountUnit: "g",
           displayAmount: "half a 450 g bag",
@@ -169,7 +189,11 @@ const STARTER_RECIPE = {
           id: "jumbo-bio-sperziebonen",
           label: "Jumbo Biologische Hele Sperziebonen",
           item: "Jumbo Biologisch Hele Sperziebonen 450 g",
-          sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-hele-sperziebonen-450-g-169332DS",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-hele-sperziebonen-450g-621516ZK",
+          packAmount: 450,
+          packUnit: "g",
+          packPrice: 1.35,
+          currency: "EUR",
           amount: 225,
           amountUnit: "g",
           displayAmount: "half a 450 g bag",
@@ -183,7 +207,11 @@ const STARTER_RECIPE = {
           id: "jumbo-bio-bladspinazie",
           label: "Jumbo Biologische Bladspinazie",
           item: "Jumbo Biologische Bladspinazie 450 g",
-          sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-bladspinazie-450-g-692546DS",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-bladspinazie-gesneden-450-g-632203DS",
+          packAmount: 450,
+          packUnit: "g",
+          packPrice: 1.39,
+          currency: "EUR",
           amount: 225,
           amountUnit: "g",
           displayAmount: "half a 450 g bag",
@@ -205,6 +233,10 @@ const STARTER_RECIPE = {
           label: "Maggi Jus Naturel",
           item: "Maggi Jus Naturel 250 ml",
           sourceUrl: "https://www.jumbo.com/producten/maggi-jus-naturel-250-ml-703835PAK",
+          packAmount: 250,
+          packUnit: "ml",
+          packPrice: 2.59,
+          currency: "EUR",
           amount: 50,
           amountUnit: "ml",
           displayAmount: "50 ml",
@@ -226,6 +258,10 @@ const STARTER_RECIPE = {
           label: "Jumbo Zonnebloemolie",
           item: "Jumbo Zonnebloemolie 500 ml",
           sourceUrl: "https://www.jumbo.com/producten/jumbo-zonnebloemolie-500ml-269994FLS",
+          packAmount: 500,
+          packUnit: "ml",
+          packPrice: 3.99,
+          currency: "EUR",
           amount: 7.5,
           amountUnit: "ml",
           displayAmount: "0.5 el share from 1 el for 4 burgers",
@@ -249,8 +285,372 @@ const STARTER_RECIPE = {
     ]
   },
   createdAt: "2026-06-05T00:00:00.000Z",
-  updatedAt: "2026-06-05T00:00:00.000Z"
+  updatedAt: "2026-06-05T14:30:00.000Z"
 };
+
+const PASTA_RECIPE_ID = "recipe-pastaschotel-kip-rode-pesto";
+const PASTA_RECIPE = {
+  id: PASTA_RECIPE_ID,
+  name: "Pastaschotel met kip en rode pesto",
+  category: "Dinner",
+  tags: ["pasta", "oven", "Jumbo", "electric hob"],
+  servings: 1,
+  summary: "A two-person oven pasta bake with chicken, red pesto, cooking cream and mozzarella.",
+  defaultDateMode: "today",
+  selections: {
+    pasta: "jumbo-penne-rigate",
+    meat: "jumbo-kipfiletblokjes",
+    soupVegetables: "jumbo-soepgroenten-diepvries",
+    redPepper: "jumbo-paprika-rood",
+    yellowPepper: "jumbo-paprika-geel",
+    garlic: "jumbo-bio-knoflook",
+    sauce: "jumbo-pesto-rood",
+    cream: "jumbo-kookroom-20",
+    topping: "jumbo-geraspte-mozzarella",
+    fat: "jumbo-olijfolie-mild",
+    chickenSeasoning: "jumbo-kruidenmix-kip",
+    herb: "euroma-oregano"
+  },
+  groups: [
+    {
+      id: "pasta",
+      label: "Pasta",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-penne-rigate",
+          label: "Jumbo's Penne Rigate",
+          item: "Jumbo's Penne Rigate 500 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-s-penne-rigate-500-g-710326ZK",
+          packAmount: 500,
+          packUnit: "g",
+          packPrice: 1.29,
+          currency: "EUR",
+          amount: 150,
+          amountUnit: "g",
+          displayAmount: "150 g dry pasta",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 374,
+          proteinPer100: 13.5,
+          carbsPer100: 75,
+          fatPer100: 1.5
+        }
+      ]
+    },
+    {
+      id: "meat",
+      label: "Chicken",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-kipfiletblokjes",
+          label: "Jumbo Kipfiletblokjes",
+          item: "Jumbo Kipfiletblokjes 600 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-kipfiletblokjes-600-g-515014BAK",
+          packAmount: 600,
+          packUnit: "g",
+          packPrice: 8.49,
+          currency: "EUR",
+          amount: 150,
+          amountUnit: "g",
+          displayAmount: "150 g",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 106,
+          proteinPer100: 24.7,
+          carbsPer100: 0,
+          fatPer100: 0.8
+        }
+      ]
+    },
+    {
+      id: "soupVegetables",
+      label: "Soup vegetables",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-soepgroenten-diepvries",
+          label: "Jumbo Soepgroenten",
+          item: "Jumbo Soepgroenten 450 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-soepgroenten-450g-600670DS",
+          packAmount: 450,
+          packUnit: "g",
+          packPrice: 1.93,
+          currency: "EUR",
+          amount: 200,
+          amountUnit: "g",
+          displayAmount: "200 g frozen",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 27,
+          proteinPer100: 1.5,
+          carbsPer100: 3,
+          fatPer100: 0.5
+        }
+      ]
+    },
+    {
+      id: "redPepper",
+      label: "Red pepper",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-paprika-rood",
+          label: "Jumbo Paprika Rood",
+          item: "Jumbo Paprika Rood 1 stuk",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-paprika-rood-641085STK",
+          packAmount: 150,
+          packUnit: "g",
+          packPrice: 1.09,
+          currency: "EUR",
+          amount: 75,
+          amountUnit: "g",
+          displayAmount: "half a pepper",
+          nutritionBasis: "per 100 g estimate",
+          kcalPer100: 31,
+          proteinPer100: 1,
+          carbsPer100: 6,
+          fatPer100: 0.3
+        }
+      ]
+    },
+    {
+      id: "yellowPepper",
+      label: "Yellow pepper",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-paprika-geel",
+          label: "Jumbo Paprika Geel",
+          item: "Jumbo Paprika Geel 1 stuk",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-paprika-geel-719402STK",
+          packAmount: 150,
+          packUnit: "g",
+          packPrice: 1.09,
+          currency: "EUR",
+          amount: 75,
+          amountUnit: "g",
+          displayAmount: "half a pepper",
+          nutritionBasis: "per 100 g estimate",
+          kcalPer100: 27,
+          proteinPer100: 1,
+          carbsPer100: 6.3,
+          fatPer100: 0.2
+        }
+      ]
+    },
+    {
+      id: "garlic",
+      label: "Garlic",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-bio-knoflook",
+          label: "Jumbo Biologische Knoflook",
+          item: "Jumbo Biologische Knoflook 2 Stuks",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-knoflook-biologisch-100g-191136NET",
+          packAmount: 100,
+          packUnit: "g",
+          packPrice: 1.49,
+          currency: "EUR",
+          amount: 5,
+          amountUnit: "g",
+          displayAmount: "1 small clove",
+          nutritionBasis: "per 100 g estimate",
+          kcalPer100: 149,
+          proteinPer100: 6.4,
+          carbsPer100: 33.1,
+          fatPer100: 0.5
+        }
+      ]
+    },
+    {
+      id: "sauce",
+      label: "Pesto",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-pesto-rood",
+          label: "Jumbo Pesto Rood",
+          item: "Jumbo Pesto Rood 190 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-pesto-rood-190g-347553POT",
+          packAmount: 190,
+          packUnit: "g",
+          packPrice: 1.13,
+          currency: "EUR",
+          amount: 100,
+          amountUnit: "g",
+          displayAmount: "100 g",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 358,
+          proteinPer100: 6.5,
+          carbsPer100: 9.1,
+          fatPer100: 32
+        },
+        {
+          id: "sacla-pesto-rosso",
+          label: "Sacla Pesto Rosso",
+          item: "Sacla Pesto Rosso 190 g",
+          sourceUrl: "https://www.jumbo.com/producten/sacla-pesto-rosso-190g-80387DS",
+          packAmount: 190,
+          packUnit: "g",
+          packPrice: 2.66,
+          currency: "EUR",
+          amount: 100,
+          amountUnit: "g",
+          displayAmount: "100 g",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 312,
+          proteinPer100: 4.3,
+          carbsPer100: 5.6,
+          fatPer100: 29.3
+        }
+      ]
+    },
+    {
+      id: "cream",
+      label: "Cooking cream",
+      inputLabel: "ml",
+      options: [
+        {
+          id: "jumbo-kookroom-20",
+          label: "Jumbo Kookroom 20%",
+          item: "Jumbo Kookroom 20% Vet 250 ml",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-kookroom-20-vet-250-ml-189102STK",
+          packAmount: 250,
+          packUnit: "ml",
+          packPrice: 0.98,
+          currency: "EUR",
+          amount: 75,
+          amountUnit: "ml",
+          displayAmount: "75 ml, up to 100 ml if dry",
+          nutritionBasis: "per 100 ml",
+          kcalPer100: 207,
+          proteinPer100: 2.6,
+          carbsPer100: 4.2,
+          fatPer100: 20
+        }
+      ]
+    },
+    {
+      id: "topping",
+      label: "Cheese",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-geraspte-mozzarella",
+          label: "Jumbo Geraspte Mozzarella 40+",
+          item: "Jumbo Geraspte Mozzarella 40+ 150 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-geraspte-mozzarella-40-150-g-588986ZK",
+          packAmount: 150,
+          packUnit: "g",
+          packPrice: 2.49,
+          currency: "EUR",
+          amount: 50,
+          amountUnit: "g",
+          displayAmount: "50 g",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 303,
+          proteinPer100: 25,
+          carbsPer100: 2.7,
+          fatPer100: 21
+        }
+      ]
+    },
+    {
+      id: "fat",
+      label: "Cooking fat",
+      inputLabel: "ml",
+      options: [
+        {
+          id: "jumbo-olijfolie-mild",
+          label: "Jumbo Olijfolie Mild",
+          item: "Jumbo Olijfolie Mild 500 ml",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-olijfolie-mild-500-ml-418263FLS",
+          packAmount: 500,
+          packUnit: "ml",
+          packPrice: 5.45,
+          currency: "EUR",
+          amount: 15,
+          amountUnit: "ml",
+          displayAmount: "1 el plus a little for the dish",
+          nutritionBasis: "per 100 ml",
+          kcalPer100: 823,
+          proteinPer100: 0,
+          carbsPer100: 0,
+          fatPer100: 91.4
+        }
+      ]
+    },
+    {
+      id: "chickenSeasoning",
+      label: "Chicken seasoning",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-kruidenmix-kip",
+          label: "Jumbo Kruidenmix Kip",
+          item: "Jumbo Kruidenmix Kip 70 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-kruidenmix-kip-70g-562156POT",
+          packAmount: 70,
+          packUnit: "g",
+          packPrice: 1.94,
+          currency: "EUR",
+          amount: 3,
+          amountUnit: "g",
+          displayAmount: "1 tsp",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 191,
+          proteinPer100: 6.9,
+          carbsPer100: 16.9,
+          fatPer100: 6.7
+        }
+      ]
+    },
+    {
+      id: "herb",
+      label: "Oregano",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "euroma-oregano",
+          label: "Euroma Oregano",
+          item: "Euroma Essential N04 Oregano",
+          sourceUrl: "https://www.jumbo.com/producten/euroma-essential-n04-oregano-619973BLK",
+          packAmount: 5,
+          packUnit: "g",
+          packPrice: 3.14,
+          currency: "EUR",
+          amount: 0.75,
+          amountUnit: "g",
+          displayAmount: "0.75 tsp",
+          nutritionBasis: "per 100 g estimate",
+          kcalPer100: 306,
+          proteinPer100: 11,
+          carbsPer100: 64,
+          fatPer100: 10
+        }
+      ]
+    }
+  ],
+  cooking: {
+    equipment: "Electric hob and oven",
+    hobNote: DEFAULT_HOB_PREFERENCES.note,
+    steps: [
+      { id: "oven", title: "Oven and dish", hob: "oven 180 C", minutes: "5", body: "Preheat the oven to 180 C. Lightly grease an oven dish with a small amount of olive oil." },
+      { id: "pasta", title: "Pasta", hob: "8-9 then 6", minutes: "8-11", body: "Cook the penne according to the package. Drain and keep it aside." },
+      { id: "chicken", title: "Chicken", hob: "7", minutes: "4-6", body: "Heat 1 tablespoon olive oil in a large frying pan or saute pan on 7. Cook the chicken cubes until the outside is white and lightly browned. Add the chicken seasoning and cook briefly." },
+      { id: "garlic", title: "Garlic", hob: "5-6", minutes: "0.5-1", body: "Lower the hob to 5-6. Add minced or pressed garlic and cook for 30-60 seconds without letting it burn." },
+      { id: "vegetables", title: "Vegetables", hob: "7 then 6-7", minutes: "12-15", body: "Add the frozen soup vegetables and diced red and yellow pepper. Bring the pan back up on 7, then cook on 6-7 until the frozen moisture has evaporated and the mixture is not soupy." },
+      { id: "season", title: "Season", hob: "6", minutes: "1", body: "Season with oregano, salt and pepper. Stir the cooked pasta through the chicken and vegetables." },
+      { id: "sauce", title: "Sauce", hob: "5", minutes: "1-2", body: "Lower to 5. Stir in the red pesto and 75 ml cooking cream. Add up to 100 ml cooking cream if the mixture looks dry." },
+      { id: "bake", title: "Bake", hob: "oven 180 C", minutes: "20", body: "Transfer everything to the oven dish, top with grated mozzarella and bake for about 20 minutes until the cheese has melted and the top has light colour." },
+      { id: "rest", title: "Rest", hob: "off", minutes: "2-3", body: "Let the dish stand for 2-3 minutes before serving so the sauce settles slightly." }
+    ]
+  },
+  createdAt: "2026-06-05T14:30:00.000Z",
+  updatedAt: "2026-06-05T14:30:00.000Z"
+};
+
+const DEFAULT_RECIPE_SEEDS = [STARTER_RECIPE, PASTA_RECIPE];
 
 function progressionRulesWithDefaults(rules = {}) {
   return Object.fromEntries(Object.entries(DEFAULT_PROGRESSION_RULES).map(([key, defaults]) => {
@@ -458,6 +858,58 @@ function recipeWithDefaults(recipe = {}, index = 0) {
   };
 }
 
+function mergeSeedRecipeOption(seedOption = {}, currentOption = {}) {
+  const merged = { ...seedOption, ...(currentOption || {}) };
+  [
+    "sourceUrl", "packAmount", "packUnit", "packPrice", "currency",
+    "amount", "amountUnit", "displayAmount", "nutritionBasis",
+    "kcalPer100", "proteinPer100", "carbsPer100", "fatPer100"
+  ].forEach(key => {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === "") merged[key] = seedOption[key];
+  });
+  return merged;
+}
+
+function mergeSeedRecipeGroup(seedGroup = {}, currentGroup = {}) {
+  const currentOptions = new Map((currentGroup.options || []).map(option => [String(option.id || ""), option]));
+  const mergedOptions = (seedGroup.options || []).map(seedOption => {
+    const currentOption = currentOptions.get(String(seedOption.id || ""));
+    return currentOption ? mergeSeedRecipeOption(seedOption, currentOption) : structuredClone(seedOption);
+  });
+  (currentGroup.options || []).forEach(option => {
+    if (!mergedOptions.some(merged => String(merged.id || "") === String(option.id || ""))) mergedOptions.push(option);
+  });
+  return {
+    ...seedGroup,
+    ...(currentGroup || {}),
+    options: mergedOptions
+  };
+}
+
+function mergeSeedRecipe(seed = {}, current = {}) {
+  const currentRecipe = recipeWithDefaults(current);
+  if (!currentRecipe.updatedAt || currentRecipe.updatedAt === "2026-06-05T00:00:00.000Z") {
+    return structuredClone(seed);
+  }
+  const currentGroups = new Map((currentRecipe.groups || []).map(group => [String(group.id || ""), group]));
+  const mergedGroups = (seed.groups || []).map(seedGroup => {
+    const currentGroup = currentGroups.get(String(seedGroup.id || ""));
+    return currentGroup ? mergeSeedRecipeGroup(seedGroup, currentGroup) : structuredClone(seedGroup);
+  });
+  (currentRecipe.groups || []).forEach(group => {
+    if (!mergedGroups.some(merged => String(merged.id || "") === String(group.id || ""))) mergedGroups.push(group);
+  });
+  return recipeWithDefaults({
+    ...seed,
+    ...currentRecipe,
+    groups: mergedGroups,
+    selections: { ...(seed.selections || {}), ...(currentRecipe.selections || {}) },
+    cooking: currentRecipe.cooking || seed.cooking,
+    createdAt: currentRecipe.createdAt || seed.createdAt,
+    updatedAt: currentRecipe.updatedAt || seed.updatedAt
+  });
+}
+
 function cookingPreferencesWithDefaults(value = {}) {
   return {
     ...(value || {}),
@@ -479,9 +931,11 @@ function recipesWithStarter(recipes = [], deletedRecipes = {}) {
     const id = recipeIdentity(recipe) || `recipe-${index}`;
     if (!deleted.has(id) && !map.has(id)) map.set(id, { ...recipe, id });
   });
-  if (!deleted.has(STARTER_RECIPE_ID) && !map.has(STARTER_RECIPE_ID)) {
-    map.set(STARTER_RECIPE_ID, structuredClone(STARTER_RECIPE));
-  }
+  DEFAULT_RECIPE_SEEDS.forEach(seed => {
+    const id = recipeIdentity(seed);
+    if (!id || deleted.has(id)) return;
+    map.set(id, map.has(id) ? mergeSeedRecipe(seed, map.get(id)) : structuredClone(seed));
+  });
   return Array.from(map.values());
 }
 
@@ -1845,5 +2299,5 @@ function ageFrom(birthday) {
 window.RepsState = {
   AppStateProvider, useApp, AppContext, todayDayKey, ageFrom,
   DAY_KEYS, PRESETS, PHASES, DEFAULT_PROGRESSION_RULES,
-  DEFAULT_HOB_PREFERENCES, STARTER_RECIPE, STORE_KEY
+  DEFAULT_HOB_PREFERENCES, STARTER_RECIPE, PASTA_RECIPE, DEFAULT_RECIPE_SEEDS, STORE_KEY
 };

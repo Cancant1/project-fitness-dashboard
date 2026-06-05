@@ -587,6 +587,10 @@ var STARTER_RECIPE = {
       label: "Jumbo Classic Burger Rundvlees",
       item: "Jumbo Classic Burger Rundvlees 2 Stuks",
       sourceUrl: "https://www.jumbo.com/producten/jumbo-classic-burger-rundvlees-2-stuks-95544TRA",
+      packAmount: 220,
+      packUnit: "g",
+      packPrice: 4.05,
+      currency: "EUR",
       amount: 220,
       amountUnit: "g",
       displayAmount: "2 burgers",
@@ -600,6 +604,10 @@ var STARTER_RECIPE = {
       label: "Jumbo Ambachtelijke Slavink",
       item: "Jumbo Ambachtelijke Slavinken 2 Stuks",
       sourceUrl: "https://www.jumbo.com/producten/jumbo-ambachtelijke-slavinken-2-stuks-201573TRA",
+      packAmount: 220,
+      packUnit: "g",
+      packPrice: 2.79,
+      currency: "EUR",
       amount: 110,
       amountUnit: "g",
       displayAmount: "1 slavink",
@@ -613,6 +621,10 @@ var STARTER_RECIPE = {
       label: "Jumbo Varken Saucijs",
       item: "Jumbo Varkens Saucijzen 10 Stuks",
       sourceUrl: "https://www.jumbo.com/producten/jumbo-varkens-saucijzen-10-stuks-163322TRA",
+      packAmount: 800,
+      packUnit: "g",
+      packPrice: 6.19,
+      currency: "EUR",
       amount: 120,
       amountUnit: "g",
       displayAmount: "1.5 saucijzen",
@@ -631,14 +643,18 @@ var STARTER_RECIPE = {
       label: "Jumbo Vastkokende Aardappelen",
       item: "Jumbo Vastkokende Aardappelen 1 kg",
       sourceUrl: "https://www.jumbo.com/producten/jumbo-vastkokende-aardappelen-1kg-74155ZK",
+      packAmount: 1000,
+      packUnit: "g",
+      packPrice: 1.29,
+      currency: "EUR",
       amount: 200,
       amountUnit: "g",
       displayAmount: "200 g",
       nutritionBasis: "per 100 g",
-      kcalPer100: 88,
-      proteinPer100: 2,
-      carbsPer100: 19,
-      fatPer100: 0
+      kcalPer100: 86,
+      proteinPer100: 1.7,
+      carbsPer100: 17.9,
+      fatPer100: 0.4
     }]
   }, {
     id: "vegetable",
@@ -649,6 +665,10 @@ var STARTER_RECIPE = {
       label: "Jumbo Biologische Broccoliroosjes",
       item: "Jumbo Biologische Broccoliroosjes 450 g",
       sourceUrl: "https://www.jumbo.com/producten/jumbo-biologische-broccoliroosjes-450-g-620066ZK",
+      packAmount: 450,
+      packUnit: "g",
+      packPrice: 2.58,
+      currency: "EUR",
       amount: 225,
       amountUnit: "g",
       displayAmount: "half a 450 g bag",
@@ -661,7 +681,11 @@ var STARTER_RECIPE = {
       id: "jumbo-bio-sperziebonen",
       label: "Jumbo Biologische Hele Sperziebonen",
       item: "Jumbo Biologisch Hele Sperziebonen 450 g",
-      sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-hele-sperziebonen-450-g-169332DS",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-hele-sperziebonen-450g-621516ZK",
+      packAmount: 450,
+      packUnit: "g",
+      packPrice: 1.35,
+      currency: "EUR",
       amount: 225,
       amountUnit: "g",
       displayAmount: "half a 450 g bag",
@@ -674,7 +698,11 @@ var STARTER_RECIPE = {
       id: "jumbo-bio-bladspinazie",
       label: "Jumbo Biologische Bladspinazie",
       item: "Jumbo Biologische Bladspinazie 450 g",
-      sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-bladspinazie-450-g-692546DS",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-bladspinazie-gesneden-450-g-632203DS",
+      packAmount: 450,
+      packUnit: "g",
+      packPrice: 1.39,
+      currency: "EUR",
       amount: 225,
       amountUnit: "g",
       displayAmount: "half a 450 g bag",
@@ -693,6 +721,10 @@ var STARTER_RECIPE = {
       label: "Maggi Jus Naturel",
       item: "Maggi Jus Naturel 250 ml",
       sourceUrl: "https://www.jumbo.com/producten/maggi-jus-naturel-250-ml-703835PAK",
+      packAmount: 250,
+      packUnit: "ml",
+      packPrice: 2.59,
+      currency: "EUR",
       amount: 50,
       amountUnit: "ml",
       displayAmount: "50 ml",
@@ -711,6 +743,10 @@ var STARTER_RECIPE = {
       label: "Jumbo Zonnebloemolie",
       item: "Jumbo Zonnebloemolie 500 ml",
       sourceUrl: "https://www.jumbo.com/producten/jumbo-zonnebloemolie-500ml-269994FLS",
+      packAmount: 500,
+      packUnit: "ml",
+      packPrice: 3.99,
+      currency: "EUR",
       amount: 7.5,
       amountUnit: "ml",
       displayAmount: "0.5 el share from 1 el for 4 burgers",
@@ -751,8 +787,376 @@ var STARTER_RECIPE = {
     }]
   },
   createdAt: "2026-06-05T00:00:00.000Z",
-  updatedAt: "2026-06-05T00:00:00.000Z"
+  updatedAt: "2026-06-05T14:30:00.000Z"
 };
+var PASTA_RECIPE_ID = "recipe-pastaschotel-kip-rode-pesto";
+var PASTA_RECIPE = {
+  id: PASTA_RECIPE_ID,
+  name: "Pastaschotel met kip en rode pesto",
+  category: "Dinner",
+  tags: ["pasta", "oven", "Jumbo", "electric hob"],
+  servings: 1,
+  summary: "A two-person oven pasta bake with chicken, red pesto, cooking cream and mozzarella.",
+  defaultDateMode: "today",
+  selections: {
+    pasta: "jumbo-penne-rigate",
+    meat: "jumbo-kipfiletblokjes",
+    soupVegetables: "jumbo-soepgroenten-diepvries",
+    redPepper: "jumbo-paprika-rood",
+    yellowPepper: "jumbo-paprika-geel",
+    garlic: "jumbo-bio-knoflook",
+    sauce: "jumbo-pesto-rood",
+    cream: "jumbo-kookroom-20",
+    topping: "jumbo-geraspte-mozzarella",
+    fat: "jumbo-olijfolie-mild",
+    chickenSeasoning: "jumbo-kruidenmix-kip",
+    herb: "euroma-oregano"
+  },
+  groups: [{
+    id: "pasta",
+    label: "Pasta",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-penne-rigate",
+      label: "Jumbo's Penne Rigate",
+      item: "Jumbo's Penne Rigate 500 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-s-penne-rigate-500-g-710326ZK",
+      packAmount: 500,
+      packUnit: "g",
+      packPrice: 1.29,
+      currency: "EUR",
+      amount: 150,
+      amountUnit: "g",
+      displayAmount: "150 g dry pasta",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 374,
+      proteinPer100: 13.5,
+      carbsPer100: 75,
+      fatPer100: 1.5
+    }]
+  }, {
+    id: "meat",
+    label: "Chicken",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-kipfiletblokjes",
+      label: "Jumbo Kipfiletblokjes",
+      item: "Jumbo Kipfiletblokjes 600 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-kipfiletblokjes-600-g-515014BAK",
+      packAmount: 600,
+      packUnit: "g",
+      packPrice: 8.49,
+      currency: "EUR",
+      amount: 150,
+      amountUnit: "g",
+      displayAmount: "150 g",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 106,
+      proteinPer100: 24.7,
+      carbsPer100: 0,
+      fatPer100: 0.8
+    }]
+  }, {
+    id: "soupVegetables",
+    label: "Soup vegetables",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-soepgroenten-diepvries",
+      label: "Jumbo Soepgroenten",
+      item: "Jumbo Soepgroenten 450 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-soepgroenten-450g-600670DS",
+      packAmount: 450,
+      packUnit: "g",
+      packPrice: 1.93,
+      currency: "EUR",
+      amount: 200,
+      amountUnit: "g",
+      displayAmount: "200 g frozen",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 27,
+      proteinPer100: 1.5,
+      carbsPer100: 3,
+      fatPer100: 0.5
+    }]
+  }, {
+    id: "redPepper",
+    label: "Red pepper",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-paprika-rood",
+      label: "Jumbo Paprika Rood",
+      item: "Jumbo Paprika Rood 1 stuk",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-paprika-rood-641085STK",
+      packAmount: 150,
+      packUnit: "g",
+      packPrice: 1.09,
+      currency: "EUR",
+      amount: 75,
+      amountUnit: "g",
+      displayAmount: "half a pepper",
+      nutritionBasis: "per 100 g estimate",
+      kcalPer100: 31,
+      proteinPer100: 1,
+      carbsPer100: 6,
+      fatPer100: 0.3
+    }]
+  }, {
+    id: "yellowPepper",
+    label: "Yellow pepper",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-paprika-geel",
+      label: "Jumbo Paprika Geel",
+      item: "Jumbo Paprika Geel 1 stuk",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-paprika-geel-719402STK",
+      packAmount: 150,
+      packUnit: "g",
+      packPrice: 1.09,
+      currency: "EUR",
+      amount: 75,
+      amountUnit: "g",
+      displayAmount: "half a pepper",
+      nutritionBasis: "per 100 g estimate",
+      kcalPer100: 27,
+      proteinPer100: 1,
+      carbsPer100: 6.3,
+      fatPer100: 0.2
+    }]
+  }, {
+    id: "garlic",
+    label: "Garlic",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-bio-knoflook",
+      label: "Jumbo Biologische Knoflook",
+      item: "Jumbo Biologische Knoflook 2 Stuks",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-knoflook-biologisch-100g-191136NET",
+      packAmount: 100,
+      packUnit: "g",
+      packPrice: 1.49,
+      currency: "EUR",
+      amount: 5,
+      amountUnit: "g",
+      displayAmount: "1 small clove",
+      nutritionBasis: "per 100 g estimate",
+      kcalPer100: 149,
+      proteinPer100: 6.4,
+      carbsPer100: 33.1,
+      fatPer100: 0.5
+    }]
+  }, {
+    id: "sauce",
+    label: "Pesto",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-pesto-rood",
+      label: "Jumbo Pesto Rood",
+      item: "Jumbo Pesto Rood 190 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-pesto-rood-190g-347553POT",
+      packAmount: 190,
+      packUnit: "g",
+      packPrice: 1.13,
+      currency: "EUR",
+      amount: 100,
+      amountUnit: "g",
+      displayAmount: "100 g",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 358,
+      proteinPer100: 6.5,
+      carbsPer100: 9.1,
+      fatPer100: 32
+    }, {
+      id: "sacla-pesto-rosso",
+      label: "Sacla Pesto Rosso",
+      item: "Sacla Pesto Rosso 190 g",
+      sourceUrl: "https://www.jumbo.com/producten/sacla-pesto-rosso-190g-80387DS",
+      packAmount: 190,
+      packUnit: "g",
+      packPrice: 2.66,
+      currency: "EUR",
+      amount: 100,
+      amountUnit: "g",
+      displayAmount: "100 g",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 312,
+      proteinPer100: 4.3,
+      carbsPer100: 5.6,
+      fatPer100: 29.3
+    }]
+  }, {
+    id: "cream",
+    label: "Cooking cream",
+    inputLabel: "ml",
+    options: [{
+      id: "jumbo-kookroom-20",
+      label: "Jumbo Kookroom 20%",
+      item: "Jumbo Kookroom 20% Vet 250 ml",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-kookroom-20-vet-250-ml-189102STK",
+      packAmount: 250,
+      packUnit: "ml",
+      packPrice: 0.98,
+      currency: "EUR",
+      amount: 75,
+      amountUnit: "ml",
+      displayAmount: "75 ml, up to 100 ml if dry",
+      nutritionBasis: "per 100 ml",
+      kcalPer100: 207,
+      proteinPer100: 2.6,
+      carbsPer100: 4.2,
+      fatPer100: 20
+    }]
+  }, {
+    id: "topping",
+    label: "Cheese",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-geraspte-mozzarella",
+      label: "Jumbo Geraspte Mozzarella 40+",
+      item: "Jumbo Geraspte Mozzarella 40+ 150 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-geraspte-mozzarella-40-150-g-588986ZK",
+      packAmount: 150,
+      packUnit: "g",
+      packPrice: 2.49,
+      currency: "EUR",
+      amount: 50,
+      amountUnit: "g",
+      displayAmount: "50 g",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 303,
+      proteinPer100: 25,
+      carbsPer100: 2.7,
+      fatPer100: 21
+    }]
+  }, {
+    id: "fat",
+    label: "Cooking fat",
+    inputLabel: "ml",
+    options: [{
+      id: "jumbo-olijfolie-mild",
+      label: "Jumbo Olijfolie Mild",
+      item: "Jumbo Olijfolie Mild 500 ml",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-olijfolie-mild-500-ml-418263FLS",
+      packAmount: 500,
+      packUnit: "ml",
+      packPrice: 5.45,
+      currency: "EUR",
+      amount: 15,
+      amountUnit: "ml",
+      displayAmount: "1 el plus a little for the dish",
+      nutritionBasis: "per 100 ml",
+      kcalPer100: 823,
+      proteinPer100: 0,
+      carbsPer100: 0,
+      fatPer100: 91.4
+    }]
+  }, {
+    id: "chickenSeasoning",
+    label: "Chicken seasoning",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-kruidenmix-kip",
+      label: "Jumbo Kruidenmix Kip",
+      item: "Jumbo Kruidenmix Kip 70 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-kruidenmix-kip-70g-562156POT",
+      packAmount: 70,
+      packUnit: "g",
+      packPrice: 1.94,
+      currency: "EUR",
+      amount: 3,
+      amountUnit: "g",
+      displayAmount: "1 tsp",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 191,
+      proteinPer100: 6.9,
+      carbsPer100: 16.9,
+      fatPer100: 6.7
+    }]
+  }, {
+    id: "herb",
+    label: "Oregano",
+    inputLabel: "grams",
+    options: [{
+      id: "euroma-oregano",
+      label: "Euroma Oregano",
+      item: "Euroma Essential N04 Oregano",
+      sourceUrl: "https://www.jumbo.com/producten/euroma-essential-n04-oregano-619973BLK",
+      packAmount: 5,
+      packUnit: "g",
+      packPrice: 3.14,
+      currency: "EUR",
+      amount: 0.75,
+      amountUnit: "g",
+      displayAmount: "0.75 tsp",
+      nutritionBasis: "per 100 g estimate",
+      kcalPer100: 306,
+      proteinPer100: 11,
+      carbsPer100: 64,
+      fatPer100: 10
+    }]
+  }],
+  cooking: {
+    equipment: "Electric hob and oven",
+    hobNote: DEFAULT_HOB_PREFERENCES.note,
+    steps: [{
+      id: "oven",
+      title: "Oven and dish",
+      hob: "oven 180 C",
+      minutes: "5",
+      body: "Preheat the oven to 180 C. Lightly grease an oven dish with a small amount of olive oil."
+    }, {
+      id: "pasta",
+      title: "Pasta",
+      hob: "8-9 then 6",
+      minutes: "8-11",
+      body: "Cook the penne according to the package. Drain and keep it aside."
+    }, {
+      id: "chicken",
+      title: "Chicken",
+      hob: "7",
+      minutes: "4-6",
+      body: "Heat 1 tablespoon olive oil in a large frying pan or saute pan on 7. Cook the chicken cubes until the outside is white and lightly browned. Add the chicken seasoning and cook briefly."
+    }, {
+      id: "garlic",
+      title: "Garlic",
+      hob: "5-6",
+      minutes: "0.5-1",
+      body: "Lower the hob to 5-6. Add minced or pressed garlic and cook for 30-60 seconds without letting it burn."
+    }, {
+      id: "vegetables",
+      title: "Vegetables",
+      hob: "7 then 6-7",
+      minutes: "12-15",
+      body: "Add the frozen soup vegetables and diced red and yellow pepper. Bring the pan back up on 7, then cook on 6-7 until the frozen moisture has evaporated and the mixture is not soupy."
+    }, {
+      id: "season",
+      title: "Season",
+      hob: "6",
+      minutes: "1",
+      body: "Season with oregano, salt and pepper. Stir the cooked pasta through the chicken and vegetables."
+    }, {
+      id: "sauce",
+      title: "Sauce",
+      hob: "5",
+      minutes: "1-2",
+      body: "Lower to 5. Stir in the red pesto and 75 ml cooking cream. Add up to 100 ml cooking cream if the mixture looks dry."
+    }, {
+      id: "bake",
+      title: "Bake",
+      hob: "oven 180 C",
+      minutes: "20",
+      body: "Transfer everything to the oven dish, top with grated mozzarella and bake for about 20 minutes until the cheese has melted and the top has light colour."
+    }, {
+      id: "rest",
+      title: "Rest",
+      hob: "off",
+      minutes: "2-3",
+      body: "Let the dish stand for 2-3 minutes before serving so the sauce settles slightly."
+    }]
+  },
+  createdAt: "2026-06-05T14:30:00.000Z",
+  updatedAt: "2026-06-05T14:30:00.000Z"
+};
+var DEFAULT_RECIPE_SEEDS = [STARTER_RECIPE, PASTA_RECIPE];
 function progressionRulesWithDefaults() {
   var rules = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return Object.fromEntries(Object.entries(DEFAULT_PROGRESSION_RULES).map(function (_ref) {
@@ -1084,6 +1488,61 @@ function recipeWithDefaults() {
     updatedAt: recipe.updatedAt || stamp
   };
 }
+function mergeSeedRecipeOption() {
+  var seedOption = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var currentOption = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var merged = _objectSpread(_objectSpread({}, seedOption), currentOption || {});
+  ["sourceUrl", "packAmount", "packUnit", "packPrice", "currency", "amount", "amountUnit", "displayAmount", "nutritionBasis", "kcalPer100", "proteinPer100", "carbsPer100", "fatPer100"].forEach(function (key) {
+    if (merged[key] === undefined || merged[key] === null || merged[key] === "") merged[key] = seedOption[key];
+  });
+  return merged;
+}
+function mergeSeedRecipeGroup() {
+  var seedGroup = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var currentGroup = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var currentOptions = new Map((currentGroup.options || []).map(function (option) {
+    return [String(option.id || ""), option];
+  }));
+  var mergedOptions = (seedGroup.options || []).map(function (seedOption) {
+    var currentOption = currentOptions.get(String(seedOption.id || ""));
+    return currentOption ? mergeSeedRecipeOption(seedOption, currentOption) : structuredClone(seedOption);
+  });
+  (currentGroup.options || []).forEach(function (option) {
+    if (!mergedOptions.some(function (merged) {
+      return String(merged.id || "") === String(option.id || "");
+    })) mergedOptions.push(option);
+  });
+  return _objectSpread(_objectSpread(_objectSpread({}, seedGroup), currentGroup || {}), {}, {
+    options: mergedOptions
+  });
+}
+function mergeSeedRecipe() {
+  var seed = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var current = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var currentRecipe = recipeWithDefaults(current);
+  if (!currentRecipe.updatedAt || currentRecipe.updatedAt === "2026-06-05T00:00:00.000Z") {
+    return structuredClone(seed);
+  }
+  var currentGroups = new Map((currentRecipe.groups || []).map(function (group) {
+    return [String(group.id || ""), group];
+  }));
+  var mergedGroups = (seed.groups || []).map(function (seedGroup) {
+    var currentGroup = currentGroups.get(String(seedGroup.id || ""));
+    return currentGroup ? mergeSeedRecipeGroup(seedGroup, currentGroup) : structuredClone(seedGroup);
+  });
+  (currentRecipe.groups || []).forEach(function (group) {
+    if (!mergedGroups.some(function (merged) {
+      return String(merged.id || "") === String(group.id || "");
+    })) mergedGroups.push(group);
+  });
+  return recipeWithDefaults(_objectSpread(_objectSpread(_objectSpread({}, seed), currentRecipe), {}, {
+    groups: mergedGroups,
+    selections: _objectSpread(_objectSpread({}, seed.selections || {}), currentRecipe.selections || {}),
+    cooking: currentRecipe.cooking || seed.cooking,
+    createdAt: currentRecipe.createdAt || seed.createdAt,
+    updatedAt: currentRecipe.updatedAt || seed.updatedAt
+  }));
+}
 function cookingPreferencesWithDefaults() {
   var _hob;
   var value = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -1105,9 +1564,11 @@ function recipesWithStarter() {
       id: id
     }));
   });
-  if (!deleted.has(STARTER_RECIPE_ID) && !map.has(STARTER_RECIPE_ID)) {
-    map.set(STARTER_RECIPE_ID, structuredClone(STARTER_RECIPE));
-  }
+  DEFAULT_RECIPE_SEEDS.forEach(function (seed) {
+    var id = recipeIdentity(seed);
+    if (!id || deleted.has(id)) return;
+    map.set(id, map.has(id) ? mergeSeedRecipe(seed, map.get(id)) : structuredClone(seed));
+  });
   return Array.from(map.values());
 }
 function foodEntryIdentity(date) {
@@ -2894,6 +3355,8 @@ window.RepsState = {
   DEFAULT_PROGRESSION_RULES: DEFAULT_PROGRESSION_RULES,
   DEFAULT_HOB_PREFERENCES: DEFAULT_HOB_PREFERENCES,
   STARTER_RECIPE: STARTER_RECIPE,
+  PASTA_RECIPE: PASTA_RECIPE,
+  DEFAULT_RECIPE_SEEDS: DEFAULT_RECIPE_SEEDS,
   STORE_KEY: STORE_KEY
 };
 
@@ -2964,7 +3427,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "05 Jun 2026 13:20";
+var BUILD_LABEL = "05 Jun 2026 12:06";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -11377,6 +11840,10 @@ window.RepsViews = {
 
 /* ---- components/recipes.jsx ---- */
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
+function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
+function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
 function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -11413,6 +11880,40 @@ function recipeMacro(value) {
   var decimals = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
   var n = recipeRound(value, decimals);
   return Number.isInteger(n) ? String(n) : n.toFixed(decimals);
+}
+function recipeCurrency(value) {
+  var currency = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "EUR";
+  var n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  try {
+    return n.toLocaleString("nl-NL", {
+      style: "currency",
+      currency: currency
+    });
+  } catch (e) {
+    return "".concat(currency, " ").concat(n.toFixed(2));
+  }
+}
+function recipeUnitAmount(value) {
+  var unit = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "g";
+  var decimals = unit === "ml" || recipeNumber(value) < 10 ? 1 : 0;
+  return "".concat(recipeMacro(value, decimals), " ").concat(unit || "").trim();
+}
+function recipePackLabel() {
+  var option = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var amount = recipeNumber(option.packAmount, null);
+  var unit = option.packUnit || option.amountUnit || "";
+  var price = option.packPrice !== undefined && option.packPrice !== null ? recipeCurrency(option.packPrice, option.currency || "EUR") : "-";
+  return amount ? "".concat(recipeUnitAmount(amount, unit), " pack \xB7 ").concat(price) : "Pack \xB7 ".concat(price);
+}
+function recipeOptionUsedCost() {
+  var option = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var amount = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var servings = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+  var packAmount = recipeNumber(option.packAmount);
+  var packPrice = Number(option.packPrice);
+  if (!packAmount || !Number.isFinite(packPrice)) return null;
+  return recipeNumber(amount) * recipeNumber(servings, 1) / packAmount * packPrice;
 }
 function recipeSlug(value) {
   return String(value || "recipe").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "recipe-".concat(Date.now().toString(36));
@@ -11465,11 +11966,13 @@ function calculateRecipe() {
     var option = recipeSelectedOption(group, selections);
     var amount = recipeNumber(amounts[group.id], recipeNumber(option === null || option === void 0 ? void 0 : option.amount, 0));
     var macros = recipeOptionMacros(option || {}, amount, servings);
+    var cost = recipeOptionUsedCost(option || {}, amount, servings);
     return {
       group: group,
       option: option,
       amount: amount,
-      macros: macros
+      macros: macros,
+      cost: cost
     };
   }).filter(function (row) {
     return row.option;
@@ -11479,18 +11982,48 @@ function calculateRecipe() {
       kcal: sum.kcal + row.macros.kcal,
       protein: sum.protein + row.macros.protein,
       carbs: sum.carbs + row.macros.carbs,
-      fat: sum.fat + row.macros.fat
+      fat: sum.fat + row.macros.fat,
+      cost: sum.cost + recipeNumber(row.cost, 0)
     };
   }, {
     kcal: 0,
     protein: 0,
     carbs: 0,
-    fat: 0
+    fat: 0,
+    cost: 0
   });
   return {
     rows: rows,
     totals: totals
   };
+}
+function recipeAllIngredientRows() {
+  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var amounts = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  var servings = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
+  return (recipe.groups || []).flatMap(function (group) {
+    var selected = recipeSelectedOption(group, selections);
+    return (group.options || []).map(function (option) {
+      var isSelected = (selected === null || selected === void 0 ? void 0 : selected.id) === option.id;
+      var amount = recipeNumber(isSelected ? amounts[group.id] : option.amount, recipeNumber(option.amount, 0));
+      var macros = isSelected ? recipeOptionMacros(option, amount, servings) : {
+        kcal: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0
+      };
+      return {
+        group: group,
+        option: option,
+        selected: isSelected,
+        amount: amount,
+        totalAmount: amount * recipeNumber(servings, 1),
+        macros: macros,
+        cost: isSelected ? recipeOptionUsedCost(option, amount, servings) : null
+      };
+    });
+  });
 }
 function recipeLogName() {
   var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -11521,6 +12054,10 @@ function emptyRecipeTemplate() {
         label: "Ingredient",
         item: "Ingredient",
         sourceUrl: "",
+        packAmount: 100,
+        packUnit: "g",
+        packPrice: 0,
+        currency: "EUR",
         amount: 100,
         amountUnit: "g",
         displayAmount: "100 g",
@@ -11554,10 +12091,11 @@ function RecipeCard(_ref) {
   var _calculateRecipe = calculateRecipe(recipe, selections, amounts, recipe.servings || 1),
     totals = _calculateRecipe.totals,
     rows = _calculateRecipe.rows;
-  var sources = rows.filter(function (row) {
-    var _row$option2;
-    return (_row$option2 = row.option) === null || _row$option2 === void 0 ? void 0 : _row$option2.sourceUrl;
-  }).length;
+  var sources = (recipe.groups || []).reduce(function (sum, group) {
+    return sum + (group.options || []).filter(function (option) {
+      return option.sourceUrl;
+    }).length;
+  }, 0);
   return React.createElement("article", {
     className: "recipe-card"
   }, React.createElement("div", {
@@ -11578,7 +12116,7 @@ function RecipeCard(_ref) {
     onClick: onDelete
   }, React.createElement(RI.X, null)))), React.createElement("div", {
     className: "recipe-card-macros"
-  }, React.createElement("span", null, React.createElement("strong", null, recipeKcal(totals.kcal)), " kcal"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.fat)), "g fat")), React.createElement("div", {
+  }, React.createElement("span", null, React.createElement("strong", null, recipeKcal(totals.kcal)), " kcal"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.fat)), "g fat"), React.createElement("span", null, React.createElement("strong", null, recipeCurrency(totals.cost)), " used")), React.createElement("div", {
     className: "recipe-card-foot"
   }, React.createElement("span", {
     className: "mono muted"
@@ -11620,6 +12158,9 @@ function RecipeModal(_ref2) {
     setAmounts = _useRecipeState0[1];
   var computed = useRecipeMemo(function () {
     return calculateRecipe(recipe, selections, amounts, servings);
+  }, [recipe, selections, amounts, servings]);
+  var ingredientRows = useRecipeMemo(function () {
+    return recipeAllIngredientRows(recipe, selections, amounts, servings);
   }, [recipe, selections, amounts, servings]);
   var hob = ((_recipe$cooking = recipe.cooking) === null || _recipe$cooking === void 0 ? void 0 : _recipe$cooking.hobNote) || RepsState.DEFAULT_HOB_PREFERENCES.note;
   var selectOption = function selectOption(group, option) {
@@ -11696,7 +12237,7 @@ function RecipeModal(_ref2) {
     }
   })), React.createElement("label", {
     className: "recipe-serving-control"
-  }, React.createElement("span", null, "Servings"), React.createElement("input", {
+  }, React.createElement("span", null, "Multiplier"), React.createElement("input", {
     type: "number",
     min: "0.25",
     step: "0.25",
@@ -11712,7 +12253,7 @@ function RecipeModal(_ref2) {
     className: "recipe-total-number"
   }, recipeKcal(computed.totals.kcal), React.createElement("span", null, "kcal")), React.createElement("div", {
     className: "recipe-total-grid"
-  }, React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.fat)), "g fat")), React.createElement("button", {
+  }, React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.fat)), "g fat"), React.createElement("span", null, React.createElement("strong", null, recipeCurrency(computed.totals.cost)), " used")), React.createElement("button", {
     className: "btn primary sm recipe-log-btn",
     type: "button",
     onClick: logMeal
@@ -11752,22 +12293,22 @@ function RecipeModal(_ref2) {
           return _objectSpread(_objectSpread({}, current), {}, _defineProperty({}, group.id, e.target.value));
         });
       }
-    }), React.createElement("span", null, (selected === null || selected === void 0 ? void 0 : selected.amountUnit) || "g", " per serving"), (selected === null || selected === void 0 ? void 0 : selected.sourceUrl) && React.createElement("a", {
+    }), React.createElement("span", null, (selected === null || selected === void 0 ? void 0 : selected.amountUnit) || "g", " used"), selected && React.createElement("span", null, recipePackLabel(selected)), (selected === null || selected === void 0 ? void 0 : selected.sourceUrl) && React.createElement("a", {
       href: selected.sourceUrl,
       target: "_blank",
       rel: "noreferrer"
     }, "Jumbo source")));
   })), tab === "ingredients" && React.createElement("div", {
     className: "recipe-ingredient-list"
-  }, computed.rows.map(function (row) {
+  }, ingredientRows.map(function (row) {
     return React.createElement("div", {
-      key: row.group.id,
-      className: "recipe-ingredient-row"
+      key: "".concat(row.group.id, "-").concat(row.option.id),
+      className: "recipe-ingredient-row ".concat(row.selected ? "is-selected" : "")
     }, React.createElement("div", null, React.createElement("span", {
       className: "recipe-card-kicker"
-    }, row.group.label), React.createElement("strong", null, row.option.item || row.option.label), React.createElement("em", null, recipeMacro(row.amount * recipeNumber(servings, 1), row.option.amountUnit === "ml" ? 1 : 0), " ", row.option.amountUnit || "g", " total \xB7 ", row.option.nutritionBasis || "per 100")), React.createElement("div", {
+    }, row.group.label, row.selected ? " · selected" : ""), React.createElement("strong", null, row.option.item || row.option.label), React.createElement("em", null, "Full pack: ", recipePackLabel(row.option)), row.selected && React.createElement("em", null, "Build uses: ", recipeUnitAmount(row.totalAmount, row.option.amountUnit || "g"), row.cost !== null ? " \xB7 ".concat(recipeCurrency(row.cost, row.option.currency || "EUR")) : ""), React.createElement("em", null, row.option.nutritionBasis || "per 100")), React.createElement("div", {
       className: "recipe-ingredient-macros"
-    }, React.createElement("span", null, recipeKcal(row.macros.kcal), " kcal"), React.createElement("span", null, recipeMacro(row.macros.protein), "g protein"), row.option.sourceUrl && React.createElement("a", {
+    }, row.selected ? React.createElement(React.Fragment, null, React.createElement("span", null, recipeKcal(row.macros.kcal), " kcal"), React.createElement("span", null, recipeMacro(row.macros.protein), "g protein")) : React.createElement("span", null, "option"), row.option.sourceUrl && React.createElement("a", {
       href: row.option.sourceUrl,
       target: "_blank",
       rel: "noreferrer"
@@ -11789,51 +12330,257 @@ function RecipeModal(_ref2) {
     }, "hob ", step.hob || "6", " \xB7 ", step.minutes || "until done", " min")), React.createElement("p", null, step.body)));
   })))));
 }
-function RecipeJsonEditorModal(_ref4) {
+function recipeOptionTemplate() {
+  var groupId = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : "ingredient";
+  var slug = recipeSlug(groupId);
+  return {
+    id: "".concat(slug, "-option-").concat(Date.now().toString(36)),
+    label: "Ingredient",
+    item: "Ingredient",
+    sourceUrl: "",
+    packAmount: 100,
+    packUnit: "g",
+    packPrice: 0,
+    currency: "EUR",
+    amount: 100,
+    amountUnit: "g",
+    displayAmount: "100 g",
+    nutritionBasis: "per 100 g",
+    kcalPer100: 100,
+    proteinPer100: 10,
+    carbsPer100: 0,
+    fatPer100: 0
+  };
+}
+function recipeGroupTemplate() {
+  var id = "group-".concat(Date.now().toString(36));
+  return {
+    id: id,
+    label: "Ingredient group",
+    inputLabel: "grams",
+    options: [recipeOptionTemplate(id)]
+  };
+}
+function recipeStepTemplate() {
+  return {
+    id: "step-".concat(Date.now().toString(36)),
+    title: "Step",
+    hob: "6",
+    minutes: "10",
+    body: "Add the cooking step."
+  };
+}
+function recipeCleanNumber(value) {
+  var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+function recipeSanitizeDraft() {
+  var _draft$cooking, _draft$cooking2, _draft$cooking3;
+  var draft = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var fallbackId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "";
+  var id = String(draft.id || fallbackId || recipeSlug(draft.name)).trim();
+  var groups = (draft.groups || []).map(function (group, groupIndex) {
+    var groupId = String(group.id || recipeSlug(group.label) || "group-".concat(groupIndex + 1)).trim();
+    var options = (group.options || []).map(function (option, optionIndex) {
+      var optionId = String(option.id || recipeSlug(option.label || option.item) || "".concat(groupId, "-option-").concat(optionIndex + 1)).trim();
+      return _objectSpread(_objectSpread({}, option), {}, {
+        id: optionId,
+        label: String(option.label || option.item || "Ingredient").trim(),
+        item: String(option.item || option.label || "Ingredient").trim(),
+        sourceUrl: String(option.sourceUrl || "").trim(),
+        packAmount: recipeCleanNumber(option.packAmount, 0),
+        packUnit: String(option.packUnit || option.amountUnit || "g").trim(),
+        packPrice: recipeCleanNumber(option.packPrice, 0),
+        currency: String(option.currency || "EUR").trim() || "EUR",
+        amount: recipeCleanNumber(option.amount, 0),
+        amountUnit: String(option.amountUnit || option.packUnit || "g").trim(),
+        displayAmount: String(option.displayAmount || "").trim(),
+        nutritionBasis: String(option.nutritionBasis || "per 100 g").trim(),
+        kcalPer100: recipeCleanNumber(option.kcalPer100, 0),
+        proteinPer100: recipeCleanNumber(option.proteinPer100, 0),
+        carbsPer100: recipeCleanNumber(option.carbsPer100, 0),
+        fatPer100: recipeCleanNumber(option.fatPer100, 0)
+      });
+    }).filter(function (option) {
+      return option.id && option.label;
+    });
+    return _objectSpread(_objectSpread({}, group), {}, {
+      id: groupId,
+      label: String(group.label || "Ingredient group").trim(),
+      inputLabel: String(group.inputLabel || "amount").trim(),
+      options: options
+    });
+  }).filter(function (group) {
+    return group.id && group.options.length;
+  });
+  var selections = _objectSpread({}, draft.selections || {});
+  groups.forEach(function (group) {
+    var _group$options$;
+    var selected = selections[group.id];
+    if (!group.options.some(function (option) {
+      return option.id === selected;
+    })) selections[group.id] = ((_group$options$ = group.options[0]) === null || _group$options$ === void 0 ? void 0 : _group$options$.id) || "";
+  });
+  var cooking = {
+    equipment: ((_draft$cooking = draft.cooking) === null || _draft$cooking === void 0 ? void 0 : _draft$cooking.equipment) || "Electric hob",
+    hobNote: ((_draft$cooking2 = draft.cooking) === null || _draft$cooking2 === void 0 ? void 0 : _draft$cooking2.hobNote) || RepsState.DEFAULT_HOB_PREFERENCES.note,
+    steps: (((_draft$cooking3 = draft.cooking) === null || _draft$cooking3 === void 0 ? void 0 : _draft$cooking3.steps) || []).map(function (step, index) {
+      return {
+        id: String(step.id || "step-".concat(index + 1)).trim(),
+        title: String(step.title || "Step ".concat(index + 1)).trim(),
+        hob: String(step.hob || "").trim(),
+        minutes: String(step.minutes || "").trim(),
+        body: String(step.body || "").trim()
+      };
+    }).filter(function (step) {
+      return step.title || step.body;
+    })
+  };
+  return _objectSpread(_objectSpread({}, draft), {}, {
+    id: id,
+    name: String(draft.name || "Untitled recipe").trim() || "Untitled recipe",
+    category: String(draft.category || "Recipes").trim() || "Recipes",
+    tags: Array.isArray(draft.tags) ? draft.tags.map(function (tag) {
+      return String(tag).trim();
+    }).filter(Boolean) : [],
+    servings: Math.max(0.25, recipeCleanNumber(draft.servings, 1)),
+    summary: String(draft.summary || "").trim(),
+    selections: selections,
+    groups: groups,
+    cooking: cooking
+  });
+}
+function RecipeEditorModal(_ref4) {
+  var _draft$cooking4, _draft$cooking5, _draft$cooking6;
   var recipe = _ref4.recipe,
     onClose = _ref4.onClose,
     onSave = _ref4.onSave,
     onDelete = _ref4.onDelete;
   var isNew = !recipe;
-  var initial = recipeClone(recipe || emptyRecipeTemplate());
-  var _useRecipeState1 = useRecipeState(initial.name || ""),
-    _useRecipeState10 = _slicedToArray(_useRecipeState1, 2),
-    name = _useRecipeState10[0],
-    setName = _useRecipeState10[1];
-  var _useRecipeState11 = useRecipeState(initial.servings || 1),
-    _useRecipeState12 = _slicedToArray(_useRecipeState11, 2),
-    servings = _useRecipeState12[0],
-    setServings = _useRecipeState12[1];
-  var _useRecipeState13 = useRecipeState(function () {
-      return JSON.stringify(initial, null, 2);
+  var _useRecipeState1 = useRecipeState(function () {
+      return recipeClone(recipe || emptyRecipeTemplate());
     }),
-    _useRecipeState14 = _slicedToArray(_useRecipeState13, 2),
-    text = _useRecipeState14[0],
-    setText = _useRecipeState14[1];
-  var _useRecipeState15 = useRecipeState(""),
-    _useRecipeState16 = _slicedToArray(_useRecipeState15, 2),
-    error = _useRecipeState16[0],
-    setError = _useRecipeState16[1];
-  var syncHeaderFields = function syncHeaderFields(patch) {
-    try {
-      var parsed = JSON.parse(text);
-      var next = _objectSpread(_objectSpread({}, parsed), patch);
-      setText(JSON.stringify(next, null, 2));
-    } catch (e) {}
+    _useRecipeState10 = _slicedToArray(_useRecipeState1, 2),
+    draft = _useRecipeState10[0],
+    setDraft = _useRecipeState10[1];
+  var _useRecipeState11 = useRecipeState(""),
+    _useRecipeState12 = _slicedToArray(_useRecipeState11, 2),
+    error = _useRecipeState12[0],
+    setError = _useRecipeState12[1];
+  var setRoot = function setRoot(patch) {
+    setError("");
+    setDraft(function (current) {
+      return _objectSpread(_objectSpread({}, current), patch);
+    });
+  };
+  var updateGroup = function updateGroup(groupIndex, patch) {
+    setError("");
+    setDraft(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, {
+        groups: (current.groups || []).map(function (group, index) {
+          return index === groupIndex ? _objectSpread(_objectSpread({}, group), patch) : group;
+        })
+      });
+    });
+  };
+  var updateOption = function updateOption(groupIndex, optionIndex, patch) {
+    setError("");
+    setDraft(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, {
+        groups: (current.groups || []).map(function (group, index) {
+          if (index !== groupIndex) return group;
+          return _objectSpread(_objectSpread({}, group), {}, {
+            options: (group.options || []).map(function (option, optIndex) {
+              return optIndex === optionIndex ? _objectSpread(_objectSpread({}, option), patch) : option;
+            })
+          });
+        })
+      });
+    });
+  };
+  var addGroup = function addGroup() {
+    setDraft(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, {
+        groups: [].concat(_toConsumableArray(current.groups || []), [recipeGroupTemplate()])
+      });
+    });
+  };
+  var deleteGroup = function deleteGroup(groupIndex) {
+    setDraft(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, {
+        groups: (current.groups || []).filter(function (_group, index) {
+          return index !== groupIndex;
+        })
+      });
+    });
+  };
+  var addOption = function addOption(groupIndex) {
+    setDraft(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, {
+        groups: (current.groups || []).map(function (group, index) {
+          return index === groupIndex ? _objectSpread(_objectSpread({}, group), {}, {
+            options: [].concat(_toConsumableArray(group.options || []), [recipeOptionTemplate(group.id)])
+          }) : group;
+        })
+      });
+    });
+  };
+  var deleteOption = function deleteOption(groupIndex, optionIndex) {
+    setDraft(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, {
+        groups: (current.groups || []).map(function (group, index) {
+          return index === groupIndex ? _objectSpread(_objectSpread({}, group), {}, {
+            options: (group.options || []).filter(function (_option, optIndex) {
+              return optIndex !== optionIndex;
+            })
+          }) : group;
+        })
+      });
+    });
+  };
+  var updateStep = function updateStep(stepIndex, patch) {
+    setDraft(function (current) {
+      var _current$cooking;
+      return _objectSpread(_objectSpread({}, current), {}, {
+        cooking: _objectSpread(_objectSpread({}, current.cooking || {}), {}, {
+          steps: (((_current$cooking = current.cooking) === null || _current$cooking === void 0 ? void 0 : _current$cooking.steps) || []).map(function (step, index) {
+            return index === stepIndex ? _objectSpread(_objectSpread({}, step), patch) : step;
+          })
+        })
+      });
+    });
+  };
+  var addStep = function addStep() {
+    setDraft(function (current) {
+      var _current$cooking2;
+      return _objectSpread(_objectSpread({}, current), {}, {
+        cooking: _objectSpread(_objectSpread({}, current.cooking || {}), {}, {
+          steps: [].concat(_toConsumableArray(((_current$cooking2 = current.cooking) === null || _current$cooking2 === void 0 ? void 0 : _current$cooking2.steps) || []), [recipeStepTemplate()])
+        })
+      });
+    });
+  };
+  var deleteStep = function deleteStep(stepIndex) {
+    setDraft(function (current) {
+      var _current$cooking3;
+      return _objectSpread(_objectSpread({}, current), {}, {
+        cooking: _objectSpread(_objectSpread({}, current.cooking || {}), {}, {
+          steps: (((_current$cooking3 = current.cooking) === null || _current$cooking3 === void 0 ? void 0 : _current$cooking3.steps) || []).filter(function (_step, index) {
+            return index !== stepIndex;
+          })
+        })
+      });
+    });
   };
   var submit = function submit() {
     try {
-      var parsed = JSON.parse(text);
-      var next = _objectSpread(_objectSpread({}, parsed), {}, {
-        id: parsed.id || (recipe === null || recipe === void 0 ? void 0 : recipe.id) || recipeSlug(name),
-        name: name.trim() || parsed.name || "Untitled recipe",
-        servings: recipeNumber(servings, parsed.servings || 1)
-      });
-      if (!Array.isArray(next.groups)) throw new Error("Recipe needs a groups array.");
+      var next = recipeSanitizeDraft(draft, (recipe === null || recipe === void 0 ? void 0 : recipe.id) || draft.id || recipeSlug(draft.name));
+      if (!next.groups.length) throw new Error("Recipe needs at least one ingredient group with one option.");
       onSave(next);
       onClose();
     } catch (e) {
-      setError(e.message || "Recipe JSON is invalid.");
+      setError(e.message || "Recipe is invalid.");
     }
   };
   return React.createElement("div", {
@@ -11851,41 +12598,347 @@ function RecipeJsonEditorModal(_ref4) {
     className: "recipe-modal-head"
   }, React.createElement("div", null, React.createElement("span", {
     className: "recipe-card-kicker"
-  }, isNew ? "New recipe" : "Edit recipe"), React.createElement("h2", null, name || "Recipe")), React.createElement("button", {
+  }, isNew ? "New recipe" : "Edit recipe"), React.createElement("h2", null, draft.name || "Recipe")), React.createElement("button", {
     className: "btn ghost sm icon-only",
     type: "button",
     title: "Close",
     onClick: onClose
   }, React.createElement(RI.X, null))), React.createElement("div", {
-    className: "recipe-editor-fields"
+    className: "recipe-editor-body"
+  }, React.createElement("section", {
+    className: "recipe-edit-section"
+  }, React.createElement("h3", null, "Recipe"), React.createElement("div", {
+    className: "recipe-edit-grid"
   }, React.createElement("label", null, React.createElement("span", null, "Name"), React.createElement("input", {
-    value: name,
+    value: draft.name || "",
     onChange: function onChange(e) {
-      setName(e.target.value);
-      syncHeaderFields({
+      return setRoot({
         name: e.target.value
       });
     }
-  })), React.createElement("label", null, React.createElement("span", null, "Servings"), React.createElement("input", {
+  })), React.createElement("label", null, React.createElement("span", null, "Category"), React.createElement("input", {
+    value: draft.category || "",
+    onChange: function onChange(e) {
+      return setRoot({
+        category: e.target.value
+      });
+    }
+  })), React.createElement("label", null, React.createElement("span", null, "Default multiplier"), React.createElement("input", {
     type: "number",
     min: "0.25",
     step: "0.25",
-    value: servings,
+    value: draft.servings || 1,
     onChange: function onChange(e) {
-      setServings(e.target.value);
-      syncHeaderFields({
-        servings: Number(e.target.value) || 1
+      return setRoot({
+        servings: e.target.value
       });
     }
-  }))), React.createElement("textarea", {
-    className: "recipe-json-input",
-    value: text,
+  })), React.createElement("label", null, React.createElement("span", null, "Tags"), React.createElement("input", {
+    value: (draft.tags || []).join(", "),
     onChange: function onChange(e) {
-      setText(e.target.value);
-      setError("");
-    },
-    spellCheck: "false"
-  }), error && React.createElement("div", {
+      return setRoot({
+        tags: e.target.value.split(",").map(function (tag) {
+          return tag.trim();
+        }).filter(Boolean)
+      });
+    }
+  })), React.createElement("label", {
+    className: "span-2"
+  }, React.createElement("span", null, "Summary"), React.createElement("textarea", {
+    value: draft.summary || "",
+    onChange: function onChange(e) {
+      return setRoot({
+        summary: e.target.value
+      });
+    }
+  })))), React.createElement("section", {
+    className: "recipe-edit-section"
+  }, React.createElement("div", {
+    className: "recipe-edit-section-head"
+  }, React.createElement("h3", null, "Ingredients"), React.createElement("button", {
+    className: "btn ghost sm",
+    type: "button",
+    onClick: addGroup
+  }, React.createElement(RI.Plus, null), " Group")), (draft.groups || []).map(function (group, groupIndex) {
+    return React.createElement("div", {
+      className: "recipe-edit-group",
+      key: "".concat(group.id || "group", "-").concat(groupIndex)
+    }, React.createElement("div", {
+      className: "recipe-edit-group-head"
+    }, React.createElement("strong", null, group.label || "Ingredient group"), React.createElement("button", {
+      className: "btn ghost sm icon-only",
+      type: "button",
+      title: "Delete group",
+      onClick: function onClick() {
+        return deleteGroup(groupIndex);
+      }
+    }, React.createElement(RI.X, null))), React.createElement("div", {
+      className: "recipe-edit-grid compact"
+    }, React.createElement("label", null, React.createElement("span", null, "Group id"), React.createElement("input", {
+      value: group.id || "",
+      onChange: function onChange(e) {
+        return updateGroup(groupIndex, {
+          id: e.target.value
+        });
+      }
+    })), React.createElement("label", null, React.createElement("span", null, "Group name"), React.createElement("input", {
+      value: group.label || "",
+      onChange: function onChange(e) {
+        return updateGroup(groupIndex, {
+          label: e.target.value
+        });
+      }
+    })), React.createElement("label", null, React.createElement("span", null, "Amount label"), React.createElement("input", {
+      value: group.inputLabel || "",
+      onChange: function onChange(e) {
+        return updateGroup(groupIndex, {
+          inputLabel: e.target.value
+        });
+      }
+    }))), React.createElement("div", {
+      className: "recipe-edit-options"
+    }, (group.options || []).map(function (option, optionIndex) {
+      var _option$packAmount, _option$packPrice, _option$amount, _option$kcalPer, _option$proteinPer, _option$carbsPer, _option$fatPer;
+      return React.createElement("div", {
+        className: "recipe-edit-option",
+        key: "".concat(option.id || "option", "-").concat(optionIndex)
+      }, React.createElement("div", {
+        className: "recipe-edit-option-head"
+      }, React.createElement("strong", null, option.label || "Ingredient"), React.createElement("button", {
+        className: "btn ghost sm icon-only",
+        type: "button",
+        title: "Delete option",
+        onClick: function onClick() {
+          return deleteOption(groupIndex, optionIndex);
+        }
+      }, React.createElement(RI.X, null))), React.createElement("div", {
+        className: "recipe-edit-grid option-grid"
+      }, React.createElement("label", null, React.createElement("span", null, "Option id"), React.createElement("input", {
+        value: option.id || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            id: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Name"), React.createElement("input", {
+        value: option.label || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            label: e.target.value
+          });
+        }
+      })), React.createElement("label", {
+        className: "span-2"
+      }, React.createElement("span", null, "Full pack item"), React.createElement("input", {
+        value: option.item || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            item: e.target.value
+          });
+        }
+      })), React.createElement("label", {
+        className: "span-2"
+      }, React.createElement("span", null, "Supermarket URL"), React.createElement("input", {
+        value: option.sourceUrl || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            sourceUrl: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Pack amount"), React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.01",
+        value: (_option$packAmount = option.packAmount) !== null && _option$packAmount !== void 0 ? _option$packAmount : "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            packAmount: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Pack unit"), React.createElement("input", {
+        value: option.packUnit || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            packUnit: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Pack price"), React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.01",
+        value: (_option$packPrice = option.packPrice) !== null && _option$packPrice !== void 0 ? _option$packPrice : "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            packPrice: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Currency"), React.createElement("input", {
+        value: option.currency || "EUR",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            currency: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Build amount"), React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.01",
+        value: (_option$amount = option.amount) !== null && _option$amount !== void 0 ? _option$amount : "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            amount: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Build unit"), React.createElement("input", {
+        value: option.amountUnit || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            amountUnit: e.target.value
+          });
+        }
+      })), React.createElement("label", {
+        className: "span-2"
+      }, React.createElement("span", null, "Display amount"), React.createElement("input", {
+        value: option.displayAmount || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            displayAmount: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Kcal / 100"), React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.1",
+        value: (_option$kcalPer = option.kcalPer100) !== null && _option$kcalPer !== void 0 ? _option$kcalPer : "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            kcalPer100: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Protein / 100"), React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.1",
+        value: (_option$proteinPer = option.proteinPer100) !== null && _option$proteinPer !== void 0 ? _option$proteinPer : "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            proteinPer100: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Carbs / 100"), React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.1",
+        value: (_option$carbsPer = option.carbsPer100) !== null && _option$carbsPer !== void 0 ? _option$carbsPer : "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            carbsPer100: e.target.value
+          });
+        }
+      })), React.createElement("label", null, React.createElement("span", null, "Fat / 100"), React.createElement("input", {
+        type: "number",
+        min: "0",
+        step: "0.1",
+        value: (_option$fatPer = option.fatPer100) !== null && _option$fatPer !== void 0 ? _option$fatPer : "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            fatPer100: e.target.value
+          });
+        }
+      })), React.createElement("label", {
+        className: "span-2"
+      }, React.createElement("span", null, "Nutrition basis"), React.createElement("input", {
+        value: option.nutritionBasis || "",
+        onChange: function onChange(e) {
+          return updateOption(groupIndex, optionIndex, {
+            nutritionBasis: e.target.value
+          });
+        }
+      }))));
+    }), React.createElement("button", {
+      className: "btn ghost sm recipe-add-option",
+      type: "button",
+      onClick: function onClick() {
+        return addOption(groupIndex);
+      }
+    }, React.createElement(RI.Plus, null), " Option")));
+  })), React.createElement("section", {
+    className: "recipe-edit-section"
+  }, React.createElement("div", {
+    className: "recipe-edit-section-head"
+  }, React.createElement("h3", null, "Cook"), React.createElement("button", {
+    className: "btn ghost sm",
+    type: "button",
+    onClick: addStep
+  }, React.createElement(RI.Plus, null), " Step")), React.createElement("div", {
+    className: "recipe-edit-grid"
+  }, React.createElement("label", null, React.createElement("span", null, "Equipment"), React.createElement("input", {
+    value: ((_draft$cooking4 = draft.cooking) === null || _draft$cooking4 === void 0 ? void 0 : _draft$cooking4.equipment) || "",
+    onChange: function onChange(e) {
+      return setRoot({
+        cooking: _objectSpread(_objectSpread({}, draft.cooking || {}), {}, {
+          equipment: e.target.value
+        })
+      });
+    }
+  })), React.createElement("label", {
+    className: "span-2"
+  }, React.createElement("span", null, "Hob note"), React.createElement("input", {
+    value: ((_draft$cooking5 = draft.cooking) === null || _draft$cooking5 === void 0 ? void 0 : _draft$cooking5.hobNote) || "",
+    onChange: function onChange(e) {
+      return setRoot({
+        cooking: _objectSpread(_objectSpread({}, draft.cooking || {}), {}, {
+          hobNote: e.target.value
+        })
+      });
+    }
+  }))), (((_draft$cooking6 = draft.cooking) === null || _draft$cooking6 === void 0 ? void 0 : _draft$cooking6.steps) || []).map(function (step, stepIndex) {
+    return React.createElement("div", {
+      className: "recipe-edit-step",
+      key: "".concat(step.id || "step", "-").concat(stepIndex)
+    }, React.createElement("div", {
+      className: "recipe-edit-option-head"
+    }, React.createElement("strong", null, step.title || "Step ".concat(stepIndex + 1)), React.createElement("button", {
+      className: "btn ghost sm icon-only",
+      type: "button",
+      title: "Delete step",
+      onClick: function onClick() {
+        return deleteStep(stepIndex);
+      }
+    }, React.createElement(RI.X, null))), React.createElement("div", {
+      className: "recipe-edit-grid compact"
+    }, React.createElement("label", null, React.createElement("span", null, "Title"), React.createElement("input", {
+      value: step.title || "",
+      onChange: function onChange(e) {
+        return updateStep(stepIndex, {
+          title: e.target.value
+        });
+      }
+    })), React.createElement("label", null, React.createElement("span", null, "Hob"), React.createElement("input", {
+      value: step.hob || "",
+      onChange: function onChange(e) {
+        return updateStep(stepIndex, {
+          hob: e.target.value
+        });
+      }
+    })), React.createElement("label", null, React.createElement("span", null, "Minutes"), React.createElement("input", {
+      value: step.minutes || "",
+      onChange: function onChange(e) {
+        return updateStep(stepIndex, {
+          minutes: e.target.value
+        });
+      }
+    })), React.createElement("label", {
+      className: "span-3"
+    }, React.createElement("span", null, "Step body"), React.createElement("textarea", {
+      value: step.body || "",
+      onChange: function onChange(e) {
+        return updateStep(stepIndex, {
+          body: e.target.value
+        });
+      }
+    }))));
+  }))), error && React.createElement("div", {
     className: "recipe-editor-error"
   }, error), React.createElement("div", {
     className: "recipe-editor-actions"
@@ -11906,14 +12959,14 @@ function RecipeJsonEditorModal(_ref4) {
 function RecipeImportModal(_ref5) {
   var onClose = _ref5.onClose,
     onImport = _ref5.onImport;
-  var _useRecipeState17 = useRecipeState(""),
-    _useRecipeState18 = _slicedToArray(_useRecipeState17, 2),
-    text = _useRecipeState18[0],
-    setText = _useRecipeState18[1];
-  var _useRecipeState19 = useRecipeState(""),
-    _useRecipeState20 = _slicedToArray(_useRecipeState19, 2),
-    error = _useRecipeState20[0],
-    setError = _useRecipeState20[1];
+  var _useRecipeState13 = useRecipeState(""),
+    _useRecipeState14 = _slicedToArray(_useRecipeState13, 2),
+    text = _useRecipeState14[0],
+    setText = _useRecipeState14[1];
+  var _useRecipeState15 = useRecipeState(""),
+    _useRecipeState16 = _slicedToArray(_useRecipeState15, 2),
+    error = _useRecipeState16[0],
+    setError = _useRecipeState16[1];
   var submit = function submit() {
     try {
       var parsed = JSON.parse(text);
@@ -11979,22 +13032,22 @@ function RecipesView() {
     deleteRecipe = app.deleteRecipe,
     importRecipes = app.importRecipes;
   var recipes = activeProfile.recipes || [];
-  var _useRecipeState21 = useRecipeState(null),
+  var _useRecipeState17 = useRecipeState(null),
+    _useRecipeState18 = _slicedToArray(_useRecipeState17, 2),
+    activeRecipe = _useRecipeState18[0],
+    setActiveRecipe = _useRecipeState18[1];
+  var _useRecipeState19 = useRecipeState(null),
+    _useRecipeState20 = _slicedToArray(_useRecipeState19, 2),
+    editingRecipe = _useRecipeState20[0],
+    setEditingRecipe = _useRecipeState20[1];
+  var _useRecipeState21 = useRecipeState(false),
     _useRecipeState22 = _slicedToArray(_useRecipeState21, 2),
-    activeRecipe = _useRecipeState22[0],
-    setActiveRecipe = _useRecipeState22[1];
-  var _useRecipeState23 = useRecipeState(null),
+    showNew = _useRecipeState22[0],
+    setShowNew = _useRecipeState22[1];
+  var _useRecipeState23 = useRecipeState(false),
     _useRecipeState24 = _slicedToArray(_useRecipeState23, 2),
-    editingRecipe = _useRecipeState24[0],
-    setEditingRecipe = _useRecipeState24[1];
-  var _useRecipeState25 = useRecipeState(false),
-    _useRecipeState26 = _slicedToArray(_useRecipeState25, 2),
-    showNew = _useRecipeState26[0],
-    setShowNew = _useRecipeState26[1];
-  var _useRecipeState27 = useRecipeState(false),
-    _useRecipeState28 = _slicedToArray(_useRecipeState27, 2),
-    showImport = _useRecipeState28[0],
-    setShowImport = _useRecipeState28[1];
+    showImport = _useRecipeState24[0],
+    setShowImport = _useRecipeState24[1];
   var saveRecipe = function saveRecipe(recipe) {
     if ((activeProfile.recipes || []).some(function (r) {
       return r.id === recipe.id;
@@ -12065,7 +13118,7 @@ function RecipesView() {
     onLog: function onLog(date, entry) {
       return addFoodEntry(date, entry);
     }
-  }), editingRecipe && React.createElement(RecipeJsonEditorModal, {
+  }), editingRecipe && React.createElement(RecipeEditorModal, {
     recipe: editingRecipe,
     onClose: function onClose() {
       return setEditingRecipe(null);
@@ -12074,7 +13127,7 @@ function RecipesView() {
     onDelete: function onDelete() {
       return removeRecipe(editingRecipe);
     }
-  }), showNew && React.createElement(RecipeJsonEditorModal, {
+  }), showNew && React.createElement(RecipeEditorModal, {
     onClose: function onClose() {
       return setShowNew(false);
     },
@@ -12090,7 +13143,9 @@ window.RepsRecipes = RecipesView;
 window.RepsRecipeUtils = {
   calculateRecipe: calculateRecipe,
   recipeDefaultSelections: recipeDefaultSelections,
-  recipeDefaultAmounts: recipeDefaultAmounts
+  recipeDefaultAmounts: recipeDefaultAmounts,
+  recipeAllIngredientRows: recipeAllIngredientRows,
+  recipeOptionUsedCost: recipeOptionUsedCost
 };
 
 /* ---- components/sessions.jsx ---- */

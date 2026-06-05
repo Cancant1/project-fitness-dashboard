@@ -26,6 +26,37 @@ function recipeMacro(value, decimals = 1) {
   return Number.isInteger(n) ? String(n) : n.toFixed(decimals);
 }
 
+function recipeCurrency(value, currency = "EUR") {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  try {
+    return n.toLocaleString("nl-NL", { style: "currency", currency });
+  } catch (e) {
+    return `${currency} ${n.toFixed(2)}`;
+  }
+}
+
+function recipeUnitAmount(value, unit = "g") {
+  const decimals = unit === "ml" || recipeNumber(value) < 10 ? 1 : 0;
+  return `${recipeMacro(value, decimals)} ${unit || ""}`.trim();
+}
+
+function recipePackLabel(option = {}) {
+  const amount = recipeNumber(option.packAmount, null);
+  const unit = option.packUnit || option.amountUnit || "";
+  const price = option.packPrice !== undefined && option.packPrice !== null
+    ? recipeCurrency(option.packPrice, option.currency || "EUR")
+    : "-";
+  return amount ? `${recipeUnitAmount(amount, unit)} pack · ${price}` : `Pack · ${price}`;
+}
+
+function recipeOptionUsedCost(option = {}, amount = 0, servings = 1) {
+  const packAmount = recipeNumber(option.packAmount);
+  const packPrice = Number(option.packPrice);
+  if (!packAmount || !Number.isFinite(packPrice)) return null;
+  return (recipeNumber(amount) * recipeNumber(servings, 1) / packAmount) * packPrice;
+}
+
 function recipeSlug(value) {
   return String(value || "recipe")
     .trim()
@@ -71,17 +102,39 @@ function calculateRecipe(recipe = {}, selections = {}, amounts = {}, servings = 
     const option = recipeSelectedOption(group, selections);
     const amount = recipeNumber(amounts[group.id], recipeNumber(option?.amount, 0));
     const macros = recipeOptionMacros(option || {}, amount, servings);
-    return { group, option, amount, macros };
+    const cost = recipeOptionUsedCost(option || {}, amount, servings);
+    return { group, option, amount, macros, cost };
   }).filter(row => row.option);
 
   const totals = rows.reduce((sum, row) => ({
     kcal: sum.kcal + row.macros.kcal,
     protein: sum.protein + row.macros.protein,
     carbs: sum.carbs + row.macros.carbs,
-    fat: sum.fat + row.macros.fat
-  }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+    fat: sum.fat + row.macros.fat,
+    cost: sum.cost + recipeNumber(row.cost, 0)
+  }), { kcal: 0, protein: 0, carbs: 0, fat: 0, cost: 0 });
 
   return { rows, totals };
+}
+
+function recipeAllIngredientRows(recipe = {}, selections = {}, amounts = {}, servings = 1) {
+  return (recipe.groups || []).flatMap(group => {
+    const selected = recipeSelectedOption(group, selections);
+    return (group.options || []).map(option => {
+      const isSelected = selected?.id === option.id;
+      const amount = recipeNumber(isSelected ? amounts[group.id] : option.amount, recipeNumber(option.amount, 0));
+      const macros = isSelected ? recipeOptionMacros(option, amount, servings) : { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+      return {
+        group,
+        option,
+        selected: isSelected,
+        amount,
+        totalAmount: amount * recipeNumber(servings, 1),
+        macros,
+        cost: isSelected ? recipeOptionUsedCost(option, amount, servings) : null
+      };
+    });
+  });
 }
 
 function recipeLogName(recipe = {}, rows = []) {
@@ -112,6 +165,10 @@ function emptyRecipeTemplate() {
             label: "Ingredient",
             item: "Ingredient",
             sourceUrl: "",
+            packAmount: 100,
+            packUnit: "g",
+            packPrice: 0,
+            currency: "EUR",
             amount: 100,
             amountUnit: "g",
             displayAmount: "100 g",
@@ -138,7 +195,8 @@ function RecipeCard({ recipe, onOpen, onEdit, onDelete }) {
   const selections = recipeDefaultSelections(recipe);
   const amounts = recipeDefaultAmounts(recipe, selections);
   const { totals, rows } = calculateRecipe(recipe, selections, amounts, recipe.servings || 1);
-  const sources = rows.filter(row => row.option?.sourceUrl).length;
+  const sources = (recipe.groups || []).reduce((sum, group) =>
+    sum + (group.options || []).filter(option => option.sourceUrl).length, 0);
   return (
     <article className="recipe-card">
       <div className="recipe-card-main">
@@ -157,6 +215,7 @@ function RecipeCard({ recipe, onOpen, onEdit, onDelete }) {
         <span><strong>{recipeMacro(totals.protein)}</strong>g protein</span>
         <span><strong>{recipeMacro(totals.carbs)}</strong>g carbs</span>
         <span><strong>{recipeMacro(totals.fat)}</strong>g fat</span>
+        <span><strong>{recipeCurrency(totals.cost)}</strong> used</span>
       </div>
       <div className="recipe-card-foot">
         <span className="mono muted">{sources} source links</span>
@@ -173,6 +232,7 @@ function RecipeModal({ recipe, onClose, onLog, onEdit }) {
   const [selections, setSelections] = useRecipeState(() => recipeDefaultSelections(recipe));
   const [amounts, setAmounts] = useRecipeState(() => recipeDefaultAmounts(recipe, recipeDefaultSelections(recipe)));
   const computed = useRecipeMemo(() => calculateRecipe(recipe, selections, amounts, servings), [recipe, selections, amounts, servings]);
+  const ingredientRows = useRecipeMemo(() => recipeAllIngredientRows(recipe, selections, amounts, servings), [recipe, selections, amounts, servings]);
   const hob = recipe.cooking?.hobNote || RepsState.DEFAULT_HOB_PREFERENCES.note;
 
   const selectOption = (group, option) => {
@@ -223,7 +283,7 @@ function RecipeModal({ recipe, onClose, onLog, onEdit }) {
             <input type="date" value={date} onChange={e => setDate(e.target.value)} />
           </label>
           <label className="recipe-serving-control">
-            <span>Servings</span>
+            <span>Multiplier</span>
             <input type="number" min="0.25" step="0.25" value={servings} onChange={e => setServings(e.target.value)} />
           </label>
         </div>
@@ -235,6 +295,7 @@ function RecipeModal({ recipe, onClose, onLog, onEdit }) {
               <span><strong>{recipeMacro(computed.totals.protein)}</strong>g protein</span>
               <span><strong>{recipeMacro(computed.totals.carbs)}</strong>g carbs</span>
               <span><strong>{recipeMacro(computed.totals.fat)}</strong>g fat</span>
+              <span><strong>{recipeCurrency(computed.totals.cost)}</strong> used</span>
             </div>
             <button className="btn primary sm recipe-log-btn" type="button" onClick={logMeal}><RI.Plus /> Log meal</button>
           </aside>
@@ -270,7 +331,8 @@ function RecipeModal({ recipe, onClose, onLog, onEdit }) {
                         value={amount}
                         onChange={e => setAmounts(current => ({ ...current, [group.id]: e.target.value }))}
                       />
-                      <span>{selected?.amountUnit || "g"} per serving</span>
+                      <span>{selected?.amountUnit || "g"} used</span>
+                      {selected && <span>{recipePackLabel(selected)}</span>}
                       {selected?.sourceUrl && <a href={selected.sourceUrl} target="_blank" rel="noreferrer">Jumbo source</a>}
                     </div>
                   </section>
@@ -281,16 +343,29 @@ function RecipeModal({ recipe, onClose, onLog, onEdit }) {
 
           {tab === "ingredients" && (
             <div className="recipe-ingredient-list">
-              {computed.rows.map(row => (
-                <div key={row.group.id} className="recipe-ingredient-row">
+              {ingredientRows.map(row => (
+                <div key={`${row.group.id}-${row.option.id}`} className={`recipe-ingredient-row ${row.selected ? "is-selected" : ""}`}>
                   <div>
-                    <span className="recipe-card-kicker">{row.group.label}</span>
+                    <span className="recipe-card-kicker">{row.group.label}{row.selected ? " · selected" : ""}</span>
                     <strong>{row.option.item || row.option.label}</strong>
-                    <em>{recipeMacro(row.amount * recipeNumber(servings, 1), row.option.amountUnit === "ml" ? 1 : 0)} {row.option.amountUnit || "g"} total · {row.option.nutritionBasis || "per 100"}</em>
+                    <em>Full pack: {recipePackLabel(row.option)}</em>
+                    {row.selected && (
+                      <em>
+                        Build uses: {recipeUnitAmount(row.totalAmount, row.option.amountUnit || "g")}
+                        {row.cost !== null ? ` · ${recipeCurrency(row.cost, row.option.currency || "EUR")}` : ""}
+                      </em>
+                    )}
+                    <em>{row.option.nutritionBasis || "per 100"}</em>
                   </div>
                   <div className="recipe-ingredient-macros">
-                    <span>{recipeKcal(row.macros.kcal)} kcal</span>
-                    <span>{recipeMacro(row.macros.protein)}g protein</span>
+                    {row.selected ? (
+                      <>
+                        <span>{recipeKcal(row.macros.kcal)} kcal</span>
+                        <span>{recipeMacro(row.macros.protein)}g protein</span>
+                      </>
+                    ) : (
+                      <span>option</span>
+                    )}
                     {row.option.sourceUrl && <a href={row.option.sourceUrl} target="_blank" rel="noreferrer">source</a>}
                   </div>
                 </div>
@@ -321,36 +396,216 @@ function RecipeModal({ recipe, onClose, onLog, onEdit }) {
   );
 }
 
-function RecipeJsonEditorModal({ recipe, onClose, onSave, onDelete }) {
+function recipeOptionTemplate(groupId = "ingredient") {
+  const slug = recipeSlug(groupId);
+  return {
+    id: `${slug}-option-${Date.now().toString(36)}`,
+    label: "Ingredient",
+    item: "Ingredient",
+    sourceUrl: "",
+    packAmount: 100,
+    packUnit: "g",
+    packPrice: 0,
+    currency: "EUR",
+    amount: 100,
+    amountUnit: "g",
+    displayAmount: "100 g",
+    nutritionBasis: "per 100 g",
+    kcalPer100: 100,
+    proteinPer100: 10,
+    carbsPer100: 0,
+    fatPer100: 0
+  };
+}
+
+function recipeGroupTemplate() {
+  const id = `group-${Date.now().toString(36)}`;
+  return {
+    id,
+    label: "Ingredient group",
+    inputLabel: "grams",
+    options: [recipeOptionTemplate(id)]
+  };
+}
+
+function recipeStepTemplate() {
+  return {
+    id: `step-${Date.now().toString(36)}`,
+    title: "Step",
+    hob: "6",
+    minutes: "10",
+    body: "Add the cooking step."
+  };
+}
+
+function recipeCleanNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function recipeSanitizeDraft(draft = {}, fallbackId = "") {
+  const id = String(draft.id || fallbackId || recipeSlug(draft.name)).trim();
+  const groups = (draft.groups || []).map((group, groupIndex) => {
+    const groupId = String(group.id || recipeSlug(group.label) || `group-${groupIndex + 1}`).trim();
+    const options = (group.options || []).map((option, optionIndex) => {
+      const optionId = String(option.id || recipeSlug(option.label || option.item) || `${groupId}-option-${optionIndex + 1}`).trim();
+      return {
+        ...option,
+        id: optionId,
+        label: String(option.label || option.item || "Ingredient").trim(),
+        item: String(option.item || option.label || "Ingredient").trim(),
+        sourceUrl: String(option.sourceUrl || "").trim(),
+        packAmount: recipeCleanNumber(option.packAmount, 0),
+        packUnit: String(option.packUnit || option.amountUnit || "g").trim(),
+        packPrice: recipeCleanNumber(option.packPrice, 0),
+        currency: String(option.currency || "EUR").trim() || "EUR",
+        amount: recipeCleanNumber(option.amount, 0),
+        amountUnit: String(option.amountUnit || option.packUnit || "g").trim(),
+        displayAmount: String(option.displayAmount || "").trim(),
+        nutritionBasis: String(option.nutritionBasis || "per 100 g").trim(),
+        kcalPer100: recipeCleanNumber(option.kcalPer100, 0),
+        proteinPer100: recipeCleanNumber(option.proteinPer100, 0),
+        carbsPer100: recipeCleanNumber(option.carbsPer100, 0),
+        fatPer100: recipeCleanNumber(option.fatPer100, 0)
+      };
+    }).filter(option => option.id && option.label);
+    return {
+      ...group,
+      id: groupId,
+      label: String(group.label || "Ingredient group").trim(),
+      inputLabel: String(group.inputLabel || "amount").trim(),
+      options
+    };
+  }).filter(group => group.id && group.options.length);
+
+  const selections = { ...(draft.selections || {}) };
+  groups.forEach(group => {
+    const selected = selections[group.id];
+    if (!group.options.some(option => option.id === selected)) selections[group.id] = group.options[0]?.id || "";
+  });
+
+  const cooking = {
+    equipment: draft.cooking?.equipment || "Electric hob",
+    hobNote: draft.cooking?.hobNote || RepsState.DEFAULT_HOB_PREFERENCES.note,
+    steps: (draft.cooking?.steps || []).map((step, index) => ({
+      id: String(step.id || `step-${index + 1}`).trim(),
+      title: String(step.title || `Step ${index + 1}`).trim(),
+      hob: String(step.hob || "").trim(),
+      minutes: String(step.minutes || "").trim(),
+      body: String(step.body || "").trim()
+    })).filter(step => step.title || step.body)
+  };
+
+  return {
+    ...draft,
+    id,
+    name: String(draft.name || "Untitled recipe").trim() || "Untitled recipe",
+    category: String(draft.category || "Recipes").trim() || "Recipes",
+    tags: Array.isArray(draft.tags) ? draft.tags.map(tag => String(tag).trim()).filter(Boolean) : [],
+    servings: Math.max(0.25, recipeCleanNumber(draft.servings, 1)),
+    summary: String(draft.summary || "").trim(),
+    selections,
+    groups,
+    cooking
+  };
+}
+
+function RecipeEditorModal({ recipe, onClose, onSave, onDelete }) {
   const isNew = !recipe;
-  const initial = recipeClone(recipe || emptyRecipeTemplate());
-  const [name, setName] = useRecipeState(initial.name || "");
-  const [servings, setServings] = useRecipeState(initial.servings || 1);
-  const [text, setText] = useRecipeState(() => JSON.stringify(initial, null, 2));
+  const [draft, setDraft] = useRecipeState(() => recipeClone(recipe || emptyRecipeTemplate()));
   const [error, setError] = useRecipeState("");
 
-  const syncHeaderFields = (patch) => {
-    try {
-      const parsed = JSON.parse(text);
-      const next = { ...parsed, ...patch };
-      setText(JSON.stringify(next, null, 2));
-    } catch (e) {}
+  const setRoot = (patch) => {
+    setError("");
+    setDraft(current => ({ ...current, ...patch }));
+  };
+
+  const updateGroup = (groupIndex, patch) => {
+    setError("");
+    setDraft(current => ({
+      ...current,
+      groups: (current.groups || []).map((group, index) => index === groupIndex ? { ...group, ...patch } : group)
+    }));
+  };
+
+  const updateOption = (groupIndex, optionIndex, patch) => {
+    setError("");
+    setDraft(current => ({
+      ...current,
+      groups: (current.groups || []).map((group, index) => {
+        if (index !== groupIndex) return group;
+        return {
+          ...group,
+          options: (group.options || []).map((option, optIndex) => optIndex === optionIndex ? { ...option, ...patch } : option)
+        };
+      })
+    }));
+  };
+
+  const addGroup = () => {
+    setDraft(current => ({ ...current, groups: [...(current.groups || []), recipeGroupTemplate()] }));
+  };
+
+  const deleteGroup = (groupIndex) => {
+    setDraft(current => ({ ...current, groups: (current.groups || []).filter((_group, index) => index !== groupIndex) }));
+  };
+
+  const addOption = (groupIndex) => {
+    setDraft(current => ({
+      ...current,
+      groups: (current.groups || []).map((group, index) => index === groupIndex
+        ? { ...group, options: [...(group.options || []), recipeOptionTemplate(group.id)] }
+        : group)
+    }));
+  };
+
+  const deleteOption = (groupIndex, optionIndex) => {
+    setDraft(current => ({
+      ...current,
+      groups: (current.groups || []).map((group, index) => index === groupIndex
+        ? { ...group, options: (group.options || []).filter((_option, optIndex) => optIndex !== optionIndex) }
+        : group)
+    }));
+  };
+
+  const updateStep = (stepIndex, patch) => {
+    setDraft(current => ({
+      ...current,
+      cooking: {
+        ...(current.cooking || {}),
+        steps: (current.cooking?.steps || []).map((step, index) => index === stepIndex ? { ...step, ...patch } : step)
+      }
+    }));
+  };
+
+  const addStep = () => {
+    setDraft(current => ({
+      ...current,
+      cooking: {
+        ...(current.cooking || {}),
+        steps: [...(current.cooking?.steps || []), recipeStepTemplate()]
+      }
+    }));
+  };
+
+  const deleteStep = (stepIndex) => {
+    setDraft(current => ({
+      ...current,
+      cooking: {
+        ...(current.cooking || {}),
+        steps: (current.cooking?.steps || []).filter((_step, index) => index !== stepIndex)
+      }
+    }));
   };
 
   const submit = () => {
     try {
-      const parsed = JSON.parse(text);
-      const next = {
-        ...parsed,
-        id: parsed.id || recipe?.id || recipeSlug(name),
-        name: name.trim() || parsed.name || "Untitled recipe",
-        servings: recipeNumber(servings, parsed.servings || 1)
-      };
-      if (!Array.isArray(next.groups)) throw new Error("Recipe needs a groups array.");
+      const next = recipeSanitizeDraft(draft, recipe?.id || draft.id || recipeSlug(draft.name));
+      if (!next.groups.length) throw new Error("Recipe needs at least one ingredient group with one option.");
       onSave(next);
       onClose();
     } catch (e) {
-      setError(e.message || "Recipe JSON is invalid.");
+      setError(e.message || "Recipe is invalid.");
     }
   };
 
@@ -360,21 +615,187 @@ function RecipeJsonEditorModal({ recipe, onClose, onSave, onDelete }) {
         <div className="recipe-modal-head">
           <div>
             <span className="recipe-card-kicker">{isNew ? "New recipe" : "Edit recipe"}</span>
-            <h2>{name || "Recipe"}</h2>
+            <h2>{draft.name || "Recipe"}</h2>
           </div>
           <button className="btn ghost sm icon-only" type="button" title="Close" onClick={onClose}><RI.X /></button>
         </div>
-        <div className="recipe-editor-fields">
-          <label>
-            <span>Name</span>
-            <input value={name} onChange={e => { setName(e.target.value); syncHeaderFields({ name: e.target.value }); }} />
-          </label>
-          <label>
-            <span>Servings</span>
-            <input type="number" min="0.25" step="0.25" value={servings} onChange={e => { setServings(e.target.value); syncHeaderFields({ servings: Number(e.target.value) || 1 }); }} />
-          </label>
+        <div className="recipe-editor-body">
+          <section className="recipe-edit-section">
+            <h3>Recipe</h3>
+            <div className="recipe-edit-grid">
+              <label>
+                <span>Name</span>
+                <input value={draft.name || ""} onChange={e => setRoot({ name: e.target.value })} />
+              </label>
+              <label>
+                <span>Category</span>
+                <input value={draft.category || ""} onChange={e => setRoot({ category: e.target.value })} />
+              </label>
+              <label>
+                <span>Default multiplier</span>
+                <input type="number" min="0.25" step="0.25" value={draft.servings || 1} onChange={e => setRoot({ servings: e.target.value })} />
+              </label>
+              <label>
+                <span>Tags</span>
+                <input value={(draft.tags || []).join(", ")} onChange={e => setRoot({ tags: e.target.value.split(",").map(tag => tag.trim()).filter(Boolean) })} />
+              </label>
+              <label className="span-2">
+                <span>Summary</span>
+                <textarea value={draft.summary || ""} onChange={e => setRoot({ summary: e.target.value })} />
+              </label>
+            </div>
+          </section>
+
+          <section className="recipe-edit-section">
+            <div className="recipe-edit-section-head">
+              <h3>Ingredients</h3>
+              <button className="btn ghost sm" type="button" onClick={addGroup}><RI.Plus /> Group</button>
+            </div>
+            {(draft.groups || []).map((group, groupIndex) => (
+              <div className="recipe-edit-group" key={`${group.id || "group"}-${groupIndex}`}>
+                <div className="recipe-edit-group-head">
+                  <strong>{group.label || "Ingredient group"}</strong>
+                  <button className="btn ghost sm icon-only" type="button" title="Delete group" onClick={() => deleteGroup(groupIndex)}><RI.X /></button>
+                </div>
+                <div className="recipe-edit-grid compact">
+                  <label>
+                    <span>Group id</span>
+                    <input value={group.id || ""} onChange={e => updateGroup(groupIndex, { id: e.target.value })} />
+                  </label>
+                  <label>
+                    <span>Group name</span>
+                    <input value={group.label || ""} onChange={e => updateGroup(groupIndex, { label: e.target.value })} />
+                  </label>
+                  <label>
+                    <span>Amount label</span>
+                    <input value={group.inputLabel || ""} onChange={e => updateGroup(groupIndex, { inputLabel: e.target.value })} />
+                  </label>
+                </div>
+
+                <div className="recipe-edit-options">
+                  {(group.options || []).map((option, optionIndex) => (
+                    <div className="recipe-edit-option" key={`${option.id || "option"}-${optionIndex}`}>
+                      <div className="recipe-edit-option-head">
+                        <strong>{option.label || "Ingredient"}</strong>
+                        <button className="btn ghost sm icon-only" type="button" title="Delete option" onClick={() => deleteOption(groupIndex, optionIndex)}><RI.X /></button>
+                      </div>
+                      <div className="recipe-edit-grid option-grid">
+                        <label>
+                          <span>Option id</span>
+                          <input value={option.id || ""} onChange={e => updateOption(groupIndex, optionIndex, { id: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Name</span>
+                          <input value={option.label || ""} onChange={e => updateOption(groupIndex, optionIndex, { label: e.target.value })} />
+                        </label>
+                        <label className="span-2">
+                          <span>Full pack item</span>
+                          <input value={option.item || ""} onChange={e => updateOption(groupIndex, optionIndex, { item: e.target.value })} />
+                        </label>
+                        <label className="span-2">
+                          <span>Supermarket URL</span>
+                          <input value={option.sourceUrl || ""} onChange={e => updateOption(groupIndex, optionIndex, { sourceUrl: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Pack amount</span>
+                          <input type="number" min="0" step="0.01" value={option.packAmount ?? ""} onChange={e => updateOption(groupIndex, optionIndex, { packAmount: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Pack unit</span>
+                          <input value={option.packUnit || ""} onChange={e => updateOption(groupIndex, optionIndex, { packUnit: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Pack price</span>
+                          <input type="number" min="0" step="0.01" value={option.packPrice ?? ""} onChange={e => updateOption(groupIndex, optionIndex, { packPrice: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Currency</span>
+                          <input value={option.currency || "EUR"} onChange={e => updateOption(groupIndex, optionIndex, { currency: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Build amount</span>
+                          <input type="number" min="0" step="0.01" value={option.amount ?? ""} onChange={e => updateOption(groupIndex, optionIndex, { amount: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Build unit</span>
+                          <input value={option.amountUnit || ""} onChange={e => updateOption(groupIndex, optionIndex, { amountUnit: e.target.value })} />
+                        </label>
+                        <label className="span-2">
+                          <span>Display amount</span>
+                          <input value={option.displayAmount || ""} onChange={e => updateOption(groupIndex, optionIndex, { displayAmount: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Kcal / 100</span>
+                          <input type="number" min="0" step="0.1" value={option.kcalPer100 ?? ""} onChange={e => updateOption(groupIndex, optionIndex, { kcalPer100: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Protein / 100</span>
+                          <input type="number" min="0" step="0.1" value={option.proteinPer100 ?? ""} onChange={e => updateOption(groupIndex, optionIndex, { proteinPer100: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Carbs / 100</span>
+                          <input type="number" min="0" step="0.1" value={option.carbsPer100 ?? ""} onChange={e => updateOption(groupIndex, optionIndex, { carbsPer100: e.target.value })} />
+                        </label>
+                        <label>
+                          <span>Fat / 100</span>
+                          <input type="number" min="0" step="0.1" value={option.fatPer100 ?? ""} onChange={e => updateOption(groupIndex, optionIndex, { fatPer100: e.target.value })} />
+                        </label>
+                        <label className="span-2">
+                          <span>Nutrition basis</span>
+                          <input value={option.nutritionBasis || ""} onChange={e => updateOption(groupIndex, optionIndex, { nutritionBasis: e.target.value })} />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                  <button className="btn ghost sm recipe-add-option" type="button" onClick={() => addOption(groupIndex)}><RI.Plus /> Option</button>
+                </div>
+              </div>
+            ))}
+          </section>
+
+          <section className="recipe-edit-section">
+            <div className="recipe-edit-section-head">
+              <h3>Cook</h3>
+              <button className="btn ghost sm" type="button" onClick={addStep}><RI.Plus /> Step</button>
+            </div>
+            <div className="recipe-edit-grid">
+              <label>
+                <span>Equipment</span>
+                <input value={draft.cooking?.equipment || ""} onChange={e => setRoot({ cooking: { ...(draft.cooking || {}), equipment: e.target.value } })} />
+              </label>
+              <label className="span-2">
+                <span>Hob note</span>
+                <input value={draft.cooking?.hobNote || ""} onChange={e => setRoot({ cooking: { ...(draft.cooking || {}), hobNote: e.target.value } })} />
+              </label>
+            </div>
+            {(draft.cooking?.steps || []).map((step, stepIndex) => (
+              <div className="recipe-edit-step" key={`${step.id || "step"}-${stepIndex}`}>
+                <div className="recipe-edit-option-head">
+                  <strong>{step.title || `Step ${stepIndex + 1}`}</strong>
+                  <button className="btn ghost sm icon-only" type="button" title="Delete step" onClick={() => deleteStep(stepIndex)}><RI.X /></button>
+                </div>
+                <div className="recipe-edit-grid compact">
+                  <label>
+                    <span>Title</span>
+                    <input value={step.title || ""} onChange={e => updateStep(stepIndex, { title: e.target.value })} />
+                  </label>
+                  <label>
+                    <span>Hob</span>
+                    <input value={step.hob || ""} onChange={e => updateStep(stepIndex, { hob: e.target.value })} />
+                  </label>
+                  <label>
+                    <span>Minutes</span>
+                    <input value={step.minutes || ""} onChange={e => updateStep(stepIndex, { minutes: e.target.value })} />
+                  </label>
+                  <label className="span-3">
+                    <span>Step body</span>
+                    <textarea value={step.body || ""} onChange={e => updateStep(stepIndex, { body: e.target.value })} />
+                  </label>
+                </div>
+              </div>
+            ))}
+          </section>
         </div>
-        <textarea className="recipe-json-input" value={text} onChange={e => { setText(e.target.value); setError(""); }} spellCheck="false" />
         {error && <div className="recipe-editor-error">{error}</div>}
         <div className="recipe-editor-actions">
           {!isNew && <button className="btn ghost sm" type="button" onClick={onDelete}><RI.X /> Delete</button>}
@@ -492,14 +913,14 @@ function RecipesView() {
           onLog={(date, entry) => addFoodEntry(date, entry)} />
       )}
       {editingRecipe && (
-        <RecipeJsonEditorModal
+        <RecipeEditorModal
           recipe={editingRecipe}
           onClose={() => setEditingRecipe(null)}
           onSave={saveRecipe}
           onDelete={() => removeRecipe(editingRecipe)} />
       )}
       {showNew && (
-        <RecipeJsonEditorModal
+        <RecipeEditorModal
           onClose={() => setShowNew(false)}
           onSave={saveRecipe} />
       )}
@@ -513,4 +934,10 @@ function RecipesView() {
 }
 
 window.RepsRecipes = RecipesView;
-window.RepsRecipeUtils = { calculateRecipe, recipeDefaultSelections, recipeDefaultAmounts };
+window.RepsRecipeUtils = {
+  calculateRecipe,
+  recipeDefaultSelections,
+  recipeDefaultAmounts,
+  recipeAllIngredientRows,
+  recipeOptionUsedCost
+};
