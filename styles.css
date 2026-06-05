@@ -204,11 +204,13 @@ table { border-collapse: collapse; }
   min-height: 100vh;
 }
 .sidebar {
-  position: fixed; top: 0; left: 0; bottom: 0;
-  width: clamp(168px, 14vw, 220px);
+  position: sticky; top: 0;
+  align-self: start;
   display: flex; flex-direction: column;
   height: 100vh;
   height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   overflow: hidden;
   border-right: var(--hair);
   background: var(--surface);
