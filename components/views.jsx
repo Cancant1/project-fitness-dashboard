@@ -1396,12 +1396,9 @@ function EnergyCommandBand({ profile, estimate, windowDays, setWindowDays, updat
   const targetDelta = estimate?.ready && savedTarget != null
     ? estimate.recommendedTargetKcal - savedTarget
     : null;
-  const savedMaintenance = Number(profile.maintenanceKcal);
-  const maintenanceDelta = estimate?.ready && Number.isFinite(savedMaintenance)
-    ? estimate.adaptiveMaintenanceKcal - savedMaintenance
-    : null;
   const chipLevel = estimate?.confidence?.level || "insufficient";
   const phase = phases[profile.phase || "maintain"] || { rate: 0, kcalDelta: 0, label: "Maintain" };
+  const phaseName = String(phase.label || "Maintain").split(" · ")[0];
   const targetWeight = profile.targetWeight == null ? null : Number(profile.targetWeight);
   const ready = !!estimate?.ready;
 
@@ -1438,8 +1435,7 @@ function EnergyCommandBand({ profile, estimate, windowDays, setWindowDays, updat
             {ready && <em>kcal</em>}
           </div>
           <div className="energy-support mono">
-            saved {Number.isFinite(savedMaintenance) ? `${Math.round(savedMaintenance)} kcal` : "—"}
-            {maintenanceDelta != null && <> · {signedKcal(maintenanceDelta)}</>}
+            {ready ? "from logged intake + weight trend" : "no saved estimate used"}
           </div>
           {!ready && <div className="energy-empty">{estimate?.reason || "Need more weight and food data."}</div>}
         </div>
@@ -1472,11 +1468,6 @@ function EnergyCommandBand({ profile, estimate, windowDays, setWindowDays, updat
               <input type="number" step="0.1" value={profile.targetWeight ?? ""}
                 onChange={e => updateProfile(profile.id, { targetWeight: e.target.value === "" ? null : Number(e.target.value) })} />
             </label>
-            <label className="energy-advanced-control">
-              <span className="kpi-label">Saved maintenance</span>
-              <input type="number" step="25" value={profile.maintenanceKcal ?? 2700}
-                onChange={e => updateProfile(profile.id, { maintenanceKcal: Number(e.target.value) || 2700 })} />
-            </label>
           </div>
         </div>
       </div>
@@ -1492,7 +1483,7 @@ function EnergyCommandBand({ profile, estimate, windowDays, setWindowDays, updat
         </div>
         <div>
           <span>Selected phase</span>
-          <strong>{phase.label} · {signedKgRate(phase.rate)}</strong>
+          <strong>{phaseName} · {signedKgRate(phase.rate)}</strong>
         </div>
         <div>
           <span>Target weight</span>
@@ -1833,10 +1824,7 @@ function Body() {
       adaptiveTdee,
       window.RepsState?.DAY_KEYS || ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]
     );
-    if (patch) updateProfile(activeProfile.id, {
-      maintenanceKcal: patch.maintenanceKcal,
-      macros: patch.macros
-    });
+    if (patch) updateProfile(activeProfile.id, { macros: patch.macros });
   };
   const openAddFoodForDate = (date) => {
     const targetDate = date || selectedDate || todayIso;
@@ -2409,6 +2397,7 @@ function Plan() {
    ========================================================= */
 const EXPORT_DEFAULTS = {
   includeProfile: false,
+  includeEquipment: true,
   includeMacros: false,
   includeRoutine: true,
   includeSessions: true,
@@ -2417,6 +2406,31 @@ const EXPORT_DEFAULTS = {
   includeBlocks: true,
   prettyPrint: true,
   introPrompt: "You are my training coach. Review the data below and give me feedback on programming, progressive overload, fatigue management, and anything I should adjust. Be specific and actionable."
+};
+
+const AVAILABLE_GYM_EQUIPMENT = {
+  free_weights: {
+    dumbbells_kg: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22.5, 25, 27.5, 30, 32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50],
+    barbell: true,
+    weight_plates_kg: [1.25, 2.5, 5, 10, 20]
+  },
+  racks_and_benches: [
+    "Squat rack",
+    "Bench rack",
+    "Angle adjustable bench"
+  ],
+  cables: {
+    single_height_adjustable_pulley_lbs: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
+    double_height_adjustable_pulleys_lbs: [10, 15, 20, 30, 40, 50, 65, 80, 95, 110, 125, 140, 155, 170, 185, 200]
+  },
+  machines_and_stations: [
+    "Cable row machine (not chest-supported)",
+    "Lat pull down machine",
+    "Pull up bar",
+    "Neutral grip bar",
+    "Height adjustable dip rack",
+    "Height adjustable stepping plateau"
+  ]
 };
 
 function loadExportPrefs() {
@@ -2472,9 +2486,11 @@ function ExportView() {
         age_years: window.RepsState.ageFrom(app.activeProfile.birthday),
         unit: app.activeProfile.unit,
         phase: app.activeProfile.phase,
-        target_weight_kg: app.activeProfile.targetWeight,
-        maintenance_kcal: app.activeProfile.maintenanceKcal
+        target_weight_kg: app.activeProfile.targetWeight
       };
+    }
+    if (prefs.includeEquipment) {
+      out.available_equipment = AVAILABLE_GYM_EQUIPMENT;
     }
     if (prefs.includeMacros) {
       out.macros_per_day = app.activeProfile.macros;
@@ -2682,9 +2698,14 @@ function ExportView() {
                   onChange={v => updatePref("includeBlocks", v)} />
                 <ToggleRow
                   label="Personal data — profile"
-                  sub="Name, birthday, age, phase, target weight, maintenance kcal"
+                  sub="Name, birthday, age, phase, target weight"
                   checked={prefs.includeProfile}
                   onChange={v => updatePref("includeProfile", v)} />
+                <ToggleRow
+                  label="Available gym equipment"
+                  sub="Free weights, racks, benches, cable stacks, machines, bars, dip rack, and step"
+                  checked={prefs.includeEquipment}
+                  onChange={v => updatePref("includeEquipment", v)} />
                 <ToggleRow
                   label="Personal data — macros per day"
                   sub="kcal / protein / carbs / fat targets by weekday"

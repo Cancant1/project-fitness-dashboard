@@ -1177,7 +1177,6 @@
       };
     });
     return {
-      maintenanceKcal: estimate.adaptiveMaintenanceKcal,
       macros: nextMacros,
       currentAvgKcal: Math.round(currentAvg),
       targetAvgKcal: estimate.recommendedTargetKcal,

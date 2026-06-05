@@ -128,13 +128,14 @@ function PhaseProgress({ profile, bodyData, kcalData }) {
       : `${targetDistanceAbs.toFixed(1)}kg ${distanceToTarget > 0 ? "to lose" : "to gain"}`;
 
   // Actual avg kcal — last 14 days
-  const maintenanceKcal = profile.maintenanceKcal || 2700;
-  const targetAvgKcal = maintenanceKcal + phase.kcalDelta;
+  const adaptiveEstimate = RepsData.adaptiveTdeeEstimate?.(profile, { windowDays: 28 });
+  const adaptiveMaintenanceKcal = adaptiveEstimate?.ready ? adaptiveEstimate.adaptiveMaintenanceKcal : null;
+  const targetAvgKcal = adaptiveMaintenanceKcal != null ? adaptiveMaintenanceKcal + phase.kcalDelta : macroTargetAvg(profile, "kcal");
   const kcalWindowStart = RepsData.addDays(todayIso, -14);
   const last14Kcal = (kcalData || []).filter(d => d.date >= kcalWindowStart && d.date < todayIso);
   const actualAvgKcal = last14Kcal.length ? Math.round(last14Kcal.reduce((s,d)=>s+d.value,0) / last14Kcal.length) : null;
-  const kcalDelta = actualAvgKcal !== null ? actualAvgKcal - targetAvgKcal : null;
-  const actualVsMaintenance = actualAvgKcal !== null ? actualAvgKcal - maintenanceKcal : null;
+  const kcalDelta = actualAvgKcal !== null && targetAvgKcal != null ? actualAvgKcal - targetAvgKcal : null;
+  const actualVsMaintenance = actualAvgKcal !== null && adaptiveMaintenanceKcal != null ? actualAvgKcal - adaptiveMaintenanceKcal : null;
   const foodImpliedRate = actualVsMaintenance !== null ? (actualVsMaintenance * 7) / KCAL_PER_KG : null;
   const plannedEnergyRate = (phase.kcalDelta * 7) / KCAL_PER_KG;
   const energyToTargetKcal = targetDistanceAbs != null ? targetDistanceAbs * KCAL_PER_KG : null;
@@ -273,10 +274,14 @@ function PhaseProgress({ profile, bodyData, kcalData }) {
         <div className="phase-metric">
           <div className="kpi-label">Target avg kcal</div>
           <div className="kpi-value tnum phase-metric-value">
-            <span>{targetAvgKcal}</span>
+            <span>{targetAvgKcal != null ? Math.round(targetAvgKcal) : "—"}</span>
           </div>
           <div className="mono phase-metric-foot" style={{color: kcalDelta == null ? "var(--muted)" : Math.abs(kcalDelta) <= 100 ? "var(--good)" : "var(--warn)"}}>
-            {actualAvgKcal != null ? `actual ${actualAvgKcal} · ${signed(kcalDelta, 0)} vs target` : "no recent food log"}
+            {targetAvgKcal == null
+              ? "adaptive maintenance not ready"
+              : actualAvgKcal != null
+                ? `actual ${actualAvgKcal} · ${signed(kcalDelta, 0)} vs target`
+                : "no recent food log"}
           </div>
         </div>
       </div>
@@ -296,9 +301,11 @@ function PhaseProgress({ profile, bodyData, kcalData }) {
         </div>
         <div className="phase-math-card">
           <div className="kpi-label">Food-implied rate</div>
-          <div className="phase-math-value tnum">{actualAvgKcal != null ? rateLabel(foodImpliedRate) : "—"}</div>
+          <div className="phase-math-value tnum">{foodImpliedRate != null ? rateLabel(foodImpliedRate) : "—"}</div>
           <div className={`mono phase-math-foot ${last14Kcal.length >= MIN_FOOD_DAYS ? "" : "warn"}`}>
-            {actualAvgKcal != null
+            {adaptiveMaintenanceKcal == null
+              ? "adaptive maintenance not ready"
+              : actualAvgKcal != null
               ? `${last14Kcal.length}d logged · ${signed(actualVsMaintenance, 0)} kcal vs maintenance`
               : `need ${MIN_FOOD_DAYS}+ completed food days`}
           </div>

@@ -1,4 +1,4 @@
-/* global React, ReactDOM, RepsLayout, RepsDashboard, RepsLog, RepsViews, RepsRecipes, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakToggle, useTweaks */
+/* global React, ReactDOM, RepsLayout, RepsDashboard, RepsLog, RepsViews, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakToggle, useTweaks */
 const { useState, useEffect } = React;
 
 // Capture the static shell routine so imported private state can override it cleanly.
@@ -142,7 +142,6 @@ function App() {
           {view === "routines"  && <Routines />}
           {view === "exercises" && <Exercises />}
           {view === "body"      && <Body />}
-          {view === "recipes"   && <RepsRecipes />}
           {view === "plan"      && <Plan />}
           {view === "export"    && <ExportView />}
           {view === "settings"  && <Settings theme={t.theme} setTheme={chooseTheme} themes={THEME_OPTIONS} />}

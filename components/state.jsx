@@ -689,7 +689,6 @@ const DEFAULT_STATE = {
       preset: "maintain",
       phase: "maintain",
       targetWeight: null,
-      maintenanceKcal: 2700,
       progressionRules: progressionRulesWithDefaults(),
       foodByDate: {},        // { "2026-05-21": [{id, product, kcal, protein, amount}, ...] }
       recipes: [],
@@ -983,7 +982,6 @@ function migrateProfile(p) {
     preset: p.preset || "maintain",
     phase: p.phase || "maintain",
     targetWeight: p.targetWeight ?? null,
-    maintenanceKcal: p.maintenanceKcal ?? 2700,
     progressionRules: progressionRulesWithDefaults(p.progressionRules),
     foodByDate,
     deletedFoodEntries,

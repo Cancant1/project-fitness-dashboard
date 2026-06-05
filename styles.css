@@ -204,9 +204,12 @@ table { border-collapse: collapse; }
   min-height: 100vh;
 }
 .sidebar {
-  position: sticky; top: 0;
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: clamp(168px, 14vw, 220px);
   display: flex; flex-direction: column;
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   border-right: var(--hair);
   background: var(--surface);
   padding: var(--pad-3) var(--pad-2);
@@ -266,12 +269,6 @@ table { border-collapse: collapse; }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.nav-kbd {
-  margin-left: auto;
-  font-family: var(--font-mono); font-size: 10px;
-  color: var(--faint);
-}
-
 .sync-quick {
   display: grid;
   grid-template-columns: 1fr;

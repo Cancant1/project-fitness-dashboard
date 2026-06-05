@@ -1229,7 +1229,6 @@ var DEFAULT_STATE = {
     preset: "maintain",
     phase: "maintain",
     targetWeight: null,
-    maintenanceKcal: 2700,
     progressionRules: progressionRulesWithDefaults(),
     foodByDate: {},
     recipes: [],
@@ -1598,7 +1597,7 @@ function removeDeletedFoodRows() {
   return out;
 }
 function migrateProfile(p) {
-  var _routines$, _p$targetWeight, _p$maintenanceKcal;
+  var _routines$, _p$targetWeight;
   var defaultMacros = PRESETS.maintain.macros;
   var deletedFoodEntries = normalizeDeletedFoodEntries(p.deletedFoodEntries || p.deletedFoodEntryIds || {});
   var foodByDate = removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries);
@@ -1618,7 +1617,6 @@ function migrateProfile(p) {
     preset: p.preset || "maintain",
     phase: p.phase || "maintain",
     targetWeight: (_p$targetWeight = p.targetWeight) !== null && _p$targetWeight !== void 0 ? _p$targetWeight : null,
-    maintenanceKcal: (_p$maintenanceKcal = p.maintenanceKcal) !== null && _p$maintenanceKcal !== void 0 ? _p$maintenanceKcal : 2700,
     progressionRules: progressionRulesWithDefaults(p.progressionRules),
     foodByDate: foodByDate,
     deletedFoodEntries: deletedFoodEntries,
@@ -3412,11 +3410,6 @@ var NAV_ITEMS = [{
   icon: I.Body,
   kbd: "7"
 }, {
-  id: "recipes",
-  label: "Recipes",
-  icon: I.Recipe,
-  kbd: ""
-}, {
   id: "plan",
   label: "Plan",
   icon: I.Plan,
@@ -3427,7 +3420,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "05 Jun 2026 12:06";
+var BUILD_LABEL = "05 Jun 2026 14:21";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -3529,9 +3522,7 @@ function Sidebar(_ref3) {
       className: "nav-icon"
     }, React.createElement(Ico, null)), React.createElement("span", {
       className: "nav-label"
-    }, item.label), item.kbd && React.createElement("span", {
-      className: "nav-kbd"
-    }, item.kbd));
+    }, item.label));
   })), React.createElement("button", {
     className: "nav-item ".concat(view === "settings" ? "is-active" : ""),
     onClick: function onClick() {
@@ -3541,9 +3532,7 @@ function Sidebar(_ref3) {
     className: "nav-icon"
   }, React.createElement(I.Settings, null)), React.createElement("span", {
     className: "nav-label"
-  }, "Settings"), React.createElement("span", {
-    className: "nav-kbd"
-  }, "0")), React.createElement("div", {
+  }, "Settings")), React.createElement("div", {
     className: "sidebar-foot"
   }, React.createElement("span", {
     className: "kbd"
@@ -3561,7 +3550,6 @@ function TopBar(_ref4) {
     routines: "Routines",
     exercises: "Exercises",
     body: "Body",
-    recipes: "Recipes",
     plan: "Plan",
     export: "AI Export",
     settings: "Settings",
@@ -3718,7 +3706,6 @@ function MobileNav(_ref6) {
     routines: "Routines",
     exercises: "Exercises",
     body: "Body",
-    recipes: "Recipes",
     plan: "Plan",
     export: "AI Export",
     settings: "Settings",
@@ -9745,7 +9732,7 @@ function buildTrajectoryModel(profile, estimate, bodyD) {
   };
 }
 function EnergyCommandBand(_ref16) {
-  var _window$RepsState2, _estimate$confidence, _estimate$confidence2, _profile$targetWeight, _profile$maintenanceK;
+  var _window$RepsState2, _estimate$confidence, _estimate$confidence2, _profile$targetWeight;
   var profile = _ref16.profile,
     estimate = _ref16.estimate,
     windowDays = _ref16.windowDays,
@@ -9755,14 +9742,13 @@ function EnergyCommandBand(_ref16) {
   var phases = ((_window$RepsState2 = window.RepsState) === null || _window$RepsState2 === void 0 ? void 0 : _window$RepsState2.PHASES) || {};
   var savedTarget = avgMacroKcal(profile);
   var targetDelta = estimate !== null && estimate !== void 0 && estimate.ready && savedTarget != null ? estimate.recommendedTargetKcal - savedTarget : null;
-  var savedMaintenance = Number(profile.maintenanceKcal);
-  var maintenanceDelta = estimate !== null && estimate !== void 0 && estimate.ready && Number.isFinite(savedMaintenance) ? estimate.adaptiveMaintenanceKcal - savedMaintenance : null;
   var chipLevel = (estimate === null || estimate === void 0 || (_estimate$confidence = estimate.confidence) === null || _estimate$confidence === void 0 ? void 0 : _estimate$confidence.level) || "insufficient";
   var phase = phases[profile.phase || "maintain"] || {
     rate: 0,
     kcalDelta: 0,
     label: "Maintain"
   };
+  var phaseName = String(phase.label || "Maintain").split(" · ")[0];
   var targetWeight = profile.targetWeight == null ? null : Number(profile.targetWeight);
   var ready = !!(estimate !== null && estimate !== void 0 && estimate.ready);
   return React.createElement("section", {
@@ -9796,7 +9782,7 @@ function EnergyCommandBand(_ref16) {
     className: "energy-main-number tnum"
   }, React.createElement("span", null, ready ? formatKcalValue(estimate.adaptiveMaintenanceKcal) : "—"), ready && React.createElement("em", null, "kcal")), React.createElement("div", {
     className: "energy-support mono"
-  }, "saved ", Number.isFinite(savedMaintenance) ? "".concat(Math.round(savedMaintenance), " kcal") : "—", maintenanceDelta != null && React.createElement(React.Fragment, null, " \xB7 ", signedKcal(maintenanceDelta))), !ready && React.createElement("div", {
+  }, ready ? "from logged intake + weight trend" : "no saved estimate used"), !ready && React.createElement("div", {
     className: "energy-empty"
   }, (estimate === null || estimate === void 0 ? void 0 : estimate.reason) || "Need more weight and food data.")), React.createElement("div", {
     className: "energy-command-target"
@@ -9842,26 +9828,13 @@ function EnergyCommandBand(_ref16) {
         targetWeight: e.target.value === "" ? null : Number(e.target.value)
       });
     }
-  })), React.createElement("label", {
-    className: "energy-advanced-control"
-  }, React.createElement("span", {
-    className: "kpi-label"
-  }, "Saved maintenance"), React.createElement("input", {
-    type: "number",
-    step: "25",
-    value: (_profile$maintenanceK = profile.maintenanceKcal) !== null && _profile$maintenanceK !== void 0 ? _profile$maintenanceK : 2700,
-    onChange: function onChange(e) {
-      return updateProfile(profile.id, {
-        maintenanceKcal: Number(e.target.value) || 2700
-      });
-    }
   }))))), React.createElement("div", {
     className: "energy-quality-strip"
   }, React.createElement("div", null, React.createElement("span", null, "Observed trend"), React.createElement("strong", {
     className: "tnum"
   }, signedKgRate(estimate === null || estimate === void 0 ? void 0 : estimate.weeklyRateKg))), React.createElement("div", null, React.createElement("span", null, "Avg intake"), React.createElement("strong", {
     className: "tnum"
-  }, (estimate === null || estimate === void 0 ? void 0 : estimate.avgKcal) != null ? "".concat(formatKcalValue(estimate.avgKcal), " kcal") : "—")), React.createElement("div", null, React.createElement("span", null, "Selected phase"), React.createElement("strong", null, phase.label, " \xB7 ", signedKgRate(phase.rate))), React.createElement("div", null, React.createElement("span", null, "Target weight"), React.createElement("strong", {
+  }, (estimate === null || estimate === void 0 ? void 0 : estimate.avgKcal) != null ? "".concat(formatKcalValue(estimate.avgKcal), " kcal") : "—")), React.createElement("div", null, React.createElement("span", null, "Selected phase"), React.createElement("strong", null, phaseName, " \xB7 ", signedKgRate(phase.rate))), React.createElement("div", null, React.createElement("span", null, "Target weight"), React.createElement("strong", {
     className: "tnum"
   }, Number.isFinite(targetWeight) ? "".concat(targetWeight.toFixed(1), " kg") : "—"))));
 }
@@ -10342,7 +10315,6 @@ function Body() {
     if (!(adaptiveTdee !== null && adaptiveTdee !== void 0 && adaptiveTdee.ready)) return;
     var patch = (_RepsData$macroTarget = (_RepsData6 = RepsData).macroTargetsForAdaptiveTdee) === null || _RepsData$macroTarget === void 0 ? void 0 : _RepsData$macroTarget.call(_RepsData6, activeProfile, adaptiveTdee, ((_window$RepsState3 = window.RepsState) === null || _window$RepsState3 === void 0 ? void 0 : _window$RepsState3.DAY_KEYS) || ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]);
     if (patch) updateProfile(activeProfile.id, {
-      maintenanceKcal: patch.maintenanceKcal,
       macros: patch.macros
     });
   };
@@ -11338,6 +11310,7 @@ function Plan() {
 }
 var EXPORT_DEFAULTS = {
   includeProfile: false,
+  includeEquipment: true,
   includeMacros: false,
   includeRoutine: true,
   includeSessions: true,
@@ -11346,6 +11319,19 @@ var EXPORT_DEFAULTS = {
   includeBlocks: true,
   prettyPrint: true,
   introPrompt: "You are my training coach. Review the data below and give me feedback on programming, progressive overload, fatigue management, and anything I should adjust. Be specific and actionable."
+};
+var AVAILABLE_GYM_EQUIPMENT = {
+  free_weights: {
+    dumbbells_kg: [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22.5, 25, 27.5, 30, 32.5, 35, 37.5, 40, 42.5, 45, 47.5, 50],
+    barbell: true,
+    weight_plates_kg: [1.25, 2.5, 5, 10, 20]
+  },
+  racks_and_benches: ["Squat rack", "Bench rack", "Angle adjustable bench"],
+  cables: {
+    single_height_adjustable_pulley_lbs: [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200],
+    double_height_adjustable_pulleys_lbs: [10, 15, 20, 30, 40, 50, 65, 80, 95, 110, 125, 140, 155, 170, 185, 200]
+  },
+  machines_and_stations: ["Cable row machine (not chest-supported)", "Lat pull down machine", "Pull up bar", "Neutral grip bar", "Height adjustable dip rack", "Height adjustable stepping plateau"]
 };
 function loadExportPrefs() {
   try {
@@ -11440,9 +11426,11 @@ function ExportView() {
         age_years: window.RepsState.ageFrom(app.activeProfile.birthday),
         unit: app.activeProfile.unit,
         phase: app.activeProfile.phase,
-        target_weight_kg: app.activeProfile.targetWeight,
-        maintenance_kcal: app.activeProfile.maintenanceKcal
+        target_weight_kg: app.activeProfile.targetWeight
       };
+    }
+    if (prefs.includeEquipment) {
+      out.available_equipment = AVAILABLE_GYM_EQUIPMENT;
     }
     if (prefs.includeMacros) {
       out.macros_per_day = app.activeProfile.macros;
@@ -11790,10 +11778,17 @@ function ExportView() {
     }
   }), React.createElement(ToggleRow, {
     label: "Personal data \u2014 profile",
-    sub: "Name, birthday, age, phase, target weight, maintenance kcal",
+    sub: "Name, birthday, age, phase, target weight",
     checked: prefs.includeProfile,
     onChange: function onChange(v) {
       return updatePref("includeProfile", v);
+    }
+  }), React.createElement(ToggleRow, {
+    label: "Available gym equipment",
+    sub: "Free weights, racks, benches, cable stacks, machines, bars, dip rack, and step",
+    checked: prefs.includeEquipment,
+    onChange: function onChange(v) {
+      return updatePref("includeEquipment", v);
     }
   }), React.createElement(ToggleRow, {
     label: "Personal data \u2014 macros per day",
@@ -11836,1316 +11831,6 @@ window.RepsViews = {
   Body: Body,
   Plan: Plan,
   ExportView: ExportView
-};
-
-/* ---- components/recipes.jsx ---- */
-function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
-function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
-function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
-function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
-function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
-function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
-function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
-function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
-function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
-function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
-function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
-function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
-function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
-function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
-var _React = React,
-  useRecipeState = _React.useState,
-  useRecipeMemo = _React.useMemo;
-var RI = RepsIcons;
-function recipeClone(value) {
-  return JSON.parse(JSON.stringify(value || {}));
-}
-function recipeNumber(value) {
-  var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-  var n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-function recipeRound(value) {
-  var decimals = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-  var n = recipeNumber(value);
-  var scale = Math.pow(10, decimals);
-  return Math.round(n * scale) / scale;
-}
-function recipeKcal(value) {
-  return Math.round(recipeNumber(value)).toLocaleString();
-}
-function recipeMacro(value) {
-  var decimals = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
-  var n = recipeRound(value, decimals);
-  return Number.isInteger(n) ? String(n) : n.toFixed(decimals);
-}
-function recipeCurrency(value) {
-  var currency = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "EUR";
-  var n = Number(value);
-  if (!Number.isFinite(n)) return "-";
-  try {
-    return n.toLocaleString("nl-NL", {
-      style: "currency",
-      currency: currency
-    });
-  } catch (e) {
-    return "".concat(currency, " ").concat(n.toFixed(2));
-  }
-}
-function recipeUnitAmount(value) {
-  var unit = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "g";
-  var decimals = unit === "ml" || recipeNumber(value) < 10 ? 1 : 0;
-  return "".concat(recipeMacro(value, decimals), " ").concat(unit || "").trim();
-}
-function recipePackLabel() {
-  var option = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var amount = recipeNumber(option.packAmount, null);
-  var unit = option.packUnit || option.amountUnit || "";
-  var price = option.packPrice !== undefined && option.packPrice !== null ? recipeCurrency(option.packPrice, option.currency || "EUR") : "-";
-  return amount ? "".concat(recipeUnitAmount(amount, unit), " pack \xB7 ").concat(price) : "Pack \xB7 ".concat(price);
-}
-function recipeOptionUsedCost() {
-  var option = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var amount = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-  var servings = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-  var packAmount = recipeNumber(option.packAmount);
-  var packPrice = Number(option.packPrice);
-  if (!packAmount || !Number.isFinite(packPrice)) return null;
-  return recipeNumber(amount) * recipeNumber(servings, 1) / packAmount * packPrice;
-}
-function recipeSlug(value) {
-  return String(value || "recipe").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "recipe-".concat(Date.now().toString(36));
-}
-function recipeDefaultSelections() {
-  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var selections = _objectSpread({}, recipe.selections || {});
-  (recipe.groups || []).forEach(function (group) {
-    var _group$options;
-    if (!selections[group.id]) selections[group.id] = ((_group$options = group.options) === null || _group$options === void 0 || (_group$options = _group$options[0]) === null || _group$options === void 0 ? void 0 : _group$options.id) || "";
-  });
-  return selections;
-}
-function recipeSelectedOption() {
-  var _group$options2;
-  var group = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-  return (group.options || []).find(function (option) {
-    return option.id === selections[group.id];
-  }) || ((_group$options2 = group.options) === null || _group$options2 === void 0 ? void 0 : _group$options2[0]) || null;
-}
-function recipeDefaultAmounts() {
-  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-  var amounts = {};
-  (recipe.groups || []).forEach(function (group) {
-    var option = recipeSelectedOption(group, selections);
-    amounts[group.id] = recipeNumber(option === null || option === void 0 ? void 0 : option.amount, 0);
-  });
-  return amounts;
-}
-function recipeOptionMacros() {
-  var option = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var amount = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-  var servings = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
-  var factor = recipeNumber(amount) * recipeNumber(servings, 1) / 100;
-  return {
-    kcal: recipeNumber(option.kcalPer100) * factor,
-    protein: recipeNumber(option.proteinPer100) * factor,
-    carbs: recipeNumber(option.carbsPer100) * factor,
-    fat: recipeNumber(option.fatPer100) * factor
-  };
-}
-function calculateRecipe() {
-  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-  var amounts = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-  var servings = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-  var rows = (recipe.groups || []).map(function (group) {
-    var option = recipeSelectedOption(group, selections);
-    var amount = recipeNumber(amounts[group.id], recipeNumber(option === null || option === void 0 ? void 0 : option.amount, 0));
-    var macros = recipeOptionMacros(option || {}, amount, servings);
-    var cost = recipeOptionUsedCost(option || {}, amount, servings);
-    return {
-      group: group,
-      option: option,
-      amount: amount,
-      macros: macros,
-      cost: cost
-    };
-  }).filter(function (row) {
-    return row.option;
-  });
-  var totals = rows.reduce(function (sum, row) {
-    return {
-      kcal: sum.kcal + row.macros.kcal,
-      protein: sum.protein + row.macros.protein,
-      carbs: sum.carbs + row.macros.carbs,
-      fat: sum.fat + row.macros.fat,
-      cost: sum.cost + recipeNumber(row.cost, 0)
-    };
-  }, {
-    kcal: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    cost: 0
-  });
-  return {
-    rows: rows,
-    totals: totals
-  };
-}
-function recipeAllIngredientRows() {
-  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
-  var amounts = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
-  var servings = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
-  return (recipe.groups || []).flatMap(function (group) {
-    var selected = recipeSelectedOption(group, selections);
-    return (group.options || []).map(function (option) {
-      var isSelected = (selected === null || selected === void 0 ? void 0 : selected.id) === option.id;
-      var amount = recipeNumber(isSelected ? amounts[group.id] : option.amount, recipeNumber(option.amount, 0));
-      var macros = isSelected ? recipeOptionMacros(option, amount, servings) : {
-        kcal: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0
-      };
-      return {
-        group: group,
-        option: option,
-        selected: isSelected,
-        amount: amount,
-        totalAmount: amount * recipeNumber(servings, 1),
-        macros: macros,
-        cost: isSelected ? recipeOptionUsedCost(option, amount, servings) : null
-      };
-    });
-  });
-}
-function recipeLogName() {
-  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var rows = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-  var pieces = rows.filter(function (row) {
-    return row.group.id === "meat" || row.group.id === "vegetable" || row.group.id === "starch";
-  }).map(function (row) {
-    var _row$option;
-    return (_row$option = row.option) === null || _row$option === void 0 ? void 0 : _row$option.label;
-  }).filter(Boolean);
-  return "Recipe: ".concat(recipe.name).concat(pieces.length ? " (".concat(pieces.join(" · "), ")") : "");
-}
-function emptyRecipeTemplate() {
-  return {
-    id: "recipe-".concat(Date.now().toString(36)),
-    name: "New recipe",
-    category: "Dinner",
-    tags: [],
-    servings: 1,
-    summary: "",
-    selections: {},
-    groups: [{
-      id: "main",
-      label: "Main ingredient",
-      inputLabel: "grams",
-      options: [{
-        id: "main-option",
-        label: "Ingredient",
-        item: "Ingredient",
-        sourceUrl: "",
-        packAmount: 100,
-        packUnit: "g",
-        packPrice: 0,
-        currency: "EUR",
-        amount: 100,
-        amountUnit: "g",
-        displayAmount: "100 g",
-        nutritionBasis: "per 100 g",
-        kcalPer100: 100,
-        proteinPer100: 10,
-        carbsPer100: 0,
-        fatPer100: 0
-      }]
-    }],
-    cooking: {
-      equipment: "Electric hob",
-      hobNote: RepsState.DEFAULT_HOB_PREFERENCES.note,
-      steps: [{
-        id: "step-1",
-        title: "Cook",
-        hob: "6",
-        minutes: "10",
-        body: "Add the cooking steps here."
-      }]
-    }
-  };
-}
-function RecipeCard(_ref) {
-  var recipe = _ref.recipe,
-    onOpen = _ref.onOpen,
-    onEdit = _ref.onEdit,
-    onDelete = _ref.onDelete;
-  var selections = recipeDefaultSelections(recipe);
-  var amounts = recipeDefaultAmounts(recipe, selections);
-  var _calculateRecipe = calculateRecipe(recipe, selections, amounts, recipe.servings || 1),
-    totals = _calculateRecipe.totals,
-    rows = _calculateRecipe.rows;
-  var sources = (recipe.groups || []).reduce(function (sum, group) {
-    return sum + (group.options || []).filter(function (option) {
-      return option.sourceUrl;
-    }).length;
-  }, 0);
-  return React.createElement("article", {
-    className: "recipe-card"
-  }, React.createElement("div", {
-    className: "recipe-card-main"
-  }, React.createElement("div", null, React.createElement("div", {
-    className: "recipe-card-kicker"
-  }, recipe.category || "Recipe", " \xB7 ", recipe.servings || 1, " serving"), React.createElement("h2", null, recipe.name), recipe.summary && React.createElement("p", null, recipe.summary)), React.createElement("div", {
-    className: "recipe-card-actions"
-  }, React.createElement("button", {
-    className: "btn ghost sm icon-only",
-    type: "button",
-    title: "Edit recipe",
-    onClick: onEdit
-  }, React.createElement(RI.Edit, null)), React.createElement("button", {
-    className: "btn ghost sm icon-only",
-    type: "button",
-    title: "Delete recipe",
-    onClick: onDelete
-  }, React.createElement(RI.X, null)))), React.createElement("div", {
-    className: "recipe-card-macros"
-  }, React.createElement("span", null, React.createElement("strong", null, recipeKcal(totals.kcal)), " kcal"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.fat)), "g fat"), React.createElement("span", null, React.createElement("strong", null, recipeCurrency(totals.cost)), " used")), React.createElement("div", {
-    className: "recipe-card-foot"
-  }, React.createElement("span", {
-    className: "mono muted"
-  }, sources, " source links"), React.createElement("button", {
-    className: "btn primary sm",
-    type: "button",
-    onClick: onOpen
-  }, React.createElement(RI.Chevron, null), " Open")));
-}
-function RecipeModal(_ref2) {
-  var _recipe$cooking, _recipe$cooking2;
-  var recipe = _ref2.recipe,
-    onClose = _ref2.onClose,
-    onLog = _ref2.onLog,
-    onEdit = _ref2.onEdit;
-  var _useRecipeState = useRecipeState("build"),
-    _useRecipeState2 = _slicedToArray(_useRecipeState, 2),
-    tab = _useRecipeState2[0],
-    setTab = _useRecipeState2[1];
-  var _useRecipeState3 = useRecipeState(RepsData.TODAY),
-    _useRecipeState4 = _slicedToArray(_useRecipeState3, 2),
-    date = _useRecipeState4[0],
-    setDate = _useRecipeState4[1];
-  var _useRecipeState5 = useRecipeState(recipe.servings || 1),
-    _useRecipeState6 = _slicedToArray(_useRecipeState5, 2),
-    servings = _useRecipeState6[0],
-    setServings = _useRecipeState6[1];
-  var _useRecipeState7 = useRecipeState(function () {
-      return recipeDefaultSelections(recipe);
-    }),
-    _useRecipeState8 = _slicedToArray(_useRecipeState7, 2),
-    selections = _useRecipeState8[0],
-    setSelections = _useRecipeState8[1];
-  var _useRecipeState9 = useRecipeState(function () {
-      return recipeDefaultAmounts(recipe, recipeDefaultSelections(recipe));
-    }),
-    _useRecipeState0 = _slicedToArray(_useRecipeState9, 2),
-    amounts = _useRecipeState0[0],
-    setAmounts = _useRecipeState0[1];
-  var computed = useRecipeMemo(function () {
-    return calculateRecipe(recipe, selections, amounts, servings);
-  }, [recipe, selections, amounts, servings]);
-  var ingredientRows = useRecipeMemo(function () {
-    return recipeAllIngredientRows(recipe, selections, amounts, servings);
-  }, [recipe, selections, amounts, servings]);
-  var hob = ((_recipe$cooking = recipe.cooking) === null || _recipe$cooking === void 0 ? void 0 : _recipe$cooking.hobNote) || RepsState.DEFAULT_HOB_PREFERENCES.note;
-  var selectOption = function selectOption(group, option) {
-    setSelections(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, _defineProperty({}, group.id, option.id));
-    });
-    setAmounts(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, _defineProperty({}, group.id, recipeNumber(option.amount, current[group.id] || 0)));
-    });
-  };
-  var logMeal = function logMeal() {
-    var totals = computed.totals;
-    onLog(date, {
-      product: recipeLogName(recipe, computed.rows),
-      amount: recipeNumber(servings, 1),
-      kcal: Math.round(totals.kcal),
-      protein: recipeRound(totals.protein, 1),
-      carbs: recipeRound(totals.carbs, 1),
-      fat: recipeRound(totals.fat, 1),
-      recipeId: recipe.id,
-      source: "recipe",
-      recipeSelections: selections
-    });
-    onClose();
-  };
-  return React.createElement("div", {
-    className: "recipe-modal-backdrop",
-    onClick: onClose
-  }, React.createElement("section", {
-    className: "recipe-modal",
-    role: "dialog",
-    "aria-modal": "true",
-    "aria-label": recipe.name,
-    onClick: function onClick(e) {
-      return e.stopPropagation();
-    }
-  }, React.createElement("div", {
-    className: "recipe-modal-head"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "recipe-card-kicker"
-  }, recipe.category || "Recipe"), React.createElement("h2", null, recipe.name)), React.createElement("div", {
-    className: "recipe-modal-actions"
-  }, React.createElement("button", {
-    className: "btn ghost sm",
-    type: "button",
-    onClick: onEdit
-  }, React.createElement(RI.Edit, null), " Edit"), React.createElement("button", {
-    className: "btn ghost sm icon-only",
-    type: "button",
-    title: "Close",
-    onClick: onClose
-  }, React.createElement(RI.X, null)))), React.createElement("div", {
-    className: "recipe-modal-toolbar"
-  }, React.createElement("div", {
-    className: "recipe-tabs",
-    role: "tablist",
-    "aria-label": "Recipe sections"
-  }, ["build", "ingredients", "cook"].map(function (id) {
-    return React.createElement("button", {
-      key: id,
-      className: "recipe-tab ".concat(tab === id ? "is-on" : ""),
-      type: "button",
-      onClick: function onClick() {
-        return setTab(id);
-      }
-    }, id === "build" ? "Build" : id === "ingredients" ? "Ingredients" : "Cook");
-  })), React.createElement("label", {
-    className: "recipe-date-control"
-  }, React.createElement("span", null, "Date"), React.createElement("input", {
-    type: "date",
-    value: date,
-    onChange: function onChange(e) {
-      return setDate(e.target.value);
-    }
-  })), React.createElement("label", {
-    className: "recipe-serving-control"
-  }, React.createElement("span", null, "Multiplier"), React.createElement("input", {
-    type: "number",
-    min: "0.25",
-    step: "0.25",
-    value: servings,
-    onChange: function onChange(e) {
-      return setServings(e.target.value);
-    }
-  }))), React.createElement("div", {
-    className: "recipe-modal-body"
-  }, React.createElement("aside", {
-    className: "recipe-total-panel"
-  }, React.createElement("div", {
-    className: "recipe-total-number"
-  }, recipeKcal(computed.totals.kcal), React.createElement("span", null, "kcal")), React.createElement("div", {
-    className: "recipe-total-grid"
-  }, React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.fat)), "g fat"), React.createElement("span", null, React.createElement("strong", null, recipeCurrency(computed.totals.cost)), " used")), React.createElement("button", {
-    className: "btn primary sm recipe-log-btn",
-    type: "button",
-    onClick: logMeal
-  }, React.createElement(RI.Plus, null), " Log meal")), tab === "build" && React.createElement("div", {
-    className: "recipe-build-grid"
-  }, (recipe.groups || []).map(function (group) {
-    var _ref3, _amounts$group$id;
-    var selected = recipeSelectedOption(group, selections);
-    var amount = (_ref3 = (_amounts$group$id = amounts[group.id]) !== null && _amounts$group$id !== void 0 ? _amounts$group$id : selected === null || selected === void 0 ? void 0 : selected.amount) !== null && _ref3 !== void 0 ? _ref3 : 0;
-    return React.createElement("section", {
-      key: group.id,
-      className: "recipe-builder-group"
-    }, React.createElement("div", {
-      className: "recipe-builder-head"
-    }, React.createElement("h3", null, group.label), React.createElement("span", {
-      className: "mono muted"
-    }, group.inputLabel || (selected === null || selected === void 0 ? void 0 : selected.amountUnit) || "amount")), React.createElement("div", {
-      className: "recipe-option-row"
-    }, (group.options || []).map(function (option) {
-      return React.createElement("button", {
-        key: option.id,
-        type: "button",
-        className: "recipe-option ".concat((selected === null || selected === void 0 ? void 0 : selected.id) === option.id ? "is-on" : ""),
-        onClick: function onClick() {
-          return selectOption(group, option);
-        }
-      }, React.createElement("span", null, option.label), React.createElement("em", null, option.displayAmount || "".concat(option.amount).concat(option.amountUnit || "")));
-    })), React.createElement("div", {
-      className: "recipe-amount-row"
-    }, React.createElement("input", {
-      type: "number",
-      min: "0",
-      step: (selected === null || selected === void 0 ? void 0 : selected.amountUnit) === "ml" ? "2.5" : "5",
-      value: amount,
-      onChange: function onChange(e) {
-        return setAmounts(function (current) {
-          return _objectSpread(_objectSpread({}, current), {}, _defineProperty({}, group.id, e.target.value));
-        });
-      }
-    }), React.createElement("span", null, (selected === null || selected === void 0 ? void 0 : selected.amountUnit) || "g", " used"), selected && React.createElement("span", null, recipePackLabel(selected)), (selected === null || selected === void 0 ? void 0 : selected.sourceUrl) && React.createElement("a", {
-      href: selected.sourceUrl,
-      target: "_blank",
-      rel: "noreferrer"
-    }, "Jumbo source")));
-  })), tab === "ingredients" && React.createElement("div", {
-    className: "recipe-ingredient-list"
-  }, ingredientRows.map(function (row) {
-    return React.createElement("div", {
-      key: "".concat(row.group.id, "-").concat(row.option.id),
-      className: "recipe-ingredient-row ".concat(row.selected ? "is-selected" : "")
-    }, React.createElement("div", null, React.createElement("span", {
-      className: "recipe-card-kicker"
-    }, row.group.label, row.selected ? " · selected" : ""), React.createElement("strong", null, row.option.item || row.option.label), React.createElement("em", null, "Full pack: ", recipePackLabel(row.option)), row.selected && React.createElement("em", null, "Build uses: ", recipeUnitAmount(row.totalAmount, row.option.amountUnit || "g"), row.cost !== null ? " \xB7 ".concat(recipeCurrency(row.cost, row.option.currency || "EUR")) : ""), React.createElement("em", null, row.option.nutritionBasis || "per 100")), React.createElement("div", {
-      className: "recipe-ingredient-macros"
-    }, row.selected ? React.createElement(React.Fragment, null, React.createElement("span", null, recipeKcal(row.macros.kcal), " kcal"), React.createElement("span", null, recipeMacro(row.macros.protein), "g protein")) : React.createElement("span", null, "option"), row.option.sourceUrl && React.createElement("a", {
-      href: row.option.sourceUrl,
-      target: "_blank",
-      rel: "noreferrer"
-    }, "source")));
-  })), tab === "cook" && React.createElement("div", {
-    className: "recipe-cook-panel"
-  }, React.createElement("div", {
-    className: "recipe-hob-note"
-  }, hob), (((_recipe$cooking2 = recipe.cooking) === null || _recipe$cooking2 === void 0 ? void 0 : _recipe$cooking2.steps) || []).map(function (step, index) {
-    return React.createElement("div", {
-      key: step.id || index,
-      className: "recipe-step"
-    }, React.createElement("div", {
-      className: "recipe-step-index mono"
-    }, index + 1), React.createElement("div", null, React.createElement("div", {
-      className: "recipe-step-head"
-    }, React.createElement("strong", null, step.title || "Step ".concat(index + 1)), React.createElement("span", {
-      className: "mono"
-    }, "hob ", step.hob || "6", " \xB7 ", step.minutes || "until done", " min")), React.createElement("p", null, step.body)));
-  })))));
-}
-function recipeOptionTemplate() {
-  var groupId = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : "ingredient";
-  var slug = recipeSlug(groupId);
-  return {
-    id: "".concat(slug, "-option-").concat(Date.now().toString(36)),
-    label: "Ingredient",
-    item: "Ingredient",
-    sourceUrl: "",
-    packAmount: 100,
-    packUnit: "g",
-    packPrice: 0,
-    currency: "EUR",
-    amount: 100,
-    amountUnit: "g",
-    displayAmount: "100 g",
-    nutritionBasis: "per 100 g",
-    kcalPer100: 100,
-    proteinPer100: 10,
-    carbsPer100: 0,
-    fatPer100: 0
-  };
-}
-function recipeGroupTemplate() {
-  var id = "group-".concat(Date.now().toString(36));
-  return {
-    id: id,
-    label: "Ingredient group",
-    inputLabel: "grams",
-    options: [recipeOptionTemplate(id)]
-  };
-}
-function recipeStepTemplate() {
-  return {
-    id: "step-".concat(Date.now().toString(36)),
-    title: "Step",
-    hob: "6",
-    minutes: "10",
-    body: "Add the cooking step."
-  };
-}
-function recipeCleanNumber(value) {
-  var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
-  var n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-function recipeSanitizeDraft() {
-  var _draft$cooking, _draft$cooking2, _draft$cooking3;
-  var draft = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  var fallbackId = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : "";
-  var id = String(draft.id || fallbackId || recipeSlug(draft.name)).trim();
-  var groups = (draft.groups || []).map(function (group, groupIndex) {
-    var groupId = String(group.id || recipeSlug(group.label) || "group-".concat(groupIndex + 1)).trim();
-    var options = (group.options || []).map(function (option, optionIndex) {
-      var optionId = String(option.id || recipeSlug(option.label || option.item) || "".concat(groupId, "-option-").concat(optionIndex + 1)).trim();
-      return _objectSpread(_objectSpread({}, option), {}, {
-        id: optionId,
-        label: String(option.label || option.item || "Ingredient").trim(),
-        item: String(option.item || option.label || "Ingredient").trim(),
-        sourceUrl: String(option.sourceUrl || "").trim(),
-        packAmount: recipeCleanNumber(option.packAmount, 0),
-        packUnit: String(option.packUnit || option.amountUnit || "g").trim(),
-        packPrice: recipeCleanNumber(option.packPrice, 0),
-        currency: String(option.currency || "EUR").trim() || "EUR",
-        amount: recipeCleanNumber(option.amount, 0),
-        amountUnit: String(option.amountUnit || option.packUnit || "g").trim(),
-        displayAmount: String(option.displayAmount || "").trim(),
-        nutritionBasis: String(option.nutritionBasis || "per 100 g").trim(),
-        kcalPer100: recipeCleanNumber(option.kcalPer100, 0),
-        proteinPer100: recipeCleanNumber(option.proteinPer100, 0),
-        carbsPer100: recipeCleanNumber(option.carbsPer100, 0),
-        fatPer100: recipeCleanNumber(option.fatPer100, 0)
-      });
-    }).filter(function (option) {
-      return option.id && option.label;
-    });
-    return _objectSpread(_objectSpread({}, group), {}, {
-      id: groupId,
-      label: String(group.label || "Ingredient group").trim(),
-      inputLabel: String(group.inputLabel || "amount").trim(),
-      options: options
-    });
-  }).filter(function (group) {
-    return group.id && group.options.length;
-  });
-  var selections = _objectSpread({}, draft.selections || {});
-  groups.forEach(function (group) {
-    var _group$options$;
-    var selected = selections[group.id];
-    if (!group.options.some(function (option) {
-      return option.id === selected;
-    })) selections[group.id] = ((_group$options$ = group.options[0]) === null || _group$options$ === void 0 ? void 0 : _group$options$.id) || "";
-  });
-  var cooking = {
-    equipment: ((_draft$cooking = draft.cooking) === null || _draft$cooking === void 0 ? void 0 : _draft$cooking.equipment) || "Electric hob",
-    hobNote: ((_draft$cooking2 = draft.cooking) === null || _draft$cooking2 === void 0 ? void 0 : _draft$cooking2.hobNote) || RepsState.DEFAULT_HOB_PREFERENCES.note,
-    steps: (((_draft$cooking3 = draft.cooking) === null || _draft$cooking3 === void 0 ? void 0 : _draft$cooking3.steps) || []).map(function (step, index) {
-      return {
-        id: String(step.id || "step-".concat(index + 1)).trim(),
-        title: String(step.title || "Step ".concat(index + 1)).trim(),
-        hob: String(step.hob || "").trim(),
-        minutes: String(step.minutes || "").trim(),
-        body: String(step.body || "").trim()
-      };
-    }).filter(function (step) {
-      return step.title || step.body;
-    })
-  };
-  return _objectSpread(_objectSpread({}, draft), {}, {
-    id: id,
-    name: String(draft.name || "Untitled recipe").trim() || "Untitled recipe",
-    category: String(draft.category || "Recipes").trim() || "Recipes",
-    tags: Array.isArray(draft.tags) ? draft.tags.map(function (tag) {
-      return String(tag).trim();
-    }).filter(Boolean) : [],
-    servings: Math.max(0.25, recipeCleanNumber(draft.servings, 1)),
-    summary: String(draft.summary || "").trim(),
-    selections: selections,
-    groups: groups,
-    cooking: cooking
-  });
-}
-function RecipeEditorModal(_ref4) {
-  var _draft$cooking4, _draft$cooking5, _draft$cooking6;
-  var recipe = _ref4.recipe,
-    onClose = _ref4.onClose,
-    onSave = _ref4.onSave,
-    onDelete = _ref4.onDelete;
-  var isNew = !recipe;
-  var _useRecipeState1 = useRecipeState(function () {
-      return recipeClone(recipe || emptyRecipeTemplate());
-    }),
-    _useRecipeState10 = _slicedToArray(_useRecipeState1, 2),
-    draft = _useRecipeState10[0],
-    setDraft = _useRecipeState10[1];
-  var _useRecipeState11 = useRecipeState(""),
-    _useRecipeState12 = _slicedToArray(_useRecipeState11, 2),
-    error = _useRecipeState12[0],
-    setError = _useRecipeState12[1];
-  var setRoot = function setRoot(patch) {
-    setError("");
-    setDraft(function (current) {
-      return _objectSpread(_objectSpread({}, current), patch);
-    });
-  };
-  var updateGroup = function updateGroup(groupIndex, patch) {
-    setError("");
-    setDraft(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, {
-        groups: (current.groups || []).map(function (group, index) {
-          return index === groupIndex ? _objectSpread(_objectSpread({}, group), patch) : group;
-        })
-      });
-    });
-  };
-  var updateOption = function updateOption(groupIndex, optionIndex, patch) {
-    setError("");
-    setDraft(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, {
-        groups: (current.groups || []).map(function (group, index) {
-          if (index !== groupIndex) return group;
-          return _objectSpread(_objectSpread({}, group), {}, {
-            options: (group.options || []).map(function (option, optIndex) {
-              return optIndex === optionIndex ? _objectSpread(_objectSpread({}, option), patch) : option;
-            })
-          });
-        })
-      });
-    });
-  };
-  var addGroup = function addGroup() {
-    setDraft(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, {
-        groups: [].concat(_toConsumableArray(current.groups || []), [recipeGroupTemplate()])
-      });
-    });
-  };
-  var deleteGroup = function deleteGroup(groupIndex) {
-    setDraft(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, {
-        groups: (current.groups || []).filter(function (_group, index) {
-          return index !== groupIndex;
-        })
-      });
-    });
-  };
-  var addOption = function addOption(groupIndex) {
-    setDraft(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, {
-        groups: (current.groups || []).map(function (group, index) {
-          return index === groupIndex ? _objectSpread(_objectSpread({}, group), {}, {
-            options: [].concat(_toConsumableArray(group.options || []), [recipeOptionTemplate(group.id)])
-          }) : group;
-        })
-      });
-    });
-  };
-  var deleteOption = function deleteOption(groupIndex, optionIndex) {
-    setDraft(function (current) {
-      return _objectSpread(_objectSpread({}, current), {}, {
-        groups: (current.groups || []).map(function (group, index) {
-          return index === groupIndex ? _objectSpread(_objectSpread({}, group), {}, {
-            options: (group.options || []).filter(function (_option, optIndex) {
-              return optIndex !== optionIndex;
-            })
-          }) : group;
-        })
-      });
-    });
-  };
-  var updateStep = function updateStep(stepIndex, patch) {
-    setDraft(function (current) {
-      var _current$cooking;
-      return _objectSpread(_objectSpread({}, current), {}, {
-        cooking: _objectSpread(_objectSpread({}, current.cooking || {}), {}, {
-          steps: (((_current$cooking = current.cooking) === null || _current$cooking === void 0 ? void 0 : _current$cooking.steps) || []).map(function (step, index) {
-            return index === stepIndex ? _objectSpread(_objectSpread({}, step), patch) : step;
-          })
-        })
-      });
-    });
-  };
-  var addStep = function addStep() {
-    setDraft(function (current) {
-      var _current$cooking2;
-      return _objectSpread(_objectSpread({}, current), {}, {
-        cooking: _objectSpread(_objectSpread({}, current.cooking || {}), {}, {
-          steps: [].concat(_toConsumableArray(((_current$cooking2 = current.cooking) === null || _current$cooking2 === void 0 ? void 0 : _current$cooking2.steps) || []), [recipeStepTemplate()])
-        })
-      });
-    });
-  };
-  var deleteStep = function deleteStep(stepIndex) {
-    setDraft(function (current) {
-      var _current$cooking3;
-      return _objectSpread(_objectSpread({}, current), {}, {
-        cooking: _objectSpread(_objectSpread({}, current.cooking || {}), {}, {
-          steps: (((_current$cooking3 = current.cooking) === null || _current$cooking3 === void 0 ? void 0 : _current$cooking3.steps) || []).filter(function (_step, index) {
-            return index !== stepIndex;
-          })
-        })
-      });
-    });
-  };
-  var submit = function submit() {
-    try {
-      var next = recipeSanitizeDraft(draft, (recipe === null || recipe === void 0 ? void 0 : recipe.id) || draft.id || recipeSlug(draft.name));
-      if (!next.groups.length) throw new Error("Recipe needs at least one ingredient group with one option.");
-      onSave(next);
-      onClose();
-    } catch (e) {
-      setError(e.message || "Recipe is invalid.");
-    }
-  };
-  return React.createElement("div", {
-    className: "recipe-modal-backdrop",
-    onClick: onClose
-  }, React.createElement("section", {
-    className: "recipe-editor-modal",
-    role: "dialog",
-    "aria-modal": "true",
-    "aria-label": "Recipe editor",
-    onClick: function onClick(e) {
-      return e.stopPropagation();
-    }
-  }, React.createElement("div", {
-    className: "recipe-modal-head"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "recipe-card-kicker"
-  }, isNew ? "New recipe" : "Edit recipe"), React.createElement("h2", null, draft.name || "Recipe")), React.createElement("button", {
-    className: "btn ghost sm icon-only",
-    type: "button",
-    title: "Close",
-    onClick: onClose
-  }, React.createElement(RI.X, null))), React.createElement("div", {
-    className: "recipe-editor-body"
-  }, React.createElement("section", {
-    className: "recipe-edit-section"
-  }, React.createElement("h3", null, "Recipe"), React.createElement("div", {
-    className: "recipe-edit-grid"
-  }, React.createElement("label", null, React.createElement("span", null, "Name"), React.createElement("input", {
-    value: draft.name || "",
-    onChange: function onChange(e) {
-      return setRoot({
-        name: e.target.value
-      });
-    }
-  })), React.createElement("label", null, React.createElement("span", null, "Category"), React.createElement("input", {
-    value: draft.category || "",
-    onChange: function onChange(e) {
-      return setRoot({
-        category: e.target.value
-      });
-    }
-  })), React.createElement("label", null, React.createElement("span", null, "Default multiplier"), React.createElement("input", {
-    type: "number",
-    min: "0.25",
-    step: "0.25",
-    value: draft.servings || 1,
-    onChange: function onChange(e) {
-      return setRoot({
-        servings: e.target.value
-      });
-    }
-  })), React.createElement("label", null, React.createElement("span", null, "Tags"), React.createElement("input", {
-    value: (draft.tags || []).join(", "),
-    onChange: function onChange(e) {
-      return setRoot({
-        tags: e.target.value.split(",").map(function (tag) {
-          return tag.trim();
-        }).filter(Boolean)
-      });
-    }
-  })), React.createElement("label", {
-    className: "span-2"
-  }, React.createElement("span", null, "Summary"), React.createElement("textarea", {
-    value: draft.summary || "",
-    onChange: function onChange(e) {
-      return setRoot({
-        summary: e.target.value
-      });
-    }
-  })))), React.createElement("section", {
-    className: "recipe-edit-section"
-  }, React.createElement("div", {
-    className: "recipe-edit-section-head"
-  }, React.createElement("h3", null, "Ingredients"), React.createElement("button", {
-    className: "btn ghost sm",
-    type: "button",
-    onClick: addGroup
-  }, React.createElement(RI.Plus, null), " Group")), (draft.groups || []).map(function (group, groupIndex) {
-    return React.createElement("div", {
-      className: "recipe-edit-group",
-      key: "".concat(group.id || "group", "-").concat(groupIndex)
-    }, React.createElement("div", {
-      className: "recipe-edit-group-head"
-    }, React.createElement("strong", null, group.label || "Ingredient group"), React.createElement("button", {
-      className: "btn ghost sm icon-only",
-      type: "button",
-      title: "Delete group",
-      onClick: function onClick() {
-        return deleteGroup(groupIndex);
-      }
-    }, React.createElement(RI.X, null))), React.createElement("div", {
-      className: "recipe-edit-grid compact"
-    }, React.createElement("label", null, React.createElement("span", null, "Group id"), React.createElement("input", {
-      value: group.id || "",
-      onChange: function onChange(e) {
-        return updateGroup(groupIndex, {
-          id: e.target.value
-        });
-      }
-    })), React.createElement("label", null, React.createElement("span", null, "Group name"), React.createElement("input", {
-      value: group.label || "",
-      onChange: function onChange(e) {
-        return updateGroup(groupIndex, {
-          label: e.target.value
-        });
-      }
-    })), React.createElement("label", null, React.createElement("span", null, "Amount label"), React.createElement("input", {
-      value: group.inputLabel || "",
-      onChange: function onChange(e) {
-        return updateGroup(groupIndex, {
-          inputLabel: e.target.value
-        });
-      }
-    }))), React.createElement("div", {
-      className: "recipe-edit-options"
-    }, (group.options || []).map(function (option, optionIndex) {
-      var _option$packAmount, _option$packPrice, _option$amount, _option$kcalPer, _option$proteinPer, _option$carbsPer, _option$fatPer;
-      return React.createElement("div", {
-        className: "recipe-edit-option",
-        key: "".concat(option.id || "option", "-").concat(optionIndex)
-      }, React.createElement("div", {
-        className: "recipe-edit-option-head"
-      }, React.createElement("strong", null, option.label || "Ingredient"), React.createElement("button", {
-        className: "btn ghost sm icon-only",
-        type: "button",
-        title: "Delete option",
-        onClick: function onClick() {
-          return deleteOption(groupIndex, optionIndex);
-        }
-      }, React.createElement(RI.X, null))), React.createElement("div", {
-        className: "recipe-edit-grid option-grid"
-      }, React.createElement("label", null, React.createElement("span", null, "Option id"), React.createElement("input", {
-        value: option.id || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            id: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Name"), React.createElement("input", {
-        value: option.label || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            label: e.target.value
-          });
-        }
-      })), React.createElement("label", {
-        className: "span-2"
-      }, React.createElement("span", null, "Full pack item"), React.createElement("input", {
-        value: option.item || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            item: e.target.value
-          });
-        }
-      })), React.createElement("label", {
-        className: "span-2"
-      }, React.createElement("span", null, "Supermarket URL"), React.createElement("input", {
-        value: option.sourceUrl || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            sourceUrl: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Pack amount"), React.createElement("input", {
-        type: "number",
-        min: "0",
-        step: "0.01",
-        value: (_option$packAmount = option.packAmount) !== null && _option$packAmount !== void 0 ? _option$packAmount : "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            packAmount: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Pack unit"), React.createElement("input", {
-        value: option.packUnit || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            packUnit: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Pack price"), React.createElement("input", {
-        type: "number",
-        min: "0",
-        step: "0.01",
-        value: (_option$packPrice = option.packPrice) !== null && _option$packPrice !== void 0 ? _option$packPrice : "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            packPrice: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Currency"), React.createElement("input", {
-        value: option.currency || "EUR",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            currency: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Build amount"), React.createElement("input", {
-        type: "number",
-        min: "0",
-        step: "0.01",
-        value: (_option$amount = option.amount) !== null && _option$amount !== void 0 ? _option$amount : "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            amount: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Build unit"), React.createElement("input", {
-        value: option.amountUnit || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            amountUnit: e.target.value
-          });
-        }
-      })), React.createElement("label", {
-        className: "span-2"
-      }, React.createElement("span", null, "Display amount"), React.createElement("input", {
-        value: option.displayAmount || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            displayAmount: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Kcal / 100"), React.createElement("input", {
-        type: "number",
-        min: "0",
-        step: "0.1",
-        value: (_option$kcalPer = option.kcalPer100) !== null && _option$kcalPer !== void 0 ? _option$kcalPer : "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            kcalPer100: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Protein / 100"), React.createElement("input", {
-        type: "number",
-        min: "0",
-        step: "0.1",
-        value: (_option$proteinPer = option.proteinPer100) !== null && _option$proteinPer !== void 0 ? _option$proteinPer : "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            proteinPer100: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Carbs / 100"), React.createElement("input", {
-        type: "number",
-        min: "0",
-        step: "0.1",
-        value: (_option$carbsPer = option.carbsPer100) !== null && _option$carbsPer !== void 0 ? _option$carbsPer : "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            carbsPer100: e.target.value
-          });
-        }
-      })), React.createElement("label", null, React.createElement("span", null, "Fat / 100"), React.createElement("input", {
-        type: "number",
-        min: "0",
-        step: "0.1",
-        value: (_option$fatPer = option.fatPer100) !== null && _option$fatPer !== void 0 ? _option$fatPer : "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            fatPer100: e.target.value
-          });
-        }
-      })), React.createElement("label", {
-        className: "span-2"
-      }, React.createElement("span", null, "Nutrition basis"), React.createElement("input", {
-        value: option.nutritionBasis || "",
-        onChange: function onChange(e) {
-          return updateOption(groupIndex, optionIndex, {
-            nutritionBasis: e.target.value
-          });
-        }
-      }))));
-    }), React.createElement("button", {
-      className: "btn ghost sm recipe-add-option",
-      type: "button",
-      onClick: function onClick() {
-        return addOption(groupIndex);
-      }
-    }, React.createElement(RI.Plus, null), " Option")));
-  })), React.createElement("section", {
-    className: "recipe-edit-section"
-  }, React.createElement("div", {
-    className: "recipe-edit-section-head"
-  }, React.createElement("h3", null, "Cook"), React.createElement("button", {
-    className: "btn ghost sm",
-    type: "button",
-    onClick: addStep
-  }, React.createElement(RI.Plus, null), " Step")), React.createElement("div", {
-    className: "recipe-edit-grid"
-  }, React.createElement("label", null, React.createElement("span", null, "Equipment"), React.createElement("input", {
-    value: ((_draft$cooking4 = draft.cooking) === null || _draft$cooking4 === void 0 ? void 0 : _draft$cooking4.equipment) || "",
-    onChange: function onChange(e) {
-      return setRoot({
-        cooking: _objectSpread(_objectSpread({}, draft.cooking || {}), {}, {
-          equipment: e.target.value
-        })
-      });
-    }
-  })), React.createElement("label", {
-    className: "span-2"
-  }, React.createElement("span", null, "Hob note"), React.createElement("input", {
-    value: ((_draft$cooking5 = draft.cooking) === null || _draft$cooking5 === void 0 ? void 0 : _draft$cooking5.hobNote) || "",
-    onChange: function onChange(e) {
-      return setRoot({
-        cooking: _objectSpread(_objectSpread({}, draft.cooking || {}), {}, {
-          hobNote: e.target.value
-        })
-      });
-    }
-  }))), (((_draft$cooking6 = draft.cooking) === null || _draft$cooking6 === void 0 ? void 0 : _draft$cooking6.steps) || []).map(function (step, stepIndex) {
-    return React.createElement("div", {
-      className: "recipe-edit-step",
-      key: "".concat(step.id || "step", "-").concat(stepIndex)
-    }, React.createElement("div", {
-      className: "recipe-edit-option-head"
-    }, React.createElement("strong", null, step.title || "Step ".concat(stepIndex + 1)), React.createElement("button", {
-      className: "btn ghost sm icon-only",
-      type: "button",
-      title: "Delete step",
-      onClick: function onClick() {
-        return deleteStep(stepIndex);
-      }
-    }, React.createElement(RI.X, null))), React.createElement("div", {
-      className: "recipe-edit-grid compact"
-    }, React.createElement("label", null, React.createElement("span", null, "Title"), React.createElement("input", {
-      value: step.title || "",
-      onChange: function onChange(e) {
-        return updateStep(stepIndex, {
-          title: e.target.value
-        });
-      }
-    })), React.createElement("label", null, React.createElement("span", null, "Hob"), React.createElement("input", {
-      value: step.hob || "",
-      onChange: function onChange(e) {
-        return updateStep(stepIndex, {
-          hob: e.target.value
-        });
-      }
-    })), React.createElement("label", null, React.createElement("span", null, "Minutes"), React.createElement("input", {
-      value: step.minutes || "",
-      onChange: function onChange(e) {
-        return updateStep(stepIndex, {
-          minutes: e.target.value
-        });
-      }
-    })), React.createElement("label", {
-      className: "span-3"
-    }, React.createElement("span", null, "Step body"), React.createElement("textarea", {
-      value: step.body || "",
-      onChange: function onChange(e) {
-        return updateStep(stepIndex, {
-          body: e.target.value
-        });
-      }
-    }))));
-  }))), error && React.createElement("div", {
-    className: "recipe-editor-error"
-  }, error), React.createElement("div", {
-    className: "recipe-editor-actions"
-  }, !isNew && React.createElement("button", {
-    className: "btn ghost sm",
-    type: "button",
-    onClick: onDelete
-  }, React.createElement(RI.X, null), " Delete"), React.createElement("span", null), React.createElement("button", {
-    className: "btn ghost sm",
-    type: "button",
-    onClick: onClose
-  }, "Cancel"), React.createElement("button", {
-    className: "btn primary sm",
-    type: "button",
-    onClick: submit
-  }, React.createElement(RI.Check, null), " Save recipe"))));
-}
-function RecipeImportModal(_ref5) {
-  var onClose = _ref5.onClose,
-    onImport = _ref5.onImport;
-  var _useRecipeState13 = useRecipeState(""),
-    _useRecipeState14 = _slicedToArray(_useRecipeState13, 2),
-    text = _useRecipeState14[0],
-    setText = _useRecipeState14[1];
-  var _useRecipeState15 = useRecipeState(""),
-    _useRecipeState16 = _slicedToArray(_useRecipeState15, 2),
-    error = _useRecipeState16[0],
-    setError = _useRecipeState16[1];
-  var submit = function submit() {
-    try {
-      var parsed = JSON.parse(text);
-      var list = Array.isArray(parsed) ? parsed : Array.isArray(parsed.recipes) ? parsed.recipes : [parsed];
-      if (!list.length) throw new Error("No recipes found.");
-      onImport(list);
-      onClose();
-    } catch (e) {
-      setError(e.message || "Import JSON is invalid.");
-    }
-  };
-  return React.createElement("div", {
-    className: "recipe-modal-backdrop",
-    onClick: onClose
-  }, React.createElement("section", {
-    className: "recipe-editor-modal compact",
-    role: "dialog",
-    "aria-modal": "true",
-    "aria-label": "Import recipes",
-    onClick: function onClick(e) {
-      return e.stopPropagation();
-    }
-  }, React.createElement("div", {
-    className: "recipe-modal-head"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "recipe-card-kicker"
-  }, "Private import"), React.createElement("h2", null, "Import recipes")), React.createElement("button", {
-    className: "btn ghost sm icon-only",
-    type: "button",
-    title: "Close",
-    onClick: onClose
-  }, React.createElement(RI.X, null))), React.createElement("textarea", {
-    className: "recipe-json-input",
-    value: text,
-    onChange: function onChange(e) {
-      setText(e.target.value);
-      setError("");
-    },
-    placeholder: "Paste one recipe, {\"recipes\":[...]}, or an array of recipes.",
-    spellCheck: "false"
-  }), error && React.createElement("div", {
-    className: "recipe-editor-error"
-  }, error), React.createElement("div", {
-    className: "recipe-editor-actions"
-  }, React.createElement("span", null), React.createElement("button", {
-    className: "btn ghost sm",
-    type: "button",
-    onClick: onClose
-  }, "Cancel"), React.createElement("button", {
-    className: "btn primary sm",
-    type: "button",
-    onClick: submit,
-    disabled: !text.trim()
-  }, React.createElement(RI.Download, null), " Import"))));
-}
-function RecipesView() {
-  var _activeProfile$cookin, _activeProfile$cookin2;
-  var app = RepsState.useApp();
-  var activeProfile = app.activeProfile,
-    addFoodEntry = app.addFoodEntry,
-    addRecipe = app.addRecipe,
-    updateRecipe = app.updateRecipe,
-    deleteRecipe = app.deleteRecipe,
-    importRecipes = app.importRecipes;
-  var recipes = activeProfile.recipes || [];
-  var _useRecipeState17 = useRecipeState(null),
-    _useRecipeState18 = _slicedToArray(_useRecipeState17, 2),
-    activeRecipe = _useRecipeState18[0],
-    setActiveRecipe = _useRecipeState18[1];
-  var _useRecipeState19 = useRecipeState(null),
-    _useRecipeState20 = _slicedToArray(_useRecipeState19, 2),
-    editingRecipe = _useRecipeState20[0],
-    setEditingRecipe = _useRecipeState20[1];
-  var _useRecipeState21 = useRecipeState(false),
-    _useRecipeState22 = _slicedToArray(_useRecipeState21, 2),
-    showNew = _useRecipeState22[0],
-    setShowNew = _useRecipeState22[1];
-  var _useRecipeState23 = useRecipeState(false),
-    _useRecipeState24 = _slicedToArray(_useRecipeState23, 2),
-    showImport = _useRecipeState24[0],
-    setShowImport = _useRecipeState24[1];
-  var saveRecipe = function saveRecipe(recipe) {
-    if ((activeProfile.recipes || []).some(function (r) {
-      return r.id === recipe.id;
-    })) updateRecipe(recipe.id, recipe);else addRecipe(recipe);
-  };
-  var removeRecipe = function removeRecipe(recipe) {
-    if (!(recipe !== null && recipe !== void 0 && recipe.id)) return;
-    if (confirm("Delete recipe \"".concat(recipe.name, "\"?"))) {
-      deleteRecipe(recipe.id);
-      if ((activeRecipe === null || activeRecipe === void 0 ? void 0 : activeRecipe.id) === recipe.id) setActiveRecipe(null);
-      if ((editingRecipe === null || editingRecipe === void 0 ? void 0 : editingRecipe.id) === recipe.id) setEditingRecipe(null);
-    }
-  };
-  return React.createElement("div", {
-    className: "view recipes-view"
-  }, React.createElement("div", {
-    className: "page-head"
-  }, React.createElement("div", null, React.createElement("h1", {
-    className: "page-title"
-  }, "Recipes"), React.createElement("div", {
-    className: "page-sub"
-  }, "Private profile recipes \xB7 source-backed macros \xB7 hob-aware cooking")), React.createElement("div", {
-    className: "page-actions"
-  }, React.createElement("button", {
-    className: "btn ghost sm",
-    type: "button",
-    onClick: function onClick() {
-      return setShowImport(true);
-    }
-  }, React.createElement(RI.Download, null), " Import"), React.createElement("button", {
-    className: "btn primary sm",
-    type: "button",
-    onClick: function onClick() {
-      return setShowNew(true);
-    }
-  }, React.createElement(RI.Plus, null), " New recipe"))), React.createElement("section", {
-    className: "recipes-command-band"
-  }, React.createElement("div", null, React.createElement("span", {
-    className: "recipe-card-kicker"
-  }, "Hob profile"), React.createElement("strong", null, ((_activeProfile$cookin = activeProfile.cookingPreferences) === null || _activeProfile$cookin === void 0 || (_activeProfile$cookin = _activeProfile$cookin.hob) === null || _activeProfile$cookin === void 0 ? void 0 : _activeProfile$cookin.usualRange) || "5-7", " usual range"), React.createElement("p", null, ((_activeProfile$cookin2 = activeProfile.cookingPreferences) === null || _activeProfile$cookin2 === void 0 || (_activeProfile$cookin2 = _activeProfile$cookin2.hob) === null || _activeProfile$cookin2 === void 0 ? void 0 : _activeProfile$cookin2.note) || RepsState.DEFAULT_HOB_PREFERENCES.note)), React.createElement("span", {
-    className: "chip"
-  }, recipes.length, " ", recipes.length === 1 ? "recipe" : "recipes")), React.createElement("div", {
-    className: "recipes-grid"
-  }, recipes.map(function (recipe) {
-    return React.createElement(RecipeCard, {
-      key: recipe.id,
-      recipe: recipe,
-      onOpen: function onOpen() {
-        return setActiveRecipe(recipe);
-      },
-      onEdit: function onEdit() {
-        return setEditingRecipe(recipe);
-      },
-      onDelete: function onDelete() {
-        return removeRecipe(recipe);
-      }
-    });
-  }), recipes.length === 0 && React.createElement("div", {
-    className: "empty"
-  }, "No recipes saved yet.")), activeRecipe && React.createElement(RecipeModal, {
-    recipe: activeRecipe,
-    onClose: function onClose() {
-      return setActiveRecipe(null);
-    },
-    onEdit: function onEdit() {
-      return setEditingRecipe(activeRecipe);
-    },
-    onLog: function onLog(date, entry) {
-      return addFoodEntry(date, entry);
-    }
-  }), editingRecipe && React.createElement(RecipeEditorModal, {
-    recipe: editingRecipe,
-    onClose: function onClose() {
-      return setEditingRecipe(null);
-    },
-    onSave: saveRecipe,
-    onDelete: function onDelete() {
-      return removeRecipe(editingRecipe);
-    }
-  }), showNew && React.createElement(RecipeEditorModal, {
-    onClose: function onClose() {
-      return setShowNew(false);
-    },
-    onSave: saveRecipe
-  }), showImport && React.createElement(RecipeImportModal, {
-    onClose: function onClose() {
-      return setShowImport(false);
-    },
-    onImport: importRecipes
-  }));
-}
-window.RepsRecipes = RecipesView;
-window.RepsRecipeUtils = {
-  calculateRecipe: calculateRecipe,
-  recipeDefaultSelections: recipeDefaultSelections,
-  recipeDefaultAmounts: recipeDefaultAmounts,
-  recipeAllIngredientRows: recipeAllIngredientRows,
-  recipeOptionUsedCost: recipeOptionUsedCost
 };
 
 /* ---- components/sessions.jsx ---- */
@@ -15025,7 +13710,7 @@ function macroTargetAvg(profile, field) {
   }, 0) / rows.length : null;
 }
 function PhaseProgress(_ref) {
-  var _RepsData$currentTrai, _RepsData, _trendData$, _trendData, _RepsData$localNutrit, _RepsData2;
+  var _RepsData$currentTrai, _RepsData, _trendData$, _trendData, _RepsData$adaptiveTde, _RepsData2, _RepsData$localNutrit, _RepsData3;
   var profile = _ref.profile,
     bodyData = _ref.bodyData,
     kcalData = _ref.kcalData;
@@ -15113,8 +13798,11 @@ function PhaseProgress(_ref) {
   var observedWrongDirection = target != null && Math.abs(observedRatePerWeek) > 0.01 && (distanceToTarget > 0 && observedRatePerWeek >= 0 || distanceToTarget < 0 && observedRatePerWeek <= 0);
   var targetDistanceAbs = distanceToTarget != null ? Math.abs(distanceToTarget) : null;
   var targetFoot = target == null ? "set in Body" : targetDistanceAbs < 0.05 ? "at target" : "".concat(targetDistanceAbs.toFixed(1), "kg ").concat(distanceToTarget > 0 ? "to lose" : "to gain");
-  var maintenanceKcal = profile.maintenanceKcal || 2700;
-  var targetAvgKcal = maintenanceKcal + phase.kcalDelta;
+  var adaptiveEstimate = (_RepsData$adaptiveTde = (_RepsData2 = RepsData).adaptiveTdeeEstimate) === null || _RepsData$adaptiveTde === void 0 ? void 0 : _RepsData$adaptiveTde.call(_RepsData2, profile, {
+    windowDays: 28
+  });
+  var adaptiveMaintenanceKcal = adaptiveEstimate !== null && adaptiveEstimate !== void 0 && adaptiveEstimate.ready ? adaptiveEstimate.adaptiveMaintenanceKcal : null;
+  var targetAvgKcal = adaptiveMaintenanceKcal != null ? adaptiveMaintenanceKcal + phase.kcalDelta : macroTargetAvg(profile, "kcal");
   var kcalWindowStart = RepsData.addDays(todayIso, -14);
   var last14Kcal = (kcalData || []).filter(function (d) {
     return d.date >= kcalWindowStart && d.date < todayIso;
@@ -15122,13 +13810,13 @@ function PhaseProgress(_ref) {
   var actualAvgKcal = last14Kcal.length ? Math.round(last14Kcal.reduce(function (s, d) {
     return s + d.value;
   }, 0) / last14Kcal.length) : null;
-  var kcalDelta = actualAvgKcal !== null ? actualAvgKcal - targetAvgKcal : null;
-  var actualVsMaintenance = actualAvgKcal !== null ? actualAvgKcal - maintenanceKcal : null;
+  var kcalDelta = actualAvgKcal !== null && targetAvgKcal != null ? actualAvgKcal - targetAvgKcal : null;
+  var actualVsMaintenance = actualAvgKcal !== null && adaptiveMaintenanceKcal != null ? actualAvgKcal - adaptiveMaintenanceKcal : null;
   var foodImpliedRate = actualVsMaintenance !== null ? actualVsMaintenance * 7 / KCAL_PER_KG : null;
   var plannedEnergyRate = phase.kcalDelta * 7 / KCAL_PER_KG;
   var energyToTargetKcal = targetDistanceAbs != null ? targetDistanceAbs * KCAL_PER_KG : null;
   var planDaysByEnergy = energyToTargetKcal != null && phase.kcalDelta !== 0 ? energyToTargetKcal / Math.abs(phase.kcalDelta) : null;
-  var proteinData = ((_RepsData$localNutrit = (_RepsData2 = RepsData).localNutritionData) === null || _RepsData$localNutrit === void 0 ? void 0 : _RepsData$localNutrit.call(_RepsData2, profile, "protein", 14, true, {
+  var proteinData = ((_RepsData$localNutrit = (_RepsData3 = RepsData).localNutritionData) === null || _RepsData$localNutrit === void 0 ? void 0 : _RepsData$localNutrit.call(_RepsData3, profile, "protein", 14, true, {
     excludeToday: true
   })) || [];
   var actualAvgProtein = avgValue(proteinData);
@@ -15288,12 +13976,12 @@ function PhaseProgress(_ref) {
     className: "kpi-label"
   }, "Target avg kcal"), React.createElement("div", {
     className: "kpi-value tnum phase-metric-value"
-  }, React.createElement("span", null, targetAvgKcal)), React.createElement("div", {
+  }, React.createElement("span", null, targetAvgKcal != null ? Math.round(targetAvgKcal) : "—")), React.createElement("div", {
     className: "mono phase-metric-foot",
     style: {
       color: kcalDelta == null ? "var(--muted)" : Math.abs(kcalDelta) <= 100 ? "var(--good)" : "var(--warn)"
     }
-  }, actualAvgKcal != null ? "actual ".concat(actualAvgKcal, " \xB7 ").concat(signed(kcalDelta, 0), " vs target") : "no recent food log"))), React.createElement("div", {
+  }, targetAvgKcal == null ? "adaptive maintenance not ready" : actualAvgKcal != null ? "actual ".concat(actualAvgKcal, " \xB7 ").concat(signed(kcalDelta, 0), " vs target") : "no recent food log"))), React.createElement("div", {
     className: "phase-math-grid"
   }, React.createElement("div", {
     className: "phase-math-card"
@@ -15317,9 +14005,9 @@ function PhaseProgress(_ref) {
     className: "kpi-label"
   }, "Food-implied rate"), React.createElement("div", {
     className: "phase-math-value tnum"
-  }, actualAvgKcal != null ? rateLabel(foodImpliedRate) : "—"), React.createElement("div", {
+  }, foodImpliedRate != null ? rateLabel(foodImpliedRate) : "—"), React.createElement("div", {
     className: "mono phase-math-foot ".concat(last14Kcal.length >= MIN_FOOD_DAYS ? "" : "warn")
-  }, actualAvgKcal != null ? "".concat(last14Kcal.length, "d logged \xB7 ").concat(signed(actualVsMaintenance, 0), " kcal vs maintenance") : "need ".concat(MIN_FOOD_DAYS, "+ completed food days"))), React.createElement("div", {
+  }, adaptiveMaintenanceKcal == null ? "adaptive maintenance not ready" : actualAvgKcal != null ? "".concat(last14Kcal.length, "d logged \xB7 ").concat(signed(actualVsMaintenance, 0), " kcal vs maintenance") : "need ".concat(MIN_FOOD_DAYS, "+ completed food days"))), React.createElement("div", {
     className: "phase-math-card"
   }, React.createElement("div", {
     className: "kpi-label"
@@ -19257,7 +17945,7 @@ function App() {
     setView: setView
   }), view === "log" && React.createElement(RepsLog, null), view === "sessions" && window.RepsSessions && React.createElement(window.RepsSessions, {
     setView: setView
-  }), view === "strength" && window.RepsStrengthView && React.createElement(window.RepsStrengthView, null), view === "routines" && React.createElement(Routines, null), view === "exercises" && React.createElement(Exercises, null), view === "body" && React.createElement(Body, null), view === "recipes" && React.createElement(RepsRecipes, null), view === "plan" && React.createElement(Plan, null), view === "export" && React.createElement(ExportView, null), view === "settings" && React.createElement(Settings, {
+  }), view === "strength" && window.RepsStrengthView && React.createElement(window.RepsStrengthView, null), view === "routines" && React.createElement(Routines, null), view === "exercises" && React.createElement(Exercises, null), view === "body" && React.createElement(Body, null), view === "plan" && React.createElement(Plan, null), view === "export" && React.createElement(ExportView, null), view === "settings" && React.createElement(Settings, {
     theme: t.theme,
     setTheme: chooseTheme,
     themes: THEME_OPTIONS

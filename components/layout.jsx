@@ -10,11 +10,10 @@ const NAV_ITEMS = [
   { id: "routines",  label: "Routines",  icon: I.Routine,   kbd: "5" },
   { id: "exercises", label: "Exercises", icon: I.Exercises, kbd: "6" },
   { id: "body",      label: "Body",      icon: I.Body,      kbd: "7" },
-  { id: "recipes",   label: "Recipes",   icon: I.Recipe,    kbd: "" },
   { id: "plan",      label: "Plan",      icon: I.Plan,      kbd: "8" },
   { id: "export",    label: "AI Export", icon: I.Export,    kbd: "9" }
 ];
-const BUILD_LABEL = "05 Jun 2026 12:06";
+const BUILD_LABEL = "05 Jun 2026 14:21";
 
 function SyncQuickActions({ onAfterAction }) {
   const app = window.RepsState?.useApp?.();
@@ -70,7 +69,6 @@ function Sidebar({ view, setView }) {
               onClick={() => setView(item.id)}>
               <span className="nav-icon"><Ico /></span>
               <span className="nav-label">{item.label}</span>
-              {item.kbd && <span className="nav-kbd">{item.kbd}</span>}
             </button>
           );
         })}
@@ -80,7 +78,6 @@ function Sidebar({ view, setView }) {
         onClick={() => setView("settings")}>
         <span className="nav-icon"><I.Settings /></span>
         <span className="nav-label">Settings</span>
-        <span className="nav-kbd">0</span>
       </button>
       <div className="sidebar-foot">
         <span className="kbd">⌘</span><span className="kbd">K</span>
@@ -93,7 +90,7 @@ function Sidebar({ view, setView }) {
 function TopBar({ view, setView }) {
   const labels = {
     dashboard: "Dashboard", log: "Log", routines: "Routines",
-    exercises: "Exercises", body: "Body", recipes: "Recipes", plan: "Plan", export: "AI Export",
+    exercises: "Exercises", body: "Body", plan: "Plan", export: "AI Export",
     settings: "Settings", sessions: "Sessions", strength: "Strength"
   };
   const app = window.RepsState?.useApp?.();
@@ -202,7 +199,7 @@ function MobileNav({ view, setView }) {
   const profile = app?.activeProfile;
   const labels = {
     dashboard: "Dashboard", log: "Log", routines: "Routines",
-    exercises: "Exercises", body: "Body", recipes: "Recipes", plan: "Plan", export: "AI Export",
+    exercises: "Exercises", body: "Body", plan: "Plan", export: "AI Export",
     settings: "Settings", sessions: "Sessions", strength: "Strength"
   };
 
