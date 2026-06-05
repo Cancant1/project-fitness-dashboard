@@ -13,6 +13,7 @@ I.Exercises = () => <Icon d="M6.5 6.5L17.5 17.5M4 8l4-4 4 4M12 16l4 4 4-4M2 12h4
 I.Body = () => <Icon d="M12 8a3 3 0 100-6 3 3 0 000 6zM6 22v-6l-2-2 2-6h12l2 6-2 2v6M9 12v10M15 12v10" />;
 I.Export = () => <Icon d="M12 3v12M7 8l5-5 5 5M5 21h14" />;
 I.Plan = () => <Icon d="M5 4h14v16H5zM9 4v16M5 9h14M5 14h14" />;
+I.Recipe = () => <Icon d="M6 3v8M10 3v8M8 3v18M15 4a4 4 0 014 4v13M15 4v8h4" />;
 I.Search = () => <Icon d="M10 17a7 7 0 100-14 7 7 0 000 14zM21 21l-6-6" />;
 I.Plus = () => <Icon d="M12 5v14M5 12h14" />;
 I.Chevron = () => <Icon d="M9 6l6 6-6 6" />;

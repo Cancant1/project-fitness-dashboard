@@ -47,6 +47,211 @@ const DEFAULT_PROGRESSION_RULES = {
 };
 const PROGRESSION_RULE_TRIGGERS = ["first_set_top_final_in_range", "all_sets_top", "hold_if_final_drops"];
 
+const DEFAULT_HOB_PREFERENCES = {
+  scale: [
+    { range: "1-4", label: "low heat" },
+    { range: "5", label: "medium-low" },
+    { range: "6", label: "medium" },
+    { range: "7", label: "medium-high" },
+    { range: "8-9", label: "high" }
+  ],
+  usualRange: "5-7",
+  note: "Electric hob: 1-4 low, 5 medium-low, 6 medium, 7 medium-high, 8-9 high."
+};
+
+const STARTER_RECIPE_ID = "recipe-potato-meat-veg-classic-burgers";
+const STARTER_RECIPE = {
+  id: STARTER_RECIPE_ID,
+  name: "Potatoes, broccoli, gravy and burgers",
+  category: "Dinner",
+  tags: ["potato-meat-vegetable", "Jumbo", "electric hob"],
+  servings: 1,
+  summary: "A normal-plus potato, vegetable and fresh meat dinner with adjustable Jumbo meat and vegetable options.",
+  defaultDateMode: "today",
+  selections: {
+    meat: "jumbo-classic-burger",
+    starch: "jumbo-vastkokende-aardappelen",
+    vegetable: "jumbo-bio-broccoli",
+    sauce: "maggi-jus-naturel",
+    fat: "jumbo-zonnebloemolie"
+  },
+  groups: [
+    {
+      id: "meat",
+      label: "Meat",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-classic-burger",
+          label: "Jumbo Classic Burger Rundvlees",
+          item: "Jumbo Classic Burger Rundvlees 2 Stuks",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-classic-burger-rundvlees-2-stuks-95544TRA",
+          amount: 220,
+          amountUnit: "g",
+          displayAmount: "2 burgers",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 235,
+          proteinPer100: 14.5,
+          carbsPer100: 2.3,
+          fatPer100: 18.6
+        },
+        {
+          id: "jumbo-ambachtelijke-slavink",
+          label: "Jumbo Ambachtelijke Slavink",
+          item: "Jumbo Ambachtelijke Slavinken 2 Stuks",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-ambachtelijke-slavinken-2-stuks-201573TRA",
+          amount: 110,
+          amountUnit: "g",
+          displayAmount: "1 slavink",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 273,
+          proteinPer100: 15.2,
+          carbsPer100: 0.7,
+          fatPer100: 23.2
+        },
+        {
+          id: "jumbo-varken-saucijs",
+          label: "Jumbo Varken Saucijs",
+          item: "Jumbo Varkens Saucijzen 10 Stuks",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-varkens-saucijzen-10-stuks-163322TRA",
+          amount: 120,
+          amountUnit: "g",
+          displayAmount: "1.5 saucijzen",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 280,
+          proteinPer100: 17.1,
+          carbsPer100: 0.5,
+          fatPer100: 23.2
+        }
+      ]
+    },
+    {
+      id: "starch",
+      label: "Potatoes",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-vastkokende-aardappelen",
+          label: "Jumbo Vastkokende Aardappelen",
+          item: "Jumbo Vastkokende Aardappelen 1 kg",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-vastkokende-aardappelen-1kg-74155ZK",
+          amount: 200,
+          amountUnit: "g",
+          displayAmount: "200 g",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 88,
+          proteinPer100: 2,
+          carbsPer100: 19,
+          fatPer100: 0
+        }
+      ]
+    },
+    {
+      id: "vegetable",
+      label: "Vegetable",
+      inputLabel: "grams",
+      options: [
+        {
+          id: "jumbo-bio-broccoli",
+          label: "Jumbo Biologische Broccoliroosjes",
+          item: "Jumbo Biologische Broccoliroosjes 450 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-biologische-broccoliroosjes-450-g-620066ZK",
+          amount: 225,
+          amountUnit: "g",
+          displayAmount: "half a 450 g bag",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 38,
+          proteinPer100: 3.3,
+          carbsPer100: 2.3,
+          fatPer100: 0.9
+        },
+        {
+          id: "jumbo-bio-sperziebonen",
+          label: "Jumbo Biologische Hele Sperziebonen",
+          item: "Jumbo Biologisch Hele Sperziebonen 450 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-hele-sperziebonen-450-g-169332DS",
+          amount: 225,
+          amountUnit: "g",
+          displayAmount: "half a 450 g bag",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 34,
+          proteinPer100: 1.8,
+          carbsPer100: 5.4,
+          fatPer100: 0.1
+        },
+        {
+          id: "jumbo-bio-bladspinazie",
+          label: "Jumbo Biologische Bladspinazie",
+          item: "Jumbo Biologische Bladspinazie 450 g",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-bladspinazie-450-g-692546DS",
+          amount: 225,
+          amountUnit: "g",
+          displayAmount: "half a 450 g bag",
+          nutritionBasis: "per 100 g",
+          kcalPer100: 24,
+          proteinPer100: 2.3,
+          carbsPer100: 1.7,
+          fatPer100: 0.4
+        }
+      ]
+    },
+    {
+      id: "sauce",
+      label: "Gravy",
+      inputLabel: "ml",
+      options: [
+        {
+          id: "maggi-jus-naturel",
+          label: "Maggi Jus Naturel",
+          item: "Maggi Jus Naturel 250 ml",
+          sourceUrl: "https://www.jumbo.com/producten/maggi-jus-naturel-250-ml-703835PAK",
+          amount: 50,
+          amountUnit: "ml",
+          displayAmount: "50 ml",
+          nutritionBasis: "per 100 ml",
+          kcalPer100: 31,
+          proteinPer100: 0.5,
+          carbsPer100: 5,
+          fatPer100: 0
+        }
+      ]
+    },
+    {
+      id: "fat",
+      label: "Cooking fat",
+      inputLabel: "ml",
+      options: [
+        {
+          id: "jumbo-zonnebloemolie",
+          label: "Jumbo Zonnebloemolie",
+          item: "Jumbo Zonnebloemolie 500 ml",
+          sourceUrl: "https://www.jumbo.com/producten/jumbo-zonnebloemolie-500ml-269994FLS",
+          amount: 7.5,
+          amountUnit: "ml",
+          displayAmount: "0.5 el share from 1 el for 4 burgers",
+          nutritionBasis: "per 100 ml",
+          kcalPer100: 828,
+          proteinPer100: 0,
+          carbsPer100: 0,
+          fatPer100: 92
+        }
+      ]
+    }
+  ],
+  cooking: {
+    equipment: "Electric hob",
+    hobNote: DEFAULT_HOB_PREFERENCES.note,
+    steps: [
+      { id: "potatoes", title: "Potatoes", hob: "8-9 then 6", minutes: "15-20", body: "Start peeled or washed potatoes in cold salted water. Bring to a boil on 8-9, lower to 6, cook until tender, then drain and steam dry." },
+      { id: "vegetable", title: "Vegetable", hob: "7 then 5-6", minutes: "5-7", body: "Cook frozen broccoli or the selected frozen vegetable with a small amount of water. Bring up on 7, hold on 5-6 until hot and tender, then drain." },
+      { id: "meat", title: "Meat", hob: "7 then 6-7", minutes: "6-12", body: "Heat the pan on 7. Add the recipe's oil share. For burgers, cook about 3-4 minutes per side on 6-7 and lower to 5 if browning too fast. For sausages or slavinken, brown briefly, then finish on 5-6 until cooked through." },
+      { id: "gravy", title: "Gravy", hob: "5", minutes: "2-3", body: "Warm the gravy on 5 while the meat rests. Stir occasionally and serve over the potatoes or beside the meat." }
+    ]
+  },
+  createdAt: "2026-06-05T00:00:00.000Z",
+  updatedAt: "2026-06-05T00:00:00.000Z"
+};
+
 function progressionRulesWithDefaults(rules = {}) {
   return Object.fromEntries(Object.entries(DEFAULT_PROGRESSION_RULES).map(([key, defaults]) => {
     const current = rules?.[key] || {};
@@ -87,6 +292,9 @@ const DEFAULT_STATE = {
       maintenanceKcal: 2700,
       progressionRules: progressionRulesWithDefaults(),
       foodByDate: {},        // { "2026-05-21": [{id, product, kcal, protein, amount}, ...] }
+      recipes: [],
+      deletedRecipes: {},
+      cookingPreferences: { hob: DEFAULT_HOB_PREFERENCES },
       customExercises: [],   // { id, name, group, equipment, unit, notes }
       hiddenExercises: []    // historical exercise names hidden from the database view
     }
@@ -216,6 +424,67 @@ function normalizeDeletedFoodEntries(value = {}) {
   );
 }
 
+function normalizeDeletedRecipes(value = {}) {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value.filter(Boolean).map(id => [String(id), true]));
+  }
+  return Object.fromEntries(
+    Object.entries(value || {})
+      .filter(([id]) => id != null && String(id).trim())
+      .map(([id, deletedAt]) => [String(id), deletedAt || true])
+  );
+}
+
+function recipeIdentity(recipe = {}) {
+  if (recipe.id !== undefined && recipe.id !== null && String(recipe.id).trim()) return String(recipe.id);
+  return String(recipe.name || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function recipeWithDefaults(recipe = {}, index = 0) {
+  const id = recipeIdentity(recipe) || `recipe-${index}`;
+  const stamp = recipe.updatedAt || recipe.createdAt || "2026-06-05T00:00:00.000Z";
+  return {
+    id,
+    name: String(recipe.name || "Untitled recipe").trim() || "Untitled recipe",
+    category: recipe.category || "Recipes",
+    tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+    servings: Number.isFinite(Number(recipe.servings)) && Number(recipe.servings) > 0 ? Number(recipe.servings) : 1,
+    summary: recipe.summary || "",
+    selections: recipe.selections || {},
+    groups: Array.isArray(recipe.groups) ? recipe.groups : [],
+    cooking: recipe.cooking || { equipment: "Electric hob", hobNote: DEFAULT_HOB_PREFERENCES.note, steps: [] },
+    createdAt: recipe.createdAt || stamp,
+    updatedAt: recipe.updatedAt || stamp
+  };
+}
+
+function cookingPreferencesWithDefaults(value = {}) {
+  return {
+    ...(value || {}),
+    hob: {
+      ...DEFAULT_HOB_PREFERENCES,
+      ...((value || {}).hob || {}),
+      scale: Array.isArray((value || {}).hob?.scale) && (value || {}).hob.scale.length
+        ? (value || {}).hob.scale
+        : DEFAULT_HOB_PREFERENCES.scale
+    }
+  };
+}
+
+function recipesWithStarter(recipes = [], deletedRecipes = {}) {
+  const deleted = new Set(Object.keys(normalizeDeletedRecipes(deletedRecipes)));
+  const map = new Map();
+  const normalized = (Array.isArray(recipes) ? recipes : []).map(recipeWithDefaults);
+  normalized.forEach((recipe, index) => {
+    const id = recipeIdentity(recipe) || `recipe-${index}`;
+    if (!deleted.has(id) && !map.has(id)) map.set(id, { ...recipe, id });
+  });
+  if (!deleted.has(STARTER_RECIPE_ID) && !map.has(STARTER_RECIPE_ID)) {
+    map.set(STARTER_RECIPE_ID, structuredClone(STARTER_RECIPE));
+  }
+  return Array.from(map.values());
+}
+
 function foodEntryIdentity(date, item = {}) {
   if (item.id !== undefined && item.id !== null && String(item.id).trim()) return String(item.id);
   return [
@@ -244,6 +513,8 @@ function migrateProfile(p) {
   const defaultMacros = PRESETS.maintain.macros;
   const deletedFoodEntries = normalizeDeletedFoodEntries(p.deletedFoodEntries || p.deletedFoodEntryIds || {});
   const foodByDate = removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries);
+  const deletedRecipes = normalizeDeletedRecipes(p.deletedRecipes || p.deletedRecipeIds || {});
+  const recipes = recipesWithStarter(p.recipes || [], deletedRecipes);
   const routines = p.routines && p.routines.length ? p.routines : [];
   const activeRoutineId = p.activeRoutineId && routines.some(r => r.id === p.activeRoutineId)
     ? p.activeRoutineId
@@ -262,6 +533,9 @@ function migrateProfile(p) {
     progressionRules: progressionRulesWithDefaults(p.progressionRules),
     foodByDate,
     deletedFoodEntries,
+    recipes,
+    deletedRecipes,
+    cookingPreferences: cookingPreferencesWithDefaults(p.cookingPreferences || {}),
     customExercises: p.customExercises || [],
     hiddenExercises: p.hiddenExercises || [],
     hiddenFoodItems: p.hiddenFoodItems || [],
@@ -615,10 +889,16 @@ function sanitizeProfileForPush(profile = {}) {
     nextPlans[date] = plan;
   }
   const deletedFoodEntries = normalizeDeletedFoodEntries(profile.deletedFoodEntries || {});
+  const deletedRecipes = normalizeDeletedRecipes(profile.deletedRecipes || {});
+  const recipes = recipesWithStarter(profile.recipes || [], deletedRecipes)
+    .filter(recipe => !deletedRecipes[recipeIdentity(recipe)]);
   return {
     ...profile,
     foodByDate: removeDeletedFoodRows(profile.foodByDate || {}, deletedFoodEntries),
     deletedFoodEntries,
+    recipes,
+    deletedRecipes,
+    cookingPreferences: cookingPreferencesWithDefaults(profile.cookingPreferences || {}),
     sessionPlansByDate: nextPlans
   };
 }
@@ -652,6 +932,29 @@ function mergeDeletedFoodEntries(remote = {}, local = {}) {
   };
 }
 
+function mergeDeletedRecipes(remote = {}, local = {}) {
+  return {
+    ...normalizeDeletedRecipes(remote),
+    ...normalizeDeletedRecipes(local)
+  };
+}
+
+function newerByUpdatedAt(remoteItem = {}, localItem = {}) {
+  const remoteTime = Date.parse(remoteItem.updatedAt || remoteItem.createdAt || "") || 0;
+  const localTime = Date.parse(localItem.updatedAt || localItem.createdAt || "") || 0;
+  return localTime >= remoteTime ? localItem : remoteItem;
+}
+
+function mergeRecipes(remote = [], local = [], deletedRecipes = {}) {
+  const deleted = new Set(Object.keys(normalizeDeletedRecipes(deletedRecipes)));
+  return mergeByKey(
+    recipesWithStarter(remote || [], deletedRecipes),
+    recipesWithStarter(local || [], deletedRecipes),
+    recipe => recipeIdentity(recipe),
+    newerByUpdatedAt
+  ).filter(recipe => !deleted.has(recipeIdentity(recipe)));
+}
+
 function mergeFoodByDate(remote = {}, local = {}, deletedFoodEntries = {}) {
   const dates = new Set([...Object.keys(remote || {}), ...Object.keys(local || {})]);
   const deleted = new Set(Object.keys(normalizeDeletedFoodEntries(deletedFoodEntries)));
@@ -678,6 +981,12 @@ function mergeProfiles(remoteProfile = {}, localProfile = {}) {
   const merged = { ...remoteProfile, ...localProfile };
   merged.deletedFoodEntries = mergeDeletedFoodEntries(remoteProfile.deletedFoodEntries || {}, localProfile.deletedFoodEntries || {});
   merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {}, merged.deletedFoodEntries);
+  merged.deletedRecipes = mergeDeletedRecipes(remoteProfile.deletedRecipes || {}, localProfile.deletedRecipes || {});
+  merged.recipes = mergeRecipes(remoteProfile.recipes || [], localProfile.recipes || [], merged.deletedRecipes);
+  merged.cookingPreferences = cookingPreferencesWithDefaults({
+    ...(remoteProfile.cookingPreferences || {}),
+    ...(localProfile.cookingPreferences || {})
+  });
   merged.dailyOverrides = { ...(remoteProfile.dailyOverrides || {}), ...(localProfile.dailyOverrides || {}) };
   merged.sessionPlansByDate = { ...(remoteProfile.sessionPlansByDate || {}), ...(localProfile.sessionPlansByDate || {}) };
   merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
@@ -1308,6 +1617,88 @@ function AppStateProvider({ children }) {
     }));
   };
 
+  const addRecipe = (recipe) => {
+    const now = new Date().toISOString();
+    const id = recipe.id || `recipe-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const nextRecipe = recipeWithDefaults({ ...recipe, id, createdAt: recipe.createdAt || now, updatedAt: now });
+    setState(s => ({
+      ...s,
+      profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
+        ...p,
+        recipes: [nextRecipe, ...(p.recipes || []).filter(r => recipeIdentity(r) !== id)],
+        deletedRecipes: Object.fromEntries(
+          Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(([recipeId]) => recipeId !== id)
+        )
+      } : p)
+    }));
+    return id;
+  };
+
+  const updateRecipe = (id, patch) => {
+    const recipeId = String(id || "").trim();
+    if (!recipeId) return;
+    const now = new Date().toISOString();
+    setState(s => ({
+      ...s,
+      profiles: s.profiles.map(p => {
+        if (p.id !== s.activeProfileId) return p;
+        const existing = (p.recipes || []).find(r => recipeIdentity(r) === recipeId);
+        const nextRecipe = recipeWithDefaults({ ...(existing || { id: recipeId }), ...(patch || {}), id: recipeId, updatedAt: now });
+        const recipes = (p.recipes || []).some(r => recipeIdentity(r) === recipeId)
+          ? (p.recipes || []).map(r => recipeIdentity(r) === recipeId ? nextRecipe : r)
+          : [nextRecipe, ...(p.recipes || [])];
+        return { ...p, recipes };
+      })
+    }));
+  };
+
+  const deleteRecipe = (id) => {
+    const recipeId = String(id || "").trim();
+    if (!recipeId) return;
+    setState(s => ({
+      ...s,
+      profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
+        ...p,
+        recipes: (p.recipes || []).filter(r => recipeIdentity(r) !== recipeId),
+        deletedRecipes: {
+          ...normalizeDeletedRecipes(p.deletedRecipes || {}),
+          [recipeId]: new Date().toISOString()
+        }
+      } : p)
+    }));
+  };
+
+  const importRecipes = (incoming = []) => {
+    const list = Array.isArray(incoming) ? incoming : [incoming];
+    const now = new Date().toISOString();
+    const normalized = list
+      .filter(Boolean)
+      .map((recipe, index) => recipeWithDefaults({
+        ...recipe,
+        id: recipe.id || recipeIdentity(recipe) || `recipe-import-${Date.now().toString(36)}-${index}`,
+        createdAt: recipe.createdAt || now,
+        updatedAt: now
+      }));
+    if (!normalized.length) return 0;
+    setState(s => ({
+      ...s,
+      profiles: s.profiles.map(p => {
+        if (p.id !== s.activeProfileId) return p;
+        const byId = new Map((p.recipes || []).map(recipe => [recipeIdentity(recipe), recipe]));
+        normalized.forEach(recipe => byId.set(recipeIdentity(recipe), recipe));
+        const importedIds = new Set(normalized.map(recipeIdentity));
+        return {
+          ...p,
+          recipes: Array.from(byId.values()).sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""))),
+          deletedRecipes: Object.fromEntries(
+            Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(([id]) => !importedIds.has(id))
+          )
+        };
+      })
+    }));
+    return normalized.length;
+  };
+
   // Routines
   const addRoutine = (routine) => {
     const id = "routine-" + Date.now().toString(36);
@@ -1415,6 +1806,7 @@ function AppStateProvider({ children }) {
     addProfile, setActiveProfile, deleteProfile,
     addFoodEntry, removeFoodEntry,
     addCustomFoodItem, removeCustomFoodItem,
+    addRecipe, updateRecipe, deleteRecipe, importRecipes,
     addCustomExercise, hideExercise, unhideExercise,
     deleteSession, restoreSession, editSession, clearSessionEdit,
     addLoggedSession, removeLoggedSession, upsertLoggedSession,
@@ -1450,4 +1842,8 @@ function ageFrom(birthday) {
   return age;
 }
 
-window.RepsState = { AppStateProvider, useApp, AppContext, todayDayKey, ageFrom, DAY_KEYS, PRESETS, PHASES, DEFAULT_PROGRESSION_RULES, STORE_KEY };
+window.RepsState = {
+  AppStateProvider, useApp, AppContext, todayDayKey, ageFrom,
+  DAY_KEYS, PRESETS, PHASES, DEFAULT_PROGRESSION_RULES,
+  DEFAULT_HOB_PREFERENCES, STARTER_RECIPE, STORE_KEY
+};

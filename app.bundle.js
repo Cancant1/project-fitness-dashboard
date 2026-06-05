@@ -53,6 +53,11 @@ I.Plan = function () {
     d: "M5 4h14v16H5zM9 4v16M5 9h14M5 14h14"
   });
 };
+I.Recipe = function () {
+  return React.createElement(Icon, {
+    d: "M6 3v8M10 3v8M8 3v18M15 4a4 4 0 014 4v13M15 4v8h4"
+  });
+};
 I.Search = function () {
   return React.createElement(Icon, {
     d: "M10 17a7 7 0 100-14 7 7 0 000 14zM21 21l-6-6"
@@ -537,6 +542,217 @@ var DEFAULT_PROGRESSION_RULES = {
   }
 };
 var PROGRESSION_RULE_TRIGGERS = ["first_set_top_final_in_range", "all_sets_top", "hold_if_final_drops"];
+var DEFAULT_HOB_PREFERENCES = {
+  scale: [{
+    range: "1-4",
+    label: "low heat"
+  }, {
+    range: "5",
+    label: "medium-low"
+  }, {
+    range: "6",
+    label: "medium"
+  }, {
+    range: "7",
+    label: "medium-high"
+  }, {
+    range: "8-9",
+    label: "high"
+  }],
+  usualRange: "5-7",
+  note: "Electric hob: 1-4 low, 5 medium-low, 6 medium, 7 medium-high, 8-9 high."
+};
+var STARTER_RECIPE_ID = "recipe-potato-meat-veg-classic-burgers";
+var STARTER_RECIPE = {
+  id: STARTER_RECIPE_ID,
+  name: "Potatoes, broccoli, gravy and burgers",
+  category: "Dinner",
+  tags: ["potato-meat-vegetable", "Jumbo", "electric hob"],
+  servings: 1,
+  summary: "A normal-plus potato, vegetable and fresh meat dinner with adjustable Jumbo meat and vegetable options.",
+  defaultDateMode: "today",
+  selections: {
+    meat: "jumbo-classic-burger",
+    starch: "jumbo-vastkokende-aardappelen",
+    vegetable: "jumbo-bio-broccoli",
+    sauce: "maggi-jus-naturel",
+    fat: "jumbo-zonnebloemolie"
+  },
+  groups: [{
+    id: "meat",
+    label: "Meat",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-classic-burger",
+      label: "Jumbo Classic Burger Rundvlees",
+      item: "Jumbo Classic Burger Rundvlees 2 Stuks",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-classic-burger-rundvlees-2-stuks-95544TRA",
+      amount: 220,
+      amountUnit: "g",
+      displayAmount: "2 burgers",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 235,
+      proteinPer100: 14.5,
+      carbsPer100: 2.3,
+      fatPer100: 18.6
+    }, {
+      id: "jumbo-ambachtelijke-slavink",
+      label: "Jumbo Ambachtelijke Slavink",
+      item: "Jumbo Ambachtelijke Slavinken 2 Stuks",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-ambachtelijke-slavinken-2-stuks-201573TRA",
+      amount: 110,
+      amountUnit: "g",
+      displayAmount: "1 slavink",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 273,
+      proteinPer100: 15.2,
+      carbsPer100: 0.7,
+      fatPer100: 23.2
+    }, {
+      id: "jumbo-varken-saucijs",
+      label: "Jumbo Varken Saucijs",
+      item: "Jumbo Varkens Saucijzen 10 Stuks",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-varkens-saucijzen-10-stuks-163322TRA",
+      amount: 120,
+      amountUnit: "g",
+      displayAmount: "1.5 saucijzen",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 280,
+      proteinPer100: 17.1,
+      carbsPer100: 0.5,
+      fatPer100: 23.2
+    }]
+  }, {
+    id: "starch",
+    label: "Potatoes",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-vastkokende-aardappelen",
+      label: "Jumbo Vastkokende Aardappelen",
+      item: "Jumbo Vastkokende Aardappelen 1 kg",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-vastkokende-aardappelen-1kg-74155ZK",
+      amount: 200,
+      amountUnit: "g",
+      displayAmount: "200 g",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 88,
+      proteinPer100: 2,
+      carbsPer100: 19,
+      fatPer100: 0
+    }]
+  }, {
+    id: "vegetable",
+    label: "Vegetable",
+    inputLabel: "grams",
+    options: [{
+      id: "jumbo-bio-broccoli",
+      label: "Jumbo Biologische Broccoliroosjes",
+      item: "Jumbo Biologische Broccoliroosjes 450 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-biologische-broccoliroosjes-450-g-620066ZK",
+      amount: 225,
+      amountUnit: "g",
+      displayAmount: "half a 450 g bag",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 38,
+      proteinPer100: 3.3,
+      carbsPer100: 2.3,
+      fatPer100: 0.9
+    }, {
+      id: "jumbo-bio-sperziebonen",
+      label: "Jumbo Biologische Hele Sperziebonen",
+      item: "Jumbo Biologisch Hele Sperziebonen 450 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-hele-sperziebonen-450-g-169332DS",
+      amount: 225,
+      amountUnit: "g",
+      displayAmount: "half a 450 g bag",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 34,
+      proteinPer100: 1.8,
+      carbsPer100: 5.4,
+      fatPer100: 0.1
+    }, {
+      id: "jumbo-bio-bladspinazie",
+      label: "Jumbo Biologische Bladspinazie",
+      item: "Jumbo Biologische Bladspinazie 450 g",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-biologisch-bladspinazie-450-g-692546DS",
+      amount: 225,
+      amountUnit: "g",
+      displayAmount: "half a 450 g bag",
+      nutritionBasis: "per 100 g",
+      kcalPer100: 24,
+      proteinPer100: 2.3,
+      carbsPer100: 1.7,
+      fatPer100: 0.4
+    }]
+  }, {
+    id: "sauce",
+    label: "Gravy",
+    inputLabel: "ml",
+    options: [{
+      id: "maggi-jus-naturel",
+      label: "Maggi Jus Naturel",
+      item: "Maggi Jus Naturel 250 ml",
+      sourceUrl: "https://www.jumbo.com/producten/maggi-jus-naturel-250-ml-703835PAK",
+      amount: 50,
+      amountUnit: "ml",
+      displayAmount: "50 ml",
+      nutritionBasis: "per 100 ml",
+      kcalPer100: 31,
+      proteinPer100: 0.5,
+      carbsPer100: 5,
+      fatPer100: 0
+    }]
+  }, {
+    id: "fat",
+    label: "Cooking fat",
+    inputLabel: "ml",
+    options: [{
+      id: "jumbo-zonnebloemolie",
+      label: "Jumbo Zonnebloemolie",
+      item: "Jumbo Zonnebloemolie 500 ml",
+      sourceUrl: "https://www.jumbo.com/producten/jumbo-zonnebloemolie-500ml-269994FLS",
+      amount: 7.5,
+      amountUnit: "ml",
+      displayAmount: "0.5 el share from 1 el for 4 burgers",
+      nutritionBasis: "per 100 ml",
+      kcalPer100: 828,
+      proteinPer100: 0,
+      carbsPer100: 0,
+      fatPer100: 92
+    }]
+  }],
+  cooking: {
+    equipment: "Electric hob",
+    hobNote: DEFAULT_HOB_PREFERENCES.note,
+    steps: [{
+      id: "potatoes",
+      title: "Potatoes",
+      hob: "8-9 then 6",
+      minutes: "15-20",
+      body: "Start peeled or washed potatoes in cold salted water. Bring to a boil on 8-9, lower to 6, cook until tender, then drain and steam dry."
+    }, {
+      id: "vegetable",
+      title: "Vegetable",
+      hob: "7 then 5-6",
+      minutes: "5-7",
+      body: "Cook frozen broccoli or the selected frozen vegetable with a small amount of water. Bring up on 7, hold on 5-6 until hot and tender, then drain."
+    }, {
+      id: "meat",
+      title: "Meat",
+      hob: "7 then 6-7",
+      minutes: "6-12",
+      body: "Heat the pan on 7. Add the recipe's oil share. For burgers, cook about 3-4 minutes per side on 6-7 and lower to 5 if browning too fast. For sausages or slavinken, brown briefly, then finish on 5-6 until cooked through."
+    }, {
+      id: "gravy",
+      title: "Gravy",
+      hob: "5",
+      minutes: "2-3",
+      body: "Warm the gravy on 5 while the meat rests. Stir occasionally and serve over the potatoes or beside the meat."
+    }]
+  },
+  createdAt: "2026-06-05T00:00:00.000Z",
+  updatedAt: "2026-06-05T00:00:00.000Z"
+};
 function progressionRulesWithDefaults() {
   var rules = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return Object.fromEntries(Object.entries(DEFAULT_PROGRESSION_RULES).map(function (_ref) {
@@ -612,6 +828,11 @@ var DEFAULT_STATE = {
     maintenanceKcal: 2700,
     progressionRules: progressionRulesWithDefaults(),
     foodByDate: {},
+    recipes: [],
+    deletedRecipes: {},
+    cookingPreferences: {
+      hob: DEFAULT_HOB_PREFERENCES
+    },
     customExercises: [],
     hiddenExercises: []
   }]
@@ -817,6 +1038,78 @@ function normalizeDeletedFoodEntries() {
     return [String(id), deletedAt || true];
   }));
 }
+function normalizeDeletedRecipes() {
+  var value = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value.filter(Boolean).map(function (id) {
+      return [String(id), true];
+    }));
+  }
+  return Object.fromEntries(Object.entries(value || {}).filter(function (_ref7) {
+    var _ref8 = _slicedToArray(_ref7, 1),
+      id = _ref8[0];
+    return id != null && String(id).trim();
+  }).map(function (_ref9) {
+    var _ref0 = _slicedToArray(_ref9, 2),
+      id = _ref0[0],
+      deletedAt = _ref0[1];
+    return [String(id), deletedAt || true];
+  }));
+}
+function recipeIdentity() {
+  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  if (recipe.id !== undefined && recipe.id !== null && String(recipe.id).trim()) return String(recipe.id);
+  return String(recipe.name || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+function recipeWithDefaults() {
+  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var index = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var id = recipeIdentity(recipe) || "recipe-".concat(index);
+  var stamp = recipe.updatedAt || recipe.createdAt || "2026-06-05T00:00:00.000Z";
+  return {
+    id: id,
+    name: String(recipe.name || "Untitled recipe").trim() || "Untitled recipe",
+    category: recipe.category || "Recipes",
+    tags: Array.isArray(recipe.tags) ? recipe.tags : [],
+    servings: Number.isFinite(Number(recipe.servings)) && Number(recipe.servings) > 0 ? Number(recipe.servings) : 1,
+    summary: recipe.summary || "",
+    selections: recipe.selections || {},
+    groups: Array.isArray(recipe.groups) ? recipe.groups : [],
+    cooking: recipe.cooking || {
+      equipment: "Electric hob",
+      hobNote: DEFAULT_HOB_PREFERENCES.note,
+      steps: []
+    },
+    createdAt: recipe.createdAt || stamp,
+    updatedAt: recipe.updatedAt || stamp
+  };
+}
+function cookingPreferencesWithDefaults() {
+  var _hob;
+  var value = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return _objectSpread(_objectSpread({}, value || {}), {}, {
+    hob: _objectSpread(_objectSpread(_objectSpread({}, DEFAULT_HOB_PREFERENCES), (value || {}).hob || {}), {}, {
+      scale: Array.isArray((_hob = (value || {}).hob) === null || _hob === void 0 ? void 0 : _hob.scale) && (value || {}).hob.scale.length ? (value || {}).hob.scale : DEFAULT_HOB_PREFERENCES.scale
+    })
+  });
+}
+function recipesWithStarter() {
+  var recipes = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+  var deletedRecipes = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var deleted = new Set(Object.keys(normalizeDeletedRecipes(deletedRecipes)));
+  var map = new Map();
+  var normalized = (Array.isArray(recipes) ? recipes : []).map(recipeWithDefaults);
+  normalized.forEach(function (recipe, index) {
+    var id = recipeIdentity(recipe) || "recipe-".concat(index);
+    if (!deleted.has(id) && !map.has(id)) map.set(id, _objectSpread(_objectSpread({}, recipe), {}, {
+      id: id
+    }));
+  });
+  if (!deleted.has(STARTER_RECIPE_ID) && !map.has(STARTER_RECIPE_ID)) {
+    map.set(STARTER_RECIPE_ID, structuredClone(STARTER_RECIPE));
+  }
+  return Array.from(map.values());
+}
 function foodEntryIdentity(date) {
   var _item$amount, _item$kcal, _item$protein, _item$carbs, _item$fat;
   var item = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
@@ -848,6 +1141,8 @@ function migrateProfile(p) {
   var defaultMacros = PRESETS.maintain.macros;
   var deletedFoodEntries = normalizeDeletedFoodEntries(p.deletedFoodEntries || p.deletedFoodEntryIds || {});
   var foodByDate = removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries);
+  var deletedRecipes = normalizeDeletedRecipes(p.deletedRecipes || p.deletedRecipeIds || {});
+  var recipes = recipesWithStarter(p.recipes || [], deletedRecipes);
   var routines = p.routines && p.routines.length ? p.routines : [];
   var activeRoutineId = p.activeRoutineId && routines.some(function (r) {
     return r.id === p.activeRoutineId;
@@ -866,6 +1161,9 @@ function migrateProfile(p) {
     progressionRules: progressionRulesWithDefaults(p.progressionRules),
     foodByDate: foodByDate,
     deletedFoodEntries: deletedFoodEntries,
+    recipes: recipes,
+    deletedRecipes: deletedRecipes,
+    cookingPreferences: cookingPreferencesWithDefaults(p.cookingPreferences || {}),
     customExercises: p.customExercises || [],
     hiddenExercises: p.hiddenExercises || [],
     hiddenFoodItems: p.hiddenFoodItems || [],
@@ -1290,9 +1588,16 @@ function sanitizeProfileForPush() {
     nextPlans[date] = plan;
   }
   var deletedFoodEntries = normalizeDeletedFoodEntries(profile.deletedFoodEntries || {});
+  var deletedRecipes = normalizeDeletedRecipes(profile.deletedRecipes || {});
+  var recipes = recipesWithStarter(profile.recipes || [], deletedRecipes).filter(function (recipe) {
+    return !deletedRecipes[recipeIdentity(recipe)];
+  });
   return _objectSpread(_objectSpread({}, profile), {}, {
     foodByDate: removeDeletedFoodRows(profile.foodByDate || {}, deletedFoodEntries),
     deletedFoodEntries: deletedFoodEntries,
+    recipes: recipes,
+    deletedRecipes: deletedRecipes,
+    cookingPreferences: cookingPreferencesWithDefaults(profile.cookingPreferences || {}),
     sessionPlansByDate: nextPlans
   });
 }
@@ -1326,6 +1631,29 @@ function mergeDeletedFoodEntries() {
   var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
   return _objectSpread(_objectSpread({}, normalizeDeletedFoodEntries(remote)), normalizeDeletedFoodEntries(local));
+}
+function mergeDeletedRecipes() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  return _objectSpread(_objectSpread({}, normalizeDeletedRecipes(remote)), normalizeDeletedRecipes(local));
+}
+function newerByUpdatedAt() {
+  var remoteItem = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var localItem = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var remoteTime = Date.parse(remoteItem.updatedAt || remoteItem.createdAt || "") || 0;
+  var localTime = Date.parse(localItem.updatedAt || localItem.createdAt || "") || 0;
+  return localTime >= remoteTime ? localItem : remoteItem;
+}
+function mergeRecipes() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  var deletedRecipes = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  var deleted = new Set(Object.keys(normalizeDeletedRecipes(deletedRecipes)));
+  return mergeByKey(recipesWithStarter(remote || [], deletedRecipes), recipesWithStarter(local || [], deletedRecipes), function (recipe) {
+    return recipeIdentity(recipe);
+  }, newerByUpdatedAt).filter(function (recipe) {
+    return !deleted.has(recipeIdentity(recipe));
+  });
 }
 function mergeFoodByDate() {
   var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -1363,6 +1691,9 @@ function mergeProfiles() {
   var merged = _objectSpread(_objectSpread({}, remoteProfile), localProfile);
   merged.deletedFoodEntries = mergeDeletedFoodEntries(remoteProfile.deletedFoodEntries || {}, localProfile.deletedFoodEntries || {});
   merged.foodByDate = mergeFoodByDate(remoteProfile.foodByDate || {}, localProfile.foodByDate || {}, merged.deletedFoodEntries);
+  merged.deletedRecipes = mergeDeletedRecipes(remoteProfile.deletedRecipes || {}, localProfile.deletedRecipes || {});
+  merged.recipes = mergeRecipes(remoteProfile.recipes || [], localProfile.recipes || [], merged.deletedRecipes);
+  merged.cookingPreferences = cookingPreferencesWithDefaults(_objectSpread(_objectSpread({}, remoteProfile.cookingPreferences || {}), localProfile.cookingPreferences || {}));
   merged.dailyOverrides = _objectSpread(_objectSpread({}, remoteProfile.dailyOverrides || {}), localProfile.dailyOverrides || {});
   merged.sessionPlansByDate = _objectSpread(_objectSpread({}, remoteProfile.sessionPlansByDate || {}), localProfile.sessionPlansByDate || {});
   merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
@@ -1411,8 +1742,8 @@ function load() {
   }
   return migrateState(DEFAULT_STATE);
 }
-function AppStateProvider(_ref7) {
-  var children = _ref7.children;
+function AppStateProvider(_ref1) {
+  var children = _ref1.children;
   var _useState = useState(load),
     _useState2 = _slicedToArray(_useState, 2),
     state = _useState2[0],
@@ -1574,7 +1905,7 @@ function AppStateProvider(_ref7) {
     });
   };
   var pullRemoteState = function () {
-    var _ref8 = _asyncToGenerator(_regenerator().m(function _callee() {
+    var _ref10 = _asyncToGenerator(_regenerator().m(function _callee() {
       var options,
         config,
         _syncMetaRef$current,
@@ -1637,11 +1968,11 @@ function AppStateProvider(_ref7) {
       }, _callee, null, [[1, 4]]);
     }));
     return function pullRemoteState() {
-      return _ref8.apply(this, arguments);
+      return _ref10.apply(this, arguments);
     };
   }();
   var pushRemoteState = function () {
-    var _ref9 = _asyncToGenerator(_regenerator().m(function _callee3() {
+    var _ref11 = _asyncToGenerator(_regenerator().m(function _callee3() {
       var options,
         config,
         runPush,
@@ -1677,7 +2008,7 @@ function AppStateProvider(_ref7) {
             return _context3.a(2, null);
           case 2:
             runPush = function () {
-              var _ref0 = _asyncToGenerator(_regenerator().m(function _callee2() {
+              var _ref12 = _asyncToGenerator(_regenerator().m(function _callee2() {
                 var remote, remoteSha, pushState, nextSha, attempt, isShaConflict, latestRemote, _t2;
                 return _regenerator().w(function (_context2) {
                   while (1) switch (_context2.p = _context2.n) {
@@ -1756,7 +2087,7 @@ function AppStateProvider(_ref7) {
                 }, _callee2, null, [[3, 5]]);
               }));
               return function runPush() {
-                return _ref0.apply(this, arguments);
+                return _ref12.apply(this, arguments);
               };
             }();
             promise = runPush();
@@ -1784,11 +2115,11 @@ function AppStateProvider(_ref7) {
       }, _callee3, null, [[3, 5, 6, 7]]);
     }));
     return function pushRemoteState() {
-      return _ref9.apply(this, arguments);
+      return _ref11.apply(this, arguments);
     };
   }();
   var resolveSyncConflict = function () {
-    var _ref1 = _asyncToGenerator(_regenerator().m(function _callee4(choice) {
+    var _ref13 = _asyncToGenerator(_regenerator().m(function _callee4(choice) {
       return _regenerator().w(function (_context4) {
         while (1) switch (_context4.n) {
           case 0:
@@ -1819,7 +2150,7 @@ function AppStateProvider(_ref7) {
       }, _callee4);
     }));
     return function resolveSyncConflict(_x4) {
-      return _ref1.apply(this, arguments);
+      return _ref13.apply(this, arguments);
     };
   }();
   var updateProfile = function updateProfile(id, patch) {
@@ -2000,9 +2331,9 @@ function AppStateProvider(_ref7) {
     });
   };
   var editSession = function editSession(id, patch) {
-    var _ref10 = patch || {},
-      _clearSessionPlanDates = _ref10._clearSessionPlanDates,
-      sessionPatch = _objectWithoutProperties(_ref10, _excluded);
+    var _ref14 = patch || {},
+      _clearSessionPlanDates = _ref14._clearSessionPlanDates,
+      sessionPatch = _objectWithoutProperties(_ref14, _excluded);
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
@@ -2016,9 +2347,9 @@ function AppStateProvider(_ref7) {
           var previousPlannedDate = ((_id2 = (p.sessionEdits || {})[id]) === null || _id2 === void 0 ? void 0 : _id2.plannedDate) || (raw === null || raw === void 0 ? void 0 : raw.plannedDate);
           var nextPlannedDate = sessionPatch.plannedDate || previousPlannedDate;
           var datesToClear = new Set([raw === null || raw === void 0 ? void 0 : raw.date, previousEffectiveDate, nextEffectiveDate, previousPlannedDate, nextPlannedDate].concat(_toConsumableArray(_clearSessionPlanDates || [])).filter(Boolean));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref11) {
-            var _ref12 = _slicedToArray(_ref11, 1),
-              date = _ref12[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref15) {
+            var _ref16 = _slicedToArray(_ref15, 1),
+              date = _ref16[0];
             return !datesToClear.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
@@ -2034,9 +2365,9 @@ function AppStateProvider(_ref7) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref13) {
-              var _ref14 = _slicedToArray(_ref13, 1),
-                k = _ref14[0];
+            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref17) {
+              var _ref18 = _slicedToArray(_ref17, 1),
+                k = _ref18[0];
               return k !== id;
             }))
           }) : p;
@@ -2077,9 +2408,9 @@ function AppStateProvider(_ref7) {
           var current = (p.dailyOverrides || {})[date] || {};
           if (!field) {
             return _objectSpread(_objectSpread({}, p), {}, {
-              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref15) {
-                var _ref16 = _slicedToArray(_ref15, 1),
-                  k = _ref16[0];
+              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref19) {
+                var _ref20 = _slicedToArray(_ref19, 1),
+                  k = _ref20[0];
                 return k !== date;
               }))
             });
@@ -2131,9 +2462,9 @@ function AppStateProvider(_ref7) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref17) {
-              var _ref18 = _slicedToArray(_ref17, 1),
-                k = _ref18[0];
+            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref21) {
+              var _ref22 = _slicedToArray(_ref21, 1),
+                k = _ref22[0];
               return k !== date;
             }))
           }) : p;
@@ -2181,14 +2512,14 @@ function AppStateProvider(_ref7) {
             if (remove && existing.id) removedIds.add(existing.id);
             return !remove;
           });
-          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref19) {
-            var _ref20 = _slicedToArray(_ref19, 1),
-              id = _ref20[0];
+          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref23) {
+            var _ref24 = _slicedToArray(_ref23, 1),
+              id = _ref24[0];
             return !removedIds.has(id) && id !== stampedSession.id;
           }));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref21) {
-            var _ref22 = _slicedToArray(_ref21, 1),
-              date = _ref22[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref25) {
+            var _ref26 = _slicedToArray(_ref25, 1),
+              date = _ref26[0];
             return !clearDates.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
@@ -2225,6 +2556,115 @@ function AppStateProvider(_ref7) {
         })
       });
     });
+  };
+  var addRecipe = function addRecipe(recipe) {
+    var now = new Date().toISOString();
+    var id = recipe.id || "recipe-".concat(Date.now().toString(36), "-").concat(Math.random().toString(36).slice(2, 7));
+    var nextRecipe = recipeWithDefaults(_objectSpread(_objectSpread({}, recipe), {}, {
+      id: id,
+      createdAt: recipe.createdAt || now,
+      updatedAt: now
+    }));
+    setState(function (s) {
+      return _objectSpread(_objectSpread({}, s), {}, {
+        profiles: s.profiles.map(function (p) {
+          return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
+            recipes: [nextRecipe].concat(_toConsumableArray((p.recipes || []).filter(function (r) {
+              return recipeIdentity(r) !== id;
+            }))),
+            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref27) {
+              var _ref28 = _slicedToArray(_ref27, 1),
+                recipeId = _ref28[0];
+              return recipeId !== id;
+            }))
+          }) : p;
+        })
+      });
+    });
+    return id;
+  };
+  var updateRecipe = function updateRecipe(id, patch) {
+    var recipeId = String(id || "").trim();
+    if (!recipeId) return;
+    var now = new Date().toISOString();
+    setState(function (s) {
+      return _objectSpread(_objectSpread({}, s), {}, {
+        profiles: s.profiles.map(function (p) {
+          if (p.id !== s.activeProfileId) return p;
+          var existing = (p.recipes || []).find(function (r) {
+            return recipeIdentity(r) === recipeId;
+          });
+          var nextRecipe = recipeWithDefaults(_objectSpread(_objectSpread(_objectSpread({}, existing || {
+            id: recipeId
+          }), patch || {}), {}, {
+            id: recipeId,
+            updatedAt: now
+          }));
+          var recipes = (p.recipes || []).some(function (r) {
+            return recipeIdentity(r) === recipeId;
+          }) ? (p.recipes || []).map(function (r) {
+            return recipeIdentity(r) === recipeId ? nextRecipe : r;
+          }) : [nextRecipe].concat(_toConsumableArray(p.recipes || []));
+          return _objectSpread(_objectSpread({}, p), {}, {
+            recipes: recipes
+          });
+        })
+      });
+    });
+  };
+  var deleteRecipe = function deleteRecipe(id) {
+    var recipeId = String(id || "").trim();
+    if (!recipeId) return;
+    setState(function (s) {
+      return _objectSpread(_objectSpread({}, s), {}, {
+        profiles: s.profiles.map(function (p) {
+          return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
+            recipes: (p.recipes || []).filter(function (r) {
+              return recipeIdentity(r) !== recipeId;
+            }),
+            deletedRecipes: _objectSpread(_objectSpread({}, normalizeDeletedRecipes(p.deletedRecipes || {})), {}, _defineProperty({}, recipeId, new Date().toISOString()))
+          }) : p;
+        })
+      });
+    });
+  };
+  var importRecipes = function importRecipes() {
+    var incoming = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
+    var list = Array.isArray(incoming) ? incoming : [incoming];
+    var now = new Date().toISOString();
+    var normalized = list.filter(Boolean).map(function (recipe, index) {
+      return recipeWithDefaults(_objectSpread(_objectSpread({}, recipe), {}, {
+        id: recipe.id || recipeIdentity(recipe) || "recipe-import-".concat(Date.now().toString(36), "-").concat(index),
+        createdAt: recipe.createdAt || now,
+        updatedAt: now
+      }));
+    });
+    if (!normalized.length) return 0;
+    setState(function (s) {
+      return _objectSpread(_objectSpread({}, s), {}, {
+        profiles: s.profiles.map(function (p) {
+          if (p.id !== s.activeProfileId) return p;
+          var byId = new Map((p.recipes || []).map(function (recipe) {
+            return [recipeIdentity(recipe), recipe];
+          }));
+          normalized.forEach(function (recipe) {
+            return byId.set(recipeIdentity(recipe), recipe);
+          });
+          var importedIds = new Set(normalized.map(recipeIdentity));
+          return _objectSpread(_objectSpread({}, p), {}, {
+            recipes: Array.from(byId.values()).sort(function (a, b) {
+              return String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
+            }),
+            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref29) {
+              var _ref30 = _slicedToArray(_ref29, 1),
+                id = _ref30[0];
+              return !importedIds.has(id);
+            }))
+          });
+        })
+      });
+    });
+    return normalized.length;
   };
   var addRoutine = function addRoutine(routine) {
     var id = "routine-" + Date.now().toString(36);
@@ -2370,6 +2810,10 @@ function AppStateProvider(_ref7) {
     removeFoodEntry: removeFoodEntry,
     addCustomFoodItem: addCustomFoodItem,
     removeCustomFoodItem: removeCustomFoodItem,
+    addRecipe: addRecipe,
+    updateRecipe: updateRecipe,
+    deleteRecipe: deleteRecipe,
+    importRecipes: importRecipes,
     addCustomExercise: addCustomExercise,
     hideExercise: hideExercise,
     unhideExercise: unhideExercise,
@@ -2448,6 +2892,8 @@ window.RepsState = {
   PRESETS: PRESETS,
   PHASES: PHASES,
   DEFAULT_PROGRESSION_RULES: DEFAULT_PROGRESSION_RULES,
+  DEFAULT_HOB_PREFERENCES: DEFAULT_HOB_PREFERENCES,
+  STARTER_RECIPE: STARTER_RECIPE,
   STORE_KEY: STORE_KEY
 };
 
@@ -2503,6 +2949,11 @@ var NAV_ITEMS = [{
   icon: I.Body,
   kbd: "7"
 }, {
+  id: "recipes",
+  label: "Recipes",
+  icon: I.Recipe,
+  kbd: ""
+}, {
   id: "plan",
   label: "Plan",
   icon: I.Plan,
@@ -2513,7 +2964,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "05 Jun 2026 09:30";
+var BUILD_LABEL = "05 Jun 2026 13:20";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -2615,7 +3066,7 @@ function Sidebar(_ref3) {
       className: "nav-icon"
     }, React.createElement(Ico, null)), React.createElement("span", {
       className: "nav-label"
-    }, item.label), React.createElement("span", {
+    }, item.label), item.kbd && React.createElement("span", {
       className: "nav-kbd"
     }, item.kbd));
   })), React.createElement("button", {
@@ -2647,6 +3098,7 @@ function TopBar(_ref4) {
     routines: "Routines",
     exercises: "Exercises",
     body: "Body",
+    recipes: "Recipes",
     plan: "Plan",
     export: "AI Export",
     settings: "Settings",
@@ -2803,6 +3255,7 @@ function MobileNav(_ref6) {
     routines: "Routines",
     exercises: "Exercises",
     body: "Body",
+    recipes: "Recipes",
     plan: "Plan",
     export: "AI Export",
     settings: "Settings",
@@ -10922,6 +11375,724 @@ window.RepsViews = {
   ExportView: ExportView
 };
 
+/* ---- components/recipes.jsx ---- */
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
+function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
+function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
+function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
+function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
+var _React = React,
+  useRecipeState = _React.useState,
+  useRecipeMemo = _React.useMemo;
+var RI = RepsIcons;
+function recipeClone(value) {
+  return JSON.parse(JSON.stringify(value || {}));
+}
+function recipeNumber(value) {
+  var fallback = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+function recipeRound(value) {
+  var decimals = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var n = recipeNumber(value);
+  var scale = Math.pow(10, decimals);
+  return Math.round(n * scale) / scale;
+}
+function recipeKcal(value) {
+  return Math.round(recipeNumber(value)).toLocaleString();
+}
+function recipeMacro(value) {
+  var decimals = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 1;
+  var n = recipeRound(value, decimals);
+  return Number.isInteger(n) ? String(n) : n.toFixed(decimals);
+}
+function recipeSlug(value) {
+  return String(value || "recipe").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "recipe-".concat(Date.now().toString(36));
+}
+function recipeDefaultSelections() {
+  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var selections = _objectSpread({}, recipe.selections || {});
+  (recipe.groups || []).forEach(function (group) {
+    var _group$options;
+    if (!selections[group.id]) selections[group.id] = ((_group$options = group.options) === null || _group$options === void 0 || (_group$options = _group$options[0]) === null || _group$options === void 0 ? void 0 : _group$options.id) || "";
+  });
+  return selections;
+}
+function recipeSelectedOption() {
+  var _group$options2;
+  var group = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  return (group.options || []).find(function (option) {
+    return option.id === selections[group.id];
+  }) || ((_group$options2 = group.options) === null || _group$options2 === void 0 ? void 0 : _group$options2[0]) || null;
+}
+function recipeDefaultAmounts() {
+  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var amounts = {};
+  (recipe.groups || []).forEach(function (group) {
+    var option = recipeSelectedOption(group, selections);
+    amounts[group.id] = recipeNumber(option === null || option === void 0 ? void 0 : option.amount, 0);
+  });
+  return amounts;
+}
+function recipeOptionMacros() {
+  var option = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var amount = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
+  var servings = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 1;
+  var factor = recipeNumber(amount) * recipeNumber(servings, 1) / 100;
+  return {
+    kcal: recipeNumber(option.kcalPer100) * factor,
+    protein: recipeNumber(option.proteinPer100) * factor,
+    carbs: recipeNumber(option.carbsPer100) * factor,
+    fat: recipeNumber(option.fatPer100) * factor
+  };
+}
+function calculateRecipe() {
+  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var selections = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var amounts = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  var servings = arguments.length > 3 && arguments[3] !== undefined ? arguments[3] : 1;
+  var rows = (recipe.groups || []).map(function (group) {
+    var option = recipeSelectedOption(group, selections);
+    var amount = recipeNumber(amounts[group.id], recipeNumber(option === null || option === void 0 ? void 0 : option.amount, 0));
+    var macros = recipeOptionMacros(option || {}, amount, servings);
+    return {
+      group: group,
+      option: option,
+      amount: amount,
+      macros: macros
+    };
+  }).filter(function (row) {
+    return row.option;
+  });
+  var totals = rows.reduce(function (sum, row) {
+    return {
+      kcal: sum.kcal + row.macros.kcal,
+      protein: sum.protein + row.macros.protein,
+      carbs: sum.carbs + row.macros.carbs,
+      fat: sum.fat + row.macros.fat
+    };
+  }, {
+    kcal: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0
+  });
+  return {
+    rows: rows,
+    totals: totals
+  };
+}
+function recipeLogName() {
+  var recipe = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var rows = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  var pieces = rows.filter(function (row) {
+    return row.group.id === "meat" || row.group.id === "vegetable" || row.group.id === "starch";
+  }).map(function (row) {
+    var _row$option;
+    return (_row$option = row.option) === null || _row$option === void 0 ? void 0 : _row$option.label;
+  }).filter(Boolean);
+  return "Recipe: ".concat(recipe.name).concat(pieces.length ? " (".concat(pieces.join(" · "), ")") : "");
+}
+function emptyRecipeTemplate() {
+  return {
+    id: "recipe-".concat(Date.now().toString(36)),
+    name: "New recipe",
+    category: "Dinner",
+    tags: [],
+    servings: 1,
+    summary: "",
+    selections: {},
+    groups: [{
+      id: "main",
+      label: "Main ingredient",
+      inputLabel: "grams",
+      options: [{
+        id: "main-option",
+        label: "Ingredient",
+        item: "Ingredient",
+        sourceUrl: "",
+        amount: 100,
+        amountUnit: "g",
+        displayAmount: "100 g",
+        nutritionBasis: "per 100 g",
+        kcalPer100: 100,
+        proteinPer100: 10,
+        carbsPer100: 0,
+        fatPer100: 0
+      }]
+    }],
+    cooking: {
+      equipment: "Electric hob",
+      hobNote: RepsState.DEFAULT_HOB_PREFERENCES.note,
+      steps: [{
+        id: "step-1",
+        title: "Cook",
+        hob: "6",
+        minutes: "10",
+        body: "Add the cooking steps here."
+      }]
+    }
+  };
+}
+function RecipeCard(_ref) {
+  var recipe = _ref.recipe,
+    onOpen = _ref.onOpen,
+    onEdit = _ref.onEdit,
+    onDelete = _ref.onDelete;
+  var selections = recipeDefaultSelections(recipe);
+  var amounts = recipeDefaultAmounts(recipe, selections);
+  var _calculateRecipe = calculateRecipe(recipe, selections, amounts, recipe.servings || 1),
+    totals = _calculateRecipe.totals,
+    rows = _calculateRecipe.rows;
+  var sources = rows.filter(function (row) {
+    var _row$option2;
+    return (_row$option2 = row.option) === null || _row$option2 === void 0 ? void 0 : _row$option2.sourceUrl;
+  }).length;
+  return React.createElement("article", {
+    className: "recipe-card"
+  }, React.createElement("div", {
+    className: "recipe-card-main"
+  }, React.createElement("div", null, React.createElement("div", {
+    className: "recipe-card-kicker"
+  }, recipe.category || "Recipe", " \xB7 ", recipe.servings || 1, " serving"), React.createElement("h2", null, recipe.name), recipe.summary && React.createElement("p", null, recipe.summary)), React.createElement("div", {
+    className: "recipe-card-actions"
+  }, React.createElement("button", {
+    className: "btn ghost sm icon-only",
+    type: "button",
+    title: "Edit recipe",
+    onClick: onEdit
+  }, React.createElement(RI.Edit, null)), React.createElement("button", {
+    className: "btn ghost sm icon-only",
+    type: "button",
+    title: "Delete recipe",
+    onClick: onDelete
+  }, React.createElement(RI.X, null)))), React.createElement("div", {
+    className: "recipe-card-macros"
+  }, React.createElement("span", null, React.createElement("strong", null, recipeKcal(totals.kcal)), " kcal"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(totals.fat)), "g fat")), React.createElement("div", {
+    className: "recipe-card-foot"
+  }, React.createElement("span", {
+    className: "mono muted"
+  }, sources, " source links"), React.createElement("button", {
+    className: "btn primary sm",
+    type: "button",
+    onClick: onOpen
+  }, React.createElement(RI.Chevron, null), " Open")));
+}
+function RecipeModal(_ref2) {
+  var _recipe$cooking, _recipe$cooking2;
+  var recipe = _ref2.recipe,
+    onClose = _ref2.onClose,
+    onLog = _ref2.onLog,
+    onEdit = _ref2.onEdit;
+  var _useRecipeState = useRecipeState("build"),
+    _useRecipeState2 = _slicedToArray(_useRecipeState, 2),
+    tab = _useRecipeState2[0],
+    setTab = _useRecipeState2[1];
+  var _useRecipeState3 = useRecipeState(RepsData.TODAY),
+    _useRecipeState4 = _slicedToArray(_useRecipeState3, 2),
+    date = _useRecipeState4[0],
+    setDate = _useRecipeState4[1];
+  var _useRecipeState5 = useRecipeState(recipe.servings || 1),
+    _useRecipeState6 = _slicedToArray(_useRecipeState5, 2),
+    servings = _useRecipeState6[0],
+    setServings = _useRecipeState6[1];
+  var _useRecipeState7 = useRecipeState(function () {
+      return recipeDefaultSelections(recipe);
+    }),
+    _useRecipeState8 = _slicedToArray(_useRecipeState7, 2),
+    selections = _useRecipeState8[0],
+    setSelections = _useRecipeState8[1];
+  var _useRecipeState9 = useRecipeState(function () {
+      return recipeDefaultAmounts(recipe, recipeDefaultSelections(recipe));
+    }),
+    _useRecipeState0 = _slicedToArray(_useRecipeState9, 2),
+    amounts = _useRecipeState0[0],
+    setAmounts = _useRecipeState0[1];
+  var computed = useRecipeMemo(function () {
+    return calculateRecipe(recipe, selections, amounts, servings);
+  }, [recipe, selections, amounts, servings]);
+  var hob = ((_recipe$cooking = recipe.cooking) === null || _recipe$cooking === void 0 ? void 0 : _recipe$cooking.hobNote) || RepsState.DEFAULT_HOB_PREFERENCES.note;
+  var selectOption = function selectOption(group, option) {
+    setSelections(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, _defineProperty({}, group.id, option.id));
+    });
+    setAmounts(function (current) {
+      return _objectSpread(_objectSpread({}, current), {}, _defineProperty({}, group.id, recipeNumber(option.amount, current[group.id] || 0)));
+    });
+  };
+  var logMeal = function logMeal() {
+    var totals = computed.totals;
+    onLog(date, {
+      product: recipeLogName(recipe, computed.rows),
+      amount: recipeNumber(servings, 1),
+      kcal: Math.round(totals.kcal),
+      protein: recipeRound(totals.protein, 1),
+      carbs: recipeRound(totals.carbs, 1),
+      fat: recipeRound(totals.fat, 1),
+      recipeId: recipe.id,
+      source: "recipe",
+      recipeSelections: selections
+    });
+    onClose();
+  };
+  return React.createElement("div", {
+    className: "recipe-modal-backdrop",
+    onClick: onClose
+  }, React.createElement("section", {
+    className: "recipe-modal",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": recipe.name,
+    onClick: function onClick(e) {
+      return e.stopPropagation();
+    }
+  }, React.createElement("div", {
+    className: "recipe-modal-head"
+  }, React.createElement("div", null, React.createElement("span", {
+    className: "recipe-card-kicker"
+  }, recipe.category || "Recipe"), React.createElement("h2", null, recipe.name)), React.createElement("div", {
+    className: "recipe-modal-actions"
+  }, React.createElement("button", {
+    className: "btn ghost sm",
+    type: "button",
+    onClick: onEdit
+  }, React.createElement(RI.Edit, null), " Edit"), React.createElement("button", {
+    className: "btn ghost sm icon-only",
+    type: "button",
+    title: "Close",
+    onClick: onClose
+  }, React.createElement(RI.X, null)))), React.createElement("div", {
+    className: "recipe-modal-toolbar"
+  }, React.createElement("div", {
+    className: "recipe-tabs",
+    role: "tablist",
+    "aria-label": "Recipe sections"
+  }, ["build", "ingredients", "cook"].map(function (id) {
+    return React.createElement("button", {
+      key: id,
+      className: "recipe-tab ".concat(tab === id ? "is-on" : ""),
+      type: "button",
+      onClick: function onClick() {
+        return setTab(id);
+      }
+    }, id === "build" ? "Build" : id === "ingredients" ? "Ingredients" : "Cook");
+  })), React.createElement("label", {
+    className: "recipe-date-control"
+  }, React.createElement("span", null, "Date"), React.createElement("input", {
+    type: "date",
+    value: date,
+    onChange: function onChange(e) {
+      return setDate(e.target.value);
+    }
+  })), React.createElement("label", {
+    className: "recipe-serving-control"
+  }, React.createElement("span", null, "Servings"), React.createElement("input", {
+    type: "number",
+    min: "0.25",
+    step: "0.25",
+    value: servings,
+    onChange: function onChange(e) {
+      return setServings(e.target.value);
+    }
+  }))), React.createElement("div", {
+    className: "recipe-modal-body"
+  }, React.createElement("aside", {
+    className: "recipe-total-panel"
+  }, React.createElement("div", {
+    className: "recipe-total-number"
+  }, recipeKcal(computed.totals.kcal), React.createElement("span", null, "kcal")), React.createElement("div", {
+    className: "recipe-total-grid"
+  }, React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.protein)), "g protein"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.carbs)), "g carbs"), React.createElement("span", null, React.createElement("strong", null, recipeMacro(computed.totals.fat)), "g fat")), React.createElement("button", {
+    className: "btn primary sm recipe-log-btn",
+    type: "button",
+    onClick: logMeal
+  }, React.createElement(RI.Plus, null), " Log meal")), tab === "build" && React.createElement("div", {
+    className: "recipe-build-grid"
+  }, (recipe.groups || []).map(function (group) {
+    var _ref3, _amounts$group$id;
+    var selected = recipeSelectedOption(group, selections);
+    var amount = (_ref3 = (_amounts$group$id = amounts[group.id]) !== null && _amounts$group$id !== void 0 ? _amounts$group$id : selected === null || selected === void 0 ? void 0 : selected.amount) !== null && _ref3 !== void 0 ? _ref3 : 0;
+    return React.createElement("section", {
+      key: group.id,
+      className: "recipe-builder-group"
+    }, React.createElement("div", {
+      className: "recipe-builder-head"
+    }, React.createElement("h3", null, group.label), React.createElement("span", {
+      className: "mono muted"
+    }, group.inputLabel || (selected === null || selected === void 0 ? void 0 : selected.amountUnit) || "amount")), React.createElement("div", {
+      className: "recipe-option-row"
+    }, (group.options || []).map(function (option) {
+      return React.createElement("button", {
+        key: option.id,
+        type: "button",
+        className: "recipe-option ".concat((selected === null || selected === void 0 ? void 0 : selected.id) === option.id ? "is-on" : ""),
+        onClick: function onClick() {
+          return selectOption(group, option);
+        }
+      }, React.createElement("span", null, option.label), React.createElement("em", null, option.displayAmount || "".concat(option.amount).concat(option.amountUnit || "")));
+    })), React.createElement("div", {
+      className: "recipe-amount-row"
+    }, React.createElement("input", {
+      type: "number",
+      min: "0",
+      step: (selected === null || selected === void 0 ? void 0 : selected.amountUnit) === "ml" ? "2.5" : "5",
+      value: amount,
+      onChange: function onChange(e) {
+        return setAmounts(function (current) {
+          return _objectSpread(_objectSpread({}, current), {}, _defineProperty({}, group.id, e.target.value));
+        });
+      }
+    }), React.createElement("span", null, (selected === null || selected === void 0 ? void 0 : selected.amountUnit) || "g", " per serving"), (selected === null || selected === void 0 ? void 0 : selected.sourceUrl) && React.createElement("a", {
+      href: selected.sourceUrl,
+      target: "_blank",
+      rel: "noreferrer"
+    }, "Jumbo source")));
+  })), tab === "ingredients" && React.createElement("div", {
+    className: "recipe-ingredient-list"
+  }, computed.rows.map(function (row) {
+    return React.createElement("div", {
+      key: row.group.id,
+      className: "recipe-ingredient-row"
+    }, React.createElement("div", null, React.createElement("span", {
+      className: "recipe-card-kicker"
+    }, row.group.label), React.createElement("strong", null, row.option.item || row.option.label), React.createElement("em", null, recipeMacro(row.amount * recipeNumber(servings, 1), row.option.amountUnit === "ml" ? 1 : 0), " ", row.option.amountUnit || "g", " total \xB7 ", row.option.nutritionBasis || "per 100")), React.createElement("div", {
+      className: "recipe-ingredient-macros"
+    }, React.createElement("span", null, recipeKcal(row.macros.kcal), " kcal"), React.createElement("span", null, recipeMacro(row.macros.protein), "g protein"), row.option.sourceUrl && React.createElement("a", {
+      href: row.option.sourceUrl,
+      target: "_blank",
+      rel: "noreferrer"
+    }, "source")));
+  })), tab === "cook" && React.createElement("div", {
+    className: "recipe-cook-panel"
+  }, React.createElement("div", {
+    className: "recipe-hob-note"
+  }, hob), (((_recipe$cooking2 = recipe.cooking) === null || _recipe$cooking2 === void 0 ? void 0 : _recipe$cooking2.steps) || []).map(function (step, index) {
+    return React.createElement("div", {
+      key: step.id || index,
+      className: "recipe-step"
+    }, React.createElement("div", {
+      className: "recipe-step-index mono"
+    }, index + 1), React.createElement("div", null, React.createElement("div", {
+      className: "recipe-step-head"
+    }, React.createElement("strong", null, step.title || "Step ".concat(index + 1)), React.createElement("span", {
+      className: "mono"
+    }, "hob ", step.hob || "6", " \xB7 ", step.minutes || "until done", " min")), React.createElement("p", null, step.body)));
+  })))));
+}
+function RecipeJsonEditorModal(_ref4) {
+  var recipe = _ref4.recipe,
+    onClose = _ref4.onClose,
+    onSave = _ref4.onSave,
+    onDelete = _ref4.onDelete;
+  var isNew = !recipe;
+  var initial = recipeClone(recipe || emptyRecipeTemplate());
+  var _useRecipeState1 = useRecipeState(initial.name || ""),
+    _useRecipeState10 = _slicedToArray(_useRecipeState1, 2),
+    name = _useRecipeState10[0],
+    setName = _useRecipeState10[1];
+  var _useRecipeState11 = useRecipeState(initial.servings || 1),
+    _useRecipeState12 = _slicedToArray(_useRecipeState11, 2),
+    servings = _useRecipeState12[0],
+    setServings = _useRecipeState12[1];
+  var _useRecipeState13 = useRecipeState(function () {
+      return JSON.stringify(initial, null, 2);
+    }),
+    _useRecipeState14 = _slicedToArray(_useRecipeState13, 2),
+    text = _useRecipeState14[0],
+    setText = _useRecipeState14[1];
+  var _useRecipeState15 = useRecipeState(""),
+    _useRecipeState16 = _slicedToArray(_useRecipeState15, 2),
+    error = _useRecipeState16[0],
+    setError = _useRecipeState16[1];
+  var syncHeaderFields = function syncHeaderFields(patch) {
+    try {
+      var parsed = JSON.parse(text);
+      var next = _objectSpread(_objectSpread({}, parsed), patch);
+      setText(JSON.stringify(next, null, 2));
+    } catch (e) {}
+  };
+  var submit = function submit() {
+    try {
+      var parsed = JSON.parse(text);
+      var next = _objectSpread(_objectSpread({}, parsed), {}, {
+        id: parsed.id || (recipe === null || recipe === void 0 ? void 0 : recipe.id) || recipeSlug(name),
+        name: name.trim() || parsed.name || "Untitled recipe",
+        servings: recipeNumber(servings, parsed.servings || 1)
+      });
+      if (!Array.isArray(next.groups)) throw new Error("Recipe needs a groups array.");
+      onSave(next);
+      onClose();
+    } catch (e) {
+      setError(e.message || "Recipe JSON is invalid.");
+    }
+  };
+  return React.createElement("div", {
+    className: "recipe-modal-backdrop",
+    onClick: onClose
+  }, React.createElement("section", {
+    className: "recipe-editor-modal",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "Recipe editor",
+    onClick: function onClick(e) {
+      return e.stopPropagation();
+    }
+  }, React.createElement("div", {
+    className: "recipe-modal-head"
+  }, React.createElement("div", null, React.createElement("span", {
+    className: "recipe-card-kicker"
+  }, isNew ? "New recipe" : "Edit recipe"), React.createElement("h2", null, name || "Recipe")), React.createElement("button", {
+    className: "btn ghost sm icon-only",
+    type: "button",
+    title: "Close",
+    onClick: onClose
+  }, React.createElement(RI.X, null))), React.createElement("div", {
+    className: "recipe-editor-fields"
+  }, React.createElement("label", null, React.createElement("span", null, "Name"), React.createElement("input", {
+    value: name,
+    onChange: function onChange(e) {
+      setName(e.target.value);
+      syncHeaderFields({
+        name: e.target.value
+      });
+    }
+  })), React.createElement("label", null, React.createElement("span", null, "Servings"), React.createElement("input", {
+    type: "number",
+    min: "0.25",
+    step: "0.25",
+    value: servings,
+    onChange: function onChange(e) {
+      setServings(e.target.value);
+      syncHeaderFields({
+        servings: Number(e.target.value) || 1
+      });
+    }
+  }))), React.createElement("textarea", {
+    className: "recipe-json-input",
+    value: text,
+    onChange: function onChange(e) {
+      setText(e.target.value);
+      setError("");
+    },
+    spellCheck: "false"
+  }), error && React.createElement("div", {
+    className: "recipe-editor-error"
+  }, error), React.createElement("div", {
+    className: "recipe-editor-actions"
+  }, !isNew && React.createElement("button", {
+    className: "btn ghost sm",
+    type: "button",
+    onClick: onDelete
+  }, React.createElement(RI.X, null), " Delete"), React.createElement("span", null), React.createElement("button", {
+    className: "btn ghost sm",
+    type: "button",
+    onClick: onClose
+  }, "Cancel"), React.createElement("button", {
+    className: "btn primary sm",
+    type: "button",
+    onClick: submit
+  }, React.createElement(RI.Check, null), " Save recipe"))));
+}
+function RecipeImportModal(_ref5) {
+  var onClose = _ref5.onClose,
+    onImport = _ref5.onImport;
+  var _useRecipeState17 = useRecipeState(""),
+    _useRecipeState18 = _slicedToArray(_useRecipeState17, 2),
+    text = _useRecipeState18[0],
+    setText = _useRecipeState18[1];
+  var _useRecipeState19 = useRecipeState(""),
+    _useRecipeState20 = _slicedToArray(_useRecipeState19, 2),
+    error = _useRecipeState20[0],
+    setError = _useRecipeState20[1];
+  var submit = function submit() {
+    try {
+      var parsed = JSON.parse(text);
+      var list = Array.isArray(parsed) ? parsed : Array.isArray(parsed.recipes) ? parsed.recipes : [parsed];
+      if (!list.length) throw new Error("No recipes found.");
+      onImport(list);
+      onClose();
+    } catch (e) {
+      setError(e.message || "Import JSON is invalid.");
+    }
+  };
+  return React.createElement("div", {
+    className: "recipe-modal-backdrop",
+    onClick: onClose
+  }, React.createElement("section", {
+    className: "recipe-editor-modal compact",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "Import recipes",
+    onClick: function onClick(e) {
+      return e.stopPropagation();
+    }
+  }, React.createElement("div", {
+    className: "recipe-modal-head"
+  }, React.createElement("div", null, React.createElement("span", {
+    className: "recipe-card-kicker"
+  }, "Private import"), React.createElement("h2", null, "Import recipes")), React.createElement("button", {
+    className: "btn ghost sm icon-only",
+    type: "button",
+    title: "Close",
+    onClick: onClose
+  }, React.createElement(RI.X, null))), React.createElement("textarea", {
+    className: "recipe-json-input",
+    value: text,
+    onChange: function onChange(e) {
+      setText(e.target.value);
+      setError("");
+    },
+    placeholder: "Paste one recipe, {\"recipes\":[...]}, or an array of recipes.",
+    spellCheck: "false"
+  }), error && React.createElement("div", {
+    className: "recipe-editor-error"
+  }, error), React.createElement("div", {
+    className: "recipe-editor-actions"
+  }, React.createElement("span", null), React.createElement("button", {
+    className: "btn ghost sm",
+    type: "button",
+    onClick: onClose
+  }, "Cancel"), React.createElement("button", {
+    className: "btn primary sm",
+    type: "button",
+    onClick: submit,
+    disabled: !text.trim()
+  }, React.createElement(RI.Download, null), " Import"))));
+}
+function RecipesView() {
+  var _activeProfile$cookin, _activeProfile$cookin2;
+  var app = RepsState.useApp();
+  var activeProfile = app.activeProfile,
+    addFoodEntry = app.addFoodEntry,
+    addRecipe = app.addRecipe,
+    updateRecipe = app.updateRecipe,
+    deleteRecipe = app.deleteRecipe,
+    importRecipes = app.importRecipes;
+  var recipes = activeProfile.recipes || [];
+  var _useRecipeState21 = useRecipeState(null),
+    _useRecipeState22 = _slicedToArray(_useRecipeState21, 2),
+    activeRecipe = _useRecipeState22[0],
+    setActiveRecipe = _useRecipeState22[1];
+  var _useRecipeState23 = useRecipeState(null),
+    _useRecipeState24 = _slicedToArray(_useRecipeState23, 2),
+    editingRecipe = _useRecipeState24[0],
+    setEditingRecipe = _useRecipeState24[1];
+  var _useRecipeState25 = useRecipeState(false),
+    _useRecipeState26 = _slicedToArray(_useRecipeState25, 2),
+    showNew = _useRecipeState26[0],
+    setShowNew = _useRecipeState26[1];
+  var _useRecipeState27 = useRecipeState(false),
+    _useRecipeState28 = _slicedToArray(_useRecipeState27, 2),
+    showImport = _useRecipeState28[0],
+    setShowImport = _useRecipeState28[1];
+  var saveRecipe = function saveRecipe(recipe) {
+    if ((activeProfile.recipes || []).some(function (r) {
+      return r.id === recipe.id;
+    })) updateRecipe(recipe.id, recipe);else addRecipe(recipe);
+  };
+  var removeRecipe = function removeRecipe(recipe) {
+    if (!(recipe !== null && recipe !== void 0 && recipe.id)) return;
+    if (confirm("Delete recipe \"".concat(recipe.name, "\"?"))) {
+      deleteRecipe(recipe.id);
+      if ((activeRecipe === null || activeRecipe === void 0 ? void 0 : activeRecipe.id) === recipe.id) setActiveRecipe(null);
+      if ((editingRecipe === null || editingRecipe === void 0 ? void 0 : editingRecipe.id) === recipe.id) setEditingRecipe(null);
+    }
+  };
+  return React.createElement("div", {
+    className: "view recipes-view"
+  }, React.createElement("div", {
+    className: "page-head"
+  }, React.createElement("div", null, React.createElement("h1", {
+    className: "page-title"
+  }, "Recipes"), React.createElement("div", {
+    className: "page-sub"
+  }, "Private profile recipes \xB7 source-backed macros \xB7 hob-aware cooking")), React.createElement("div", {
+    className: "page-actions"
+  }, React.createElement("button", {
+    className: "btn ghost sm",
+    type: "button",
+    onClick: function onClick() {
+      return setShowImport(true);
+    }
+  }, React.createElement(RI.Download, null), " Import"), React.createElement("button", {
+    className: "btn primary sm",
+    type: "button",
+    onClick: function onClick() {
+      return setShowNew(true);
+    }
+  }, React.createElement(RI.Plus, null), " New recipe"))), React.createElement("section", {
+    className: "recipes-command-band"
+  }, React.createElement("div", null, React.createElement("span", {
+    className: "recipe-card-kicker"
+  }, "Hob profile"), React.createElement("strong", null, ((_activeProfile$cookin = activeProfile.cookingPreferences) === null || _activeProfile$cookin === void 0 || (_activeProfile$cookin = _activeProfile$cookin.hob) === null || _activeProfile$cookin === void 0 ? void 0 : _activeProfile$cookin.usualRange) || "5-7", " usual range"), React.createElement("p", null, ((_activeProfile$cookin2 = activeProfile.cookingPreferences) === null || _activeProfile$cookin2 === void 0 || (_activeProfile$cookin2 = _activeProfile$cookin2.hob) === null || _activeProfile$cookin2 === void 0 ? void 0 : _activeProfile$cookin2.note) || RepsState.DEFAULT_HOB_PREFERENCES.note)), React.createElement("span", {
+    className: "chip"
+  }, recipes.length, " ", recipes.length === 1 ? "recipe" : "recipes")), React.createElement("div", {
+    className: "recipes-grid"
+  }, recipes.map(function (recipe) {
+    return React.createElement(RecipeCard, {
+      key: recipe.id,
+      recipe: recipe,
+      onOpen: function onOpen() {
+        return setActiveRecipe(recipe);
+      },
+      onEdit: function onEdit() {
+        return setEditingRecipe(recipe);
+      },
+      onDelete: function onDelete() {
+        return removeRecipe(recipe);
+      }
+    });
+  }), recipes.length === 0 && React.createElement("div", {
+    className: "empty"
+  }, "No recipes saved yet.")), activeRecipe && React.createElement(RecipeModal, {
+    recipe: activeRecipe,
+    onClose: function onClose() {
+      return setActiveRecipe(null);
+    },
+    onEdit: function onEdit() {
+      return setEditingRecipe(activeRecipe);
+    },
+    onLog: function onLog(date, entry) {
+      return addFoodEntry(date, entry);
+    }
+  }), editingRecipe && React.createElement(RecipeJsonEditorModal, {
+    recipe: editingRecipe,
+    onClose: function onClose() {
+      return setEditingRecipe(null);
+    },
+    onSave: saveRecipe,
+    onDelete: function onDelete() {
+      return removeRecipe(editingRecipe);
+    }
+  }), showNew && React.createElement(RecipeJsonEditorModal, {
+    onClose: function onClose() {
+      return setShowNew(false);
+    },
+    onSave: saveRecipe
+  }), showImport && React.createElement(RecipeImportModal, {
+    onClose: function onClose() {
+      return setShowImport(false);
+    },
+    onImport: importRecipes
+  }));
+}
+window.RepsRecipes = RecipesView;
+window.RepsRecipeUtils = {
+  calculateRecipe: calculateRecipe,
+  recipeDefaultSelections: recipeDefaultSelections,
+  recipeDefaultAmounts: recipeDefaultAmounts
+};
+
 /* ---- components/sessions.jsx ---- */
 function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
@@ -17031,7 +18202,7 @@ function App() {
     setView: setView
   }), view === "log" && React.createElement(RepsLog, null), view === "sessions" && window.RepsSessions && React.createElement(window.RepsSessions, {
     setView: setView
-  }), view === "strength" && window.RepsStrengthView && React.createElement(window.RepsStrengthView, null), view === "routines" && React.createElement(Routines, null), view === "exercises" && React.createElement(Exercises, null), view === "body" && React.createElement(Body, null), view === "plan" && React.createElement(Plan, null), view === "export" && React.createElement(ExportView, null), view === "settings" && React.createElement(Settings, {
+  }), view === "strength" && window.RepsStrengthView && React.createElement(window.RepsStrengthView, null), view === "routines" && React.createElement(Routines, null), view === "exercises" && React.createElement(Exercises, null), view === "body" && React.createElement(Body, null), view === "recipes" && React.createElement(RepsRecipes, null), view === "plan" && React.createElement(Plan, null), view === "export" && React.createElement(ExportView, null), view === "settings" && React.createElement(Settings, {
     theme: t.theme,
     setTheme: chooseTheme,
     themes: THEME_OPTIONS

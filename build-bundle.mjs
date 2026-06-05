@@ -13,6 +13,7 @@ const sourceFiles = [
   "components/dashboard.jsx",
   "components/log.jsx",
   "components/views.jsx",
+  "components/recipes.jsx",
   "components/sessions.jsx",
   "components/exercise-modal.jsx",
   "components/phase-progress.jsx",
