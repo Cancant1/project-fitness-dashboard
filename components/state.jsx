@@ -965,13 +965,14 @@ function AppStateProvider({ children }) {
   const removeFoodEntry = (date, id) => {
     setState(s => ({
       ...s,
-      profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
-        ...p,
-        foodByDate: {
-          ...p.foodByDate,
-          [date]: (p.foodByDate[date] || []).filter(f => f.id !== id)
-        }
-      } : p)
+      profiles: s.profiles.map(p => {
+        if (p.id !== s.activeProfileId) return p;
+        const foodByDate = { ...(p.foodByDate || {}) };
+        const entries = (foodByDate[date] || []).filter(f => f.id !== id);
+        if (entries.length) foodByDate[date] = entries;
+        else delete foodByDate[date];
+        return { ...p, foodByDate };
+      })
     }));
   };
 

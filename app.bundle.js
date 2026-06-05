@@ -1855,11 +1855,15 @@ function AppStateProvider(_ref3) {
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
-          return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            foodByDate: _objectSpread(_objectSpread({}, p.foodByDate), {}, _defineProperty({}, date, (p.foodByDate[date] || []).filter(function (f) {
-              return f.id !== id;
-            })))
-          }) : p;
+          if (p.id !== s.activeProfileId) return p;
+          var foodByDate = _objectSpread({}, p.foodByDate || {});
+          var entries = (foodByDate[date] || []).filter(function (f) {
+            return f.id !== id;
+          });
+          if (entries.length) foodByDate[date] = entries;else delete foodByDate[date];
+          return _objectSpread(_objectSpread({}, p), {}, {
+            foodByDate: foodByDate
+          });
         })
       });
     });
@@ -2439,7 +2443,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "03 Jun 2026 19:53";
+var BUILD_LABEL = "05 Jun 2026 09:24";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -7286,7 +7290,8 @@ function AddFoodModal(_ref5) {
     onAdd = _ref5.onAdd,
     onSaveToCatalog = _ref5.onSaveToCatalog,
     activeProfile = _ref5.activeProfile,
-    updateProfile = _ref5.updateProfile;
+    updateProfile = _ref5.updateProfile,
+    targetDate = _ref5.targetDate;
   var _useS = useS("catalog"),
     _useS2 = _slicedToArray(_useS, 2),
     mode = _useS2[0],
@@ -7334,6 +7339,7 @@ function AddFoodModal(_ref5) {
   var hidden = (activeProfile === null || activeProfile === void 0 ? void 0 : activeProfile.hiddenFoodItems) || [];
   var items = allFoodCatalogItems(activeProfile, RepsData.foodItems);
   var hiddenKeys = new Set(hidden.map(foodProductKey));
+  var dateLabel = targetDate ? RepsData.shortDate(targetDate) : "selected date";
   var filtered = items.filter(function (f) {
     if (!showHidden && hiddenKeys.has(foodProductKey(f.product))) return false;
     if (q && !f.product.toLowerCase().includes(q.toLowerCase()) && !(f.category || "").toLowerCase().includes(q.toLowerCase())) return false;
@@ -7432,7 +7438,7 @@ function AddFoodModal(_ref5) {
     style: {
       marginTop: 2
     }
-  }, "Catalog \xB7 or quick-add a one-off estimate")), React.createElement("button", {
+  }, "Log for ", dateLabel, " \xB7 catalog \xB7 or quick-add a one-off estimate")), React.createElement("button", {
     className: "btn ghost sm icon-only",
     onClick: onClose
   }, React.createElement(VI.X, null))), React.createElement("div", {
@@ -8234,7 +8240,9 @@ function roundLedgerMacro(value) {
 }
 function LedgerFoodDetails(_ref14) {
   var date = _ref14.date,
-    foods = _ref14.foods;
+    foods = _ref14.foods,
+    onAddFood = _ref14.onAddFood,
+    onRemoveFood = _ref14.onRemoveFood;
   var totals = foods.reduce(function (sum, f) {
     return {
       kcal: sum.kcal + (Number(f.kcal) || 0),
@@ -8261,8 +8269,15 @@ function LedgerFoodDetails(_ref14) {
   }, React.createElement("div", null, React.createElement("strong", null, "Logged foods"), React.createElement("span", {
     className: "muted"
   }, " ", RepsData.shortDate(date))), React.createElement("div", {
+    className: "ledger-food-detail-actions"
+  }, React.createElement("div", {
     className: "mono"
-  }, foods.length, " ", foods.length === 1 ? "item" : "items", " \xB7 ", Math.round(totals.kcal), " kcal \xB7 ", roundLedgerMacro(totals.protein, 1), "g protein")), foods.length === 0 ? React.createElement("div", {
+  }, foods.length, " ", foods.length === 1 ? "item" : "items", " \xB7 ", Math.round(totals.kcal), " kcal \xB7 ", roundLedgerMacro(totals.protein, 1), "g protein"), React.createElement("button", {
+    className: "btn primary sm",
+    type: "button",
+    onClick: onAddFood,
+    title: "Add food for ".concat(RepsData.shortDate(date))
+  }, React.createElement(VI.Plus, null), " Add food"))), foods.length === 0 ? React.createElement("div", {
     className: "body-empty-line"
   }, "No food logged for this date.") : React.createElement("div", {
     className: "ledger-food-list"
@@ -8274,7 +8289,9 @@ function LedgerFoodDetails(_ref14) {
       className: "ledger-food-name"
     }, React.createElement("span", {
       className: "mono muted"
-    }, formatLedgerAmount(f.amount)), f.product || "Food item"), React.createElement("span", {
+    }, formatLedgerAmount(f.amount)), f.product || "Food item"), React.createElement("div", {
+      className: "ledger-food-macros"
+    }, React.createElement("span", {
       className: "mono"
     }, Math.round(Number(f.kcal) || 0), " kcal"), React.createElement("span", {
       className: "mono good-text"
@@ -8282,7 +8299,14 @@ function LedgerFoodDetails(_ref14) {
       className: "mono muted"
     }, roundLedgerMacro(f.carbs, 1), "g carbs"), hasFat && React.createElement("span", {
       className: "mono muted"
-    }, roundLedgerMacro(f.fat, 1), "g fat"));
+    }, roundLedgerMacro(f.fat, 1), "g fat")), React.createElement("button", {
+      className: "btn ghost icon-only ledger-food-remove",
+      type: "button",
+      onClick: function onClick() {
+        return onRemoveFood === null || onRemoveFood === void 0 ? void 0 : onRemoveFood(f.id);
+      },
+      title: "Remove ".concat(f.product || "food item")
+    }, React.createElement(VI.X, null)));
   })));
 }
 function DailyLogTable(_ref15) {
@@ -8295,6 +8319,8 @@ function DailyLogTable(_ref15) {
     clearDailyOverride = _ref15.clearDailyOverride,
     selectedDate = _ref15.selectedDate,
     onSelectDate = _ref15.onSelectDate,
+    onAddFoodForDate = _ref15.onAddFoodForDate,
+    onRemoveFoodForDate = _ref15.onRemoveFoodForDate,
     _ref15$foodsOpen = _ref15.foodsOpen,
     foodsOpen = _ref15$foodsOpen === void 0 ? true : _ref15$foodsOpen,
     onFoodsOpenChange = _ref15.onFoodsOpenChange,
@@ -8583,7 +8609,13 @@ function DailyLogTable(_ref15) {
       colSpan: "8"
     }, React.createElement(LedgerFoodDetails, {
       date: date,
-      foods: foods
+      foods: foods,
+      onAddFood: function onAddFood() {
+        return onAddFoodForDate === null || onAddFoodForDate === void 0 ? void 0 : onAddFoodForDate(date);
+      },
+      onRemoveFood: function onRemoveFood(id) {
+        return onRemoveFoodForDate === null || onRemoveFoodForDate === void 0 ? void 0 : onRemoveFoodForDate(date, id);
+      }
     }))));
   })))));
 }
@@ -8980,7 +9012,7 @@ function TodayRailBand(_ref24) {
     addFoodEntry = _ref24.addFoodEntry,
     removeFoodEntry = _ref24.removeFoodEntry,
     setShowWeightModal = _ref24.setShowWeightModal,
-    setShowAddFood = _ref24.setShowAddFood;
+    onAddFoodForDate = _ref24.onAddFoodForDate;
   var loggedLabel = selectedDate === todayIso ? "Today" : RepsData.shortDate(selectedDate);
   var quickFoods = _um(function () {
     return quickFoodSuggestions(activeProfile, foodItems, 10);
@@ -8989,7 +9021,7 @@ function TodayRailBand(_ref24) {
     className: "body-band today-rail-band"
   }, React.createElement("div", {
     className: "body-band-head today-rail-head"
-  }, React.createElement("div", null, React.createElement("h2", null, "Today Rail"), React.createElement("div", {
+  }, React.createElement("div", null, React.createElement("h2", null, "Daily Rail"), React.createElement("div", {
     className: "body-band-sub"
   }, loggedLabel, " \xB7 ", targets.kcal, " kcal \xB7 ", targets.protein, "g protein")), React.createElement("span", {
     className: "chip"
@@ -9038,7 +9070,7 @@ function TodayRailBand(_ref24) {
   }, React.createElement(VI.Plus, null), " Weight"), React.createElement("button", {
     className: "btn primary sm",
     onClick: function onClick() {
-      return setShowAddFood(true);
+      return onAddFoodForDate(selectedDate);
     }
   }, React.createElement(VI.Plus, null), " Add food"))), React.createElement("div", {
     className: "today-rail-grid"
@@ -9213,6 +9245,10 @@ function Body() {
     _useS54 = _slicedToArray(_useS53, 2),
     tdeeWindowDays = _useS54[0],
     setTdeeWindowDays = _useS54[1];
+  var _useS55 = useS(null),
+    _useS56 = _slicedToArray(_useS55, 2),
+    foodModalDate = _useS56[0],
+    setFoodModalDate = _useS56[1];
   var selectedDayKey = window.RepsData.dayName(selectedDate);
   var targets = activeProfile.macros[selectedDayKey] || {
     kcal: 2000,
@@ -9282,10 +9318,10 @@ function Body() {
   }, [activeProfile]);
   var foodItems = RepsData.foodItems;
   var selectedOverride = dailyOverrides[selectedDate] || {};
-  var _useS55 = useS(false),
-    _useS56 = _slicedToArray(_useS55, 2),
-    showAddFood = _useS56[0],
-    setShowAddFood = _useS56[1];
+  var _useS57 = useS(false),
+    _useS58 = _slicedToArray(_useS57, 2),
+    showAddFood = _useS58[0],
+    setShowAddFood = _useS58[1];
   var ledgerFoodsOpen = activeProfile.bodyLedgerFoodsOpen !== false;
   var entries = (activeProfile.foodByDate || {})[selectedDate] || [];
   var foodKcal = entries.reduce(function (s, f) {
@@ -9318,6 +9354,16 @@ function Body() {
       maintenanceKcal: patch.maintenanceKcal,
       macros: patch.macros
     });
+  };
+  var openAddFoodForDate = function openAddFoodForDate(date) {
+    var targetDate = date || selectedDate || todayIso;
+    setSelectedDate(targetDate);
+    setFoodModalDate(targetDate);
+    setShowAddFood(true);
+  };
+  var closeAddFood = function closeAddFood() {
+    setShowAddFood(false);
+    setFoodModalDate(null);
   };
   return React.createElement("div", {
     className: "view body-view"
@@ -9362,7 +9408,7 @@ function Body() {
   }, React.createElement(VI.Plus, null), " Weight"), React.createElement("button", {
     className: "btn primary sm",
     onClick: function onClick() {
-      return setShowAddFood(true);
+      return openAddFoodForDate(selectedDate);
     }
   }, React.createElement(VI.Plus, null), " Add food")), React.createElement("div", {
     className: "body-workspace"
@@ -9391,7 +9437,7 @@ function Body() {
     addFoodEntry: addFoodEntry,
     removeFoodEntry: removeFoodEntry,
     setShowWeightModal: setShowWeightModal,
-    setShowAddFood: setShowAddFood
+    onAddFoodForDate: openAddFoodForDate
   }), React.createElement(GoalTrajectoryBand, {
     profile: activeProfile,
     estimate: adaptiveTdee,
@@ -9406,6 +9452,8 @@ function Body() {
     clearDailyOverride: clearDailyOverride,
     selectedDate: selectedDate,
     onSelectDate: setSelectedDate,
+    onAddFoodForDate: openAddFoodForDate,
+    onRemoveFoodForDate: removeFoodEntry,
     foodsOpen: ledgerFoodsOpen,
     onFoodsOpenChange: function onFoodsOpenChange(open) {
       return updateProfile(activeProfile.id, {
@@ -9415,11 +9463,10 @@ function Body() {
   })), showAddFood && React.createElement(AddFoodModal, {
     activeProfile: activeProfile,
     updateProfile: updateProfile,
-    onClose: function onClose() {
-      return setShowAddFood(false);
-    },
+    targetDate: foodModalDate || selectedDate,
+    onClose: closeAddFood,
     onAdd: function onAdd(entry) {
-      return addFoodEntry(selectedDate, entry);
+      return addFoodEntry(foodModalDate || selectedDate, entry);
     },
     onSaveToCatalog: function onSaveToCatalog(item) {
       return addCustomFoodItem && addCustomFoodItem(item);
@@ -9501,22 +9548,22 @@ function AddBlockModal(_ref27) {
     onSave = _ref27.onSave,
     onDelete = _ref27.onDelete;
   var isEdit = !!initialBlock;
-  var _useS57 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.name) || "Block " + new Date().getFullYear()),
-    _useS58 = _slicedToArray(_useS57, 2),
-    name = _useS58[0],
-    setName = _useS58[1];
-  var _useS59 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.startDate) || window.RepsData.TODAY),
+  var _useS59 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.name) || "Block " + new Date().getFullYear()),
     _useS60 = _slicedToArray(_useS59, 2),
-    startDate = _useS60[0],
-    setStartDate = _useS60[1];
-  var _useS61 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.weeks) || 8),
+    name = _useS60[0],
+    setName = _useS60[1];
+  var _useS61 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.startDate) || window.RepsData.TODAY),
     _useS62 = _slicedToArray(_useS61, 2),
-    weeks = _useS62[0],
-    setWeeks = _useS62[1];
-  var _useS63 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.goal) || ""),
+    startDate = _useS62[0],
+    setStartDate = _useS62[1];
+  var _useS63 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.weeks) || 8),
     _useS64 = _slicedToArray(_useS63, 2),
-    goal = _useS64[0],
-    setGoal = _useS64[1];
+    weeks = _useS64[0],
+    setWeeks = _useS64[1];
+  var _useS65 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.goal) || ""),
+    _useS66 = _slicedToArray(_useS65, 2),
+    goal = _useS66[0],
+    setGoal = _useS66[1];
   var submit = function submit() {
     if (!name.trim()) return;
     var parsedWeeks = Math.max(1, Math.min(52, Number(weeks) || 8));

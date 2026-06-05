@@ -639,7 +639,7 @@ function Exercises() {
 /* =========================================================
    BODY + FOOD
    ========================================================= */
-function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updateProfile }) {
+function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updateProfile, targetDate }) {
   const [mode, setMode] = useS("catalog");
   const [q, setQ] = useS("");
   const [picked, setPicked] = useS(null);
@@ -655,6 +655,7 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
   const hidden = activeProfile?.hiddenFoodItems || [];
   const items = allFoodCatalogItems(activeProfile, RepsData.foodItems);
   const hiddenKeys = new Set(hidden.map(foodProductKey));
+  const dateLabel = targetDate ? RepsData.shortDate(targetDate) : "selected date";
   const filtered = items.filter(f => {
     if (!showHidden && hiddenKeys.has(foodProductKey(f.product))) return false;
     if (q && !f.product.toLowerCase().includes(q.toLowerCase()) && !(f.category || "").toLowerCase().includes(q.toLowerCase())) return false;
@@ -722,7 +723,7 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
         <div className="panel-head">
           <div>
             <h3>Add food</h3>
-            <div className="kpi-label" style={{marginTop:2}}>Catalog · or quick-add a one-off estimate</div>
+            <div className="kpi-label" style={{marginTop:2}}>Log for {dateLabel} · catalog · or quick-add a one-off estimate</div>
           </div>
           <button className="btn ghost sm icon-only" onClick={onClose}><VI.X /></button>
         </div>
@@ -1034,7 +1035,7 @@ function roundLedgerMacro(value, decimals = 0) {
   return Math.round(n * scale) / scale;
 }
 
-function LedgerFoodDetails({ date, foods }) {
+function LedgerFoodDetails({ date, foods, onAddFood, onRemoveFood }) {
   const totals = foods.reduce((sum, f) => ({
     kcal: sum.kcal + (Number(f.kcal) || 0),
     protein: sum.protein + (Number(f.protein) || 0),
@@ -1051,8 +1052,13 @@ function LedgerFoodDetails({ date, foods }) {
           <strong>Logged foods</strong>
           <span className="muted"> {RepsData.shortDate(date)}</span>
         </div>
-        <div className="mono">
-          {foods.length} {foods.length === 1 ? "item" : "items"} · {Math.round(totals.kcal)} kcal · {roundLedgerMacro(totals.protein, 1)}g protein
+        <div className="ledger-food-detail-actions">
+          <div className="mono">
+            {foods.length} {foods.length === 1 ? "item" : "items"} · {Math.round(totals.kcal)} kcal · {roundLedgerMacro(totals.protein, 1)}g protein
+          </div>
+          <button className="btn primary sm" type="button" onClick={onAddFood} title={`Add food for ${RepsData.shortDate(date)}`}>
+            <VI.Plus /> Add food
+          </button>
         </div>
       </div>
       {foods.length === 0 ? (
@@ -1065,10 +1071,19 @@ function LedgerFoodDetails({ date, foods }) {
                 <span className="mono muted">{formatLedgerAmount(f.amount)}</span>
                 {f.product || "Food item"}
               </div>
-              <span className="mono">{Math.round(Number(f.kcal) || 0)} kcal</span>
-              <span className="mono good-text">{roundLedgerMacro(f.protein, 1)}g protein</span>
-              {hasCarbs && <span className="mono muted">{roundLedgerMacro(f.carbs, 1)}g carbs</span>}
-              {hasFat && <span className="mono muted">{roundLedgerMacro(f.fat, 1)}g fat</span>}
+              <div className="ledger-food-macros">
+                <span className="mono">{Math.round(Number(f.kcal) || 0)} kcal</span>
+                <span className="mono good-text">{roundLedgerMacro(f.protein, 1)}g protein</span>
+                {hasCarbs && <span className="mono muted">{roundLedgerMacro(f.carbs, 1)}g carbs</span>}
+                {hasFat && <span className="mono muted">{roundLedgerMacro(f.fat, 1)}g fat</span>}
+              </div>
+              <button
+                className="btn ghost icon-only ledger-food-remove"
+                type="button"
+                onClick={() => onRemoveFood?.(f.id)}
+                title={`Remove ${f.product || "food item"}`}>
+                <VI.X />
+              </button>
             </div>
           ))}
         </div>
@@ -1077,7 +1092,7 @@ function LedgerFoodDetails({ date, foods }) {
   );
 }
 
-function DailyLogTable({ bodyD, kcal, protein, activeProfile, updateProfile, updateDailyOverride, clearDailyOverride, selectedDate, onSelectDate, foodsOpen = true, onFoodsOpenChange, className = "" }) {
+function DailyLogTable({ bodyD, kcal, protein, activeProfile, updateProfile, updateDailyOverride, clearDailyOverride, selectedDate, onSelectDate, onAddFoodForDate, onRemoveFoodForDate, foodsOpen = true, onFoodsOpenChange, className = "" }) {
   const [rangeDays, setRangeDays] = useS("14");
   const today = window.RepsData.TODAY;
   const overrides = activeProfile.dailyOverrides || {};
@@ -1241,7 +1256,11 @@ function DailyLogTable({ bodyD, kcal, protein, activeProfile, updateProfile, upd
                   {isSelected && foodsOpen && (
                     <tr className="ledger-food-detail-row">
                       <td colSpan="8">
-                        <LedgerFoodDetails date={date} foods={foods} />
+                        <LedgerFoodDetails
+                          date={date}
+                          foods={foods}
+                          onAddFood={() => onAddFoodForDate?.(date)}
+                          onRemoveFood={(id) => onRemoveFoodForDate?.(date, id)} />
                       </td>
                     </tr>
                   )}
@@ -1590,7 +1609,7 @@ function TodayRailBand({
   selectedDate, setSelectedDate, todayIso, selectedDayKey, targets,
   todayKcal, todayProtein, todayCarbs, todayFat, trackCarbs, trackFat,
   entries, activeProfile, foodItems, addFoodEntry, removeFoodEntry,
-  setShowWeightModal, setShowAddFood
+  setShowWeightModal, onAddFoodForDate
 }) {
   const loggedLabel = selectedDate === todayIso ? "Today" : RepsData.shortDate(selectedDate);
   const quickFoods = _um(
@@ -1602,7 +1621,7 @@ function TodayRailBand({
     <section className="body-band today-rail-band">
       <div className="body-band-head today-rail-head">
         <div>
-          <h2>Today Rail</h2>
+          <h2>Daily Rail</h2>
           <div className="body-band-sub">{loggedLabel} · {targets.kcal} kcal · {targets.protein}g protein</div>
         </div>
         <span className="chip">{entries.length} {entries.length === 1 ? "item" : "items"}</span>
@@ -1622,7 +1641,7 @@ function TodayRailBand({
         </div>
         <div className="today-actions">
           <button className="btn sm" onClick={() => setShowWeightModal(true)}><VI.Plus /> Weight</button>
-          <button className="btn primary sm" onClick={() => setShowAddFood(true)}><VI.Plus /> Add food</button>
+          <button className="btn primary sm" onClick={() => onAddFoodForDate(selectedDate)}><VI.Plus /> Add food</button>
         </div>
       </div>
 
@@ -1750,6 +1769,7 @@ function Body() {
   const [selectedDate, setSelectedDate] = useS(todayIso);
   const [showWeightModal, setShowWeightModal] = useS(false);
   const [tdeeWindowDays, setTdeeWindowDays] = useS(28);
+  const [foodModalDate, setFoodModalDate] = useS(null);
   const selectedDayKey = window.RepsData.dayName(selectedDate);
   const targets = activeProfile.macros[selectedDayKey] || { kcal: 2000, protein: 160, carbs: 200, fat: 60 };
 
@@ -1813,6 +1833,16 @@ function Body() {
       macros: patch.macros
     });
   };
+  const openAddFoodForDate = (date) => {
+    const targetDate = date || selectedDate || todayIso;
+    setSelectedDate(targetDate);
+    setFoodModalDate(targetDate);
+    setShowAddFood(true);
+  };
+  const closeAddFood = () => {
+    setShowAddFood(false);
+    setFoodModalDate(null);
+  };
 
   return (
     <div className="view body-view">
@@ -1833,7 +1863,7 @@ function Body() {
           {selectedDate !== todayIso && <button className="btn ghost sm" onClick={() => setSelectedDate(todayIso)}>Today</button>}
         </div>
         <button className="btn sm" onClick={() => setShowWeightModal(true)}><VI.Plus /> Weight</button>
-        <button className="btn primary sm" onClick={() => setShowAddFood(true)}><VI.Plus /> Add food</button>
+        <button className="btn primary sm" onClick={() => openAddFoodForDate(selectedDate)}><VI.Plus /> Add food</button>
       </div>
 
       <div className="body-workspace">
@@ -1863,7 +1893,7 @@ function Body() {
           addFoodEntry={addFoodEntry}
           removeFoodEntry={removeFoodEntry}
           setShowWeightModal={setShowWeightModal}
-          setShowAddFood={setShowAddFood} />
+          onAddFoodForDate={openAddFoodForDate} />
 
         <GoalTrajectoryBand
           profile={activeProfile}
@@ -1881,6 +1911,8 @@ function Body() {
           clearDailyOverride={clearDailyOverride}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
+          onAddFoodForDate={openAddFoodForDate}
+          onRemoveFoodForDate={removeFoodEntry}
           foodsOpen={ledgerFoodsOpen}
           onFoodsOpenChange={(open) => updateProfile(activeProfile.id, { bodyLedgerFoodsOpen: !!open })} />
       </div>
@@ -1888,8 +1920,9 @@ function Body() {
 
       {showAddFood && <AddFoodModal
         activeProfile={activeProfile} updateProfile={updateProfile}
-        onClose={() => setShowAddFood(false)}
-        onAdd={(entry) => addFoodEntry(selectedDate, entry)}
+        targetDate={foodModalDate || selectedDate}
+        onClose={closeAddFood}
+        onAdd={(entry) => addFoodEntry(foodModalDate || selectedDate, entry)}
         onSaveToCatalog={(item) => addCustomFoodItem && addCustomFoodItem(item)} />}
       {showWeightModal && <WeightEntryModal
         onClose={() => setShowWeightModal(false)}
