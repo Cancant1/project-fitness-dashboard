@@ -1665,6 +1665,7 @@ function migrateProfile(p) {
     loggedSessions: p.loggedSessions || [],
     bodyLedgerFoodsOpen: p.bodyLedgerFoodsOpen !== undefined ? !!p.bodyLedgerFoodsOpen : true,
     sessionPlansByDate: p.sessionPlansByDate || {},
+    sessionPlanTombstones: p.sessionPlanTombstones || {},
     dailyOverrides: p.dailyOverrides || {},
     exerciseAnnotations: p.exerciseAnnotations || {},
     blockWeeksOverride: p.blockWeeksOverride || {},
@@ -1968,32 +1969,54 @@ function sameLoggedSessionSlot() {
   if (a.date && b.date && a.date === b.date && (!aDay || !bDay || aDay === bDay)) return true;
   return false;
 }
+function hasSetValue(value) {
+  return value !== undefined && value !== null && String(value).trim() !== "";
+}
+function stateSetHasResult() {
+  var set = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return hasSetValue(set.repsNumber) || hasSetValue(set.reps) || hasSetValue(set.durationMinutes) || hasSetValue(set.duration) || hasSetValue(set.note);
+}
 function stateLoggedSetCount() {
   var sets = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
-  return (sets || []).filter(function (set) {
-    return set.weight != null || set.repsNumber != null || set.reps != null || set.durationMinutes || set.duration || set.rpe || set.note;
-  }).length;
+  return (sets || []).filter(stateSetHasResult).length;
 }
 function stateSessionSetCount() {
   var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  if ((session.entries || []).length > 0) {
+    return (session.entries || []).reduce(function (sum, entry) {
+      return sum + stateLoggedSetCount(entry.sets || []);
+    }, 0);
+  }
   var explicit = Number(session.performedSetCount);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  return 0;
+}
+function stateSessionDetailScore() {
+  var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return (session.entries || []).reduce(function (sum, entry) {
-    return sum + stateLoggedSetCount(entry.sets || []);
+    return sum + (entry.sets || []).reduce(function (setSum, set) {
+      return setSum + (hasSetValue(set.repsNumber) || hasSetValue(set.reps) ? 20 : 0) + (hasSetValue(set.durationMinutes) || hasSetValue(set.duration) ? 20 : 0) + (hasSetValue(set.weight) ? 3 : 0) + (hasSetValue(set.rpe) ? 2 : 0) + (hasSetValue(set.note) ? 5 : 0);
+    }, 0);
   }, 0);
 }
 function stateSessionScore() {
   var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
-  return stateSessionSetCount(session) * 1000 + (session.entries || []).length * 10 + (session.status === "performed" ? 1 : 0);
+  return stateSessionSetCount(session) * 10000 + stateSessionDetailScore(session) * 10 + (session.entries || []).length + (session.status === "performed" ? 1 : 0);
 }
 function betterLoggedSession(current, candidate) {
   if (!current) return candidate;
   if (!candidate) return current;
+  var currentSets = stateSessionSetCount(current);
+  var candidateSets = stateSessionSetCount(candidate);
+  if (candidateSets !== currentSets) return candidateSets > currentSets ? candidate : current;
+  var currentTime = Date.parse(current.updatedAt || current.savedAt || current.createdAt || "") || 0;
+  var candidateTime = Date.parse(candidate.updatedAt || candidate.savedAt || candidate.createdAt || "") || 0;
+  if (candidateTime !== currentTime && currentTime && candidateTime) {
+    return candidateTime > currentTime ? candidate : current;
+  }
   var currentScore = stateSessionScore(current);
   var candidateScore = stateSessionScore(candidate);
   if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
-  var currentTime = Date.parse(current.updatedAt || current.savedAt || current.createdAt || "") || 0;
-  var candidateTime = Date.parse(candidate.updatedAt || candidate.savedAt || candidate.createdAt || "") || 0;
   return candidateTime > currentTime ? candidate : current;
 }
 function routineDaysForProfile() {
@@ -2021,6 +2044,70 @@ function planSetCount() {
       return set._edited || set._done === true || set._done === false || String((_set$weight = set.weight) !== null && _set$weight !== void 0 ? _set$weight : "").trim() !== "" || String((_set$reps = set.reps) !== null && _set$reps !== void 0 ? _set$reps : "").trim() !== "" || String((_set$duration = set.duration) !== null && _set$duration !== void 0 ? _set$duration : "").trim() !== "" || String((_set$rpe = set.rpe) !== null && _set$rpe !== void 0 ? _set$rpe : "").trim() !== "" || String((_set$note = set.note) !== null && _set$note !== void 0 ? _set$note : "").trim() !== "";
     }).length : 0);
   }, 0);
+}
+function planResultSetCount() {
+  var plan = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return Object.values(plan.setsByExercise || {}).reduce(function (sum, sets) {
+    return sum + (Array.isArray(sets) ? sets.filter(function (set) {
+      return hasSetValue(set.reps) || hasSetValue(set.duration) || hasSetValue(set.note);
+    }).length : 0);
+  }, 0);
+}
+function recordUpdatedMs() {
+  var record = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return Date.parse(record.updatedAt || record.savedAt || record.createdAt || "") || 0;
+}
+function planDataScore() {
+  var plan = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  return planResultSetCount(plan) * 10000 + planSetCount(plan) * 100 + Object.keys(plan.setsByExercise || {}).length * 10 + (plan.extraExercises || []).length + (plan.removedKeys || []).length;
+}
+function betterSessionPlan(current, candidate) {
+  if (!current) return candidate;
+  if (!candidate) return current;
+  var currentTime = recordUpdatedMs(current);
+  var candidateTime = recordUpdatedMs(candidate);
+  if (candidateTime !== currentTime && currentTime && candidateTime) {
+    return candidateTime > currentTime ? candidate : current;
+  }
+  var currentScore = planDataScore(current);
+  var candidateScore = planDataScore(candidate);
+  if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
+  if (candidateTime !== currentTime) return candidateTime > currentTime ? candidate : current;
+  return candidate;
+}
+function tombstoneUpdatedMs(value) {
+  if (typeof value !== "string") return 0;
+  return Date.parse(value) || 0;
+}
+function mergeSessionPlanTombstones() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var dates = new Set([].concat(_toConsumableArray(Object.keys(remote || {})), _toConsumableArray(Object.keys(local || {}))));
+  return Object.fromEntries(Array.from(dates).map(function (date) {
+    var remoteValue = remote === null || remote === void 0 ? void 0 : remote[date];
+    var localValue = local === null || local === void 0 ? void 0 : local[date];
+    return [date, tombstoneUpdatedMs(localValue) >= tombstoneUpdatedMs(remoteValue) ? localValue || remoteValue || true : remoteValue];
+  }));
+}
+function planIsDeleted(date) {
+  var plan = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var tombstones = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  var deletedAt = tombstoneUpdatedMs(tombstones === null || tombstones === void 0 ? void 0 : tombstones[date]);
+  if (!deletedAt) return false;
+  var planTime = recordUpdatedMs(plan);
+  return !planTime || deletedAt >= planTime;
+}
+function mergeSessionPlans() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var tombstones = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
+  var dates = new Set([].concat(_toConsumableArray(Object.keys(remote || {})), _toConsumableArray(Object.keys(local || {}))));
+  var merged = {};
+  dates.forEach(function (date) {
+    var plan = betterSessionPlan(remote === null || remote === void 0 ? void 0 : remote[date], local === null || local === void 0 ? void 0 : local[date]);
+    if (plan && !planIsDeleted(date, plan, tombstones)) merged[date] = plan;
+  });
+  return merged;
 }
 function planVisibleExerciseCount() {
   var _window$RepsData8, _window$RepsData8$day;
@@ -2061,18 +2148,28 @@ function bestLoggedSessionForPlan() {
 }
 function sanitizeProfileForPush() {
   var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var sessionPlanTombstones = _objectSpread({}, profile.sessionPlanTombstones || {});
   var nextPlans = {};
   for (var _i2 = 0, _Object$entries2 = Object.entries(profile.sessionPlansByDate || {}); _i2 < _Object$entries2.length; _i2++) {
     var _Object$entries2$_i = _slicedToArray(_Object$entries2[_i2], 2),
       date = _Object$entries2$_i[0],
       plan = _Object$entries2$_i[1];
+    if (planIsDeleted(date, plan, sessionPlanTombstones)) continue;
     var logged = bestLoggedSessionForPlan(profile, date, plan);
     if (logged) {
       var visibleExercises = planVisibleExerciseCount(plan, profile, date);
       var loggedExercises = (logged.entries || []).length;
-      var sets = planSetCount(plan);
       var loggedSets = stateSessionSetCount(logged);
-      if (visibleExercises < loggedExercises || sets < loggedSets) continue;
+      var resultSets = planResultSetCount(plan);
+      var planTime = recordUpdatedMs(plan);
+      var loggedTime = recordUpdatedMs(logged);
+      var loggedIsNewer = loggedTime && (!planTime || loggedTime >= planTime);
+      var loggedIsAtLeastAsComplete = loggedSets > resultSets || loggedSets === resultSets && visibleExercises <= loggedExercises;
+      if (loggedIsAtLeastAsComplete && loggedIsNewer) {
+        sessionPlanTombstones[date] = logged.updatedAt || logged.savedAt || logged.createdAt || new Date().toISOString();
+        continue;
+      }
+      if (visibleExercises < loggedExercises || resultSets < loggedSets) continue;
     }
     nextPlans[date] = plan;
   }
@@ -2087,7 +2184,8 @@ function sanitizeProfileForPush() {
     recipes: recipes,
     deletedRecipes: deletedRecipes,
     cookingPreferences: cookingPreferencesWithDefaults(profile.cookingPreferences || {}),
-    sessionPlansByDate: nextPlans
+    sessionPlansByDate: nextPlans,
+    sessionPlanTombstones: sessionPlanTombstones
   });
 }
 function sanitizeStateForPush() {
@@ -2184,7 +2282,8 @@ function mergeProfiles() {
   merged.recipes = mergeRecipes(remoteProfile.recipes || [], localProfile.recipes || [], merged.deletedRecipes);
   merged.cookingPreferences = cookingPreferencesWithDefaults(_objectSpread(_objectSpread({}, remoteProfile.cookingPreferences || {}), localProfile.cookingPreferences || {}));
   merged.dailyOverrides = _objectSpread(_objectSpread({}, remoteProfile.dailyOverrides || {}), localProfile.dailyOverrides || {});
-  merged.sessionPlansByDate = _objectSpread(_objectSpread({}, remoteProfile.sessionPlansByDate || {}), localProfile.sessionPlansByDate || {});
+  merged.sessionPlanTombstones = mergeSessionPlanTombstones(remoteProfile.sessionPlanTombstones || {}, localProfile.sessionPlanTombstones || {});
+  merged.sessionPlansByDate = mergeSessionPlans(remoteProfile.sessionPlansByDate || {}, localProfile.sessionPlansByDate || {}, merged.sessionPlanTombstones);
   merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
   merged.weightEntries = mergeByKey(remoteProfile.weightEntries || [], localProfile.weightEntries || [], function (item) {
     var _item$id;
@@ -2825,6 +2924,10 @@ function AppStateProvider(_ref11) {
     var _ref16 = patch || {},
       _clearSessionPlanDates = _ref16._clearSessionPlanDates,
       sessionPatch = _objectWithoutProperties(_ref16, _excluded);
+    var editedAt = sessionPatch.updatedAt || new Date().toISOString();
+    var stampedPatch = _objectSpread(_objectSpread({}, sessionPatch), {}, {
+      updatedAt: editedAt
+    });
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
@@ -2834,9 +2937,9 @@ function AppStateProvider(_ref11) {
             return x.id === id;
           });
           var previousEffectiveDate = ((_id = (p.sessionEdits || {})[id]) === null || _id === void 0 ? void 0 : _id.date) || (raw === null || raw === void 0 ? void 0 : raw.date);
-          var nextEffectiveDate = sessionPatch.date || previousEffectiveDate;
+          var nextEffectiveDate = stampedPatch.date || previousEffectiveDate;
           var previousPlannedDate = ((_id2 = (p.sessionEdits || {})[id]) === null || _id2 === void 0 ? void 0 : _id2.plannedDate) || (raw === null || raw === void 0 ? void 0 : raw.plannedDate);
-          var nextPlannedDate = sessionPatch.plannedDate || previousPlannedDate;
+          var nextPlannedDate = stampedPatch.plannedDate || previousPlannedDate;
           var datesToClear = new Set([raw === null || raw === void 0 ? void 0 : raw.date, previousEffectiveDate, nextEffectiveDate, previousPlannedDate, nextPlannedDate].concat(_toConsumableArray(_clearSessionPlanDates || [])).filter(Boolean));
           var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref17) {
             var _ref18 = _slicedToArray(_ref17, 1),
@@ -2844,8 +2947,11 @@ function AppStateProvider(_ref11) {
             return !datesToClear.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
-            sessionEdits: _objectSpread(_objectSpread({}, p.sessionEdits || {}), {}, _defineProperty({}, id, _objectSpread(_objectSpread({}, (p.sessionEdits || {})[id] || {}), sessionPatch))),
-            sessionPlansByDate: nextPlans
+            sessionEdits: _objectSpread(_objectSpread({}, p.sessionEdits || {}), {}, _defineProperty({}, id, _objectSpread(_objectSpread({}, (p.sessionEdits || {})[id] || {}), stampedPatch))),
+            sessionPlansByDate: nextPlans,
+            sessionPlanTombstones: _objectSpread(_objectSpread({}, p.sessionPlanTombstones || {}), Object.fromEntries(Array.from(datesToClear).map(function (date) {
+              return [date, editedAt];
+            })))
           });
         })
       });
@@ -2874,7 +2980,12 @@ function AppStateProvider(_ref11) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionPlansByDate: _objectSpread(_objectSpread({}, p.sessionPlansByDate || {}), {}, _defineProperty({}, date, _objectSpread(_objectSpread({}, (p.sessionPlansByDate || {})[date] || {}), stampedPatch)))
+            sessionPlansByDate: _objectSpread(_objectSpread({}, p.sessionPlansByDate || {}), {}, _defineProperty({}, date, _objectSpread(_objectSpread({}, (p.sessionPlansByDate || {})[date] || {}), stampedPatch))),
+            sessionPlanTombstones: Object.fromEntries(Object.entries(p.sessionPlanTombstones || {}).filter(function (_ref21) {
+              var _ref22 = _slicedToArray(_ref21, 1),
+                key = _ref22[0];
+              return key !== date;
+            }))
           }) : p;
         })
       });
@@ -2899,9 +3010,9 @@ function AppStateProvider(_ref11) {
           var current = (p.dailyOverrides || {})[date] || {};
           if (!field) {
             return _objectSpread(_objectSpread({}, p), {}, {
-              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref21) {
-                var _ref22 = _slicedToArray(_ref21, 1),
-                  k = _ref22[0];
+              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref23) {
+                var _ref24 = _slicedToArray(_ref23, 1),
+                  k = _ref24[0];
                 return k !== date;
               }))
             });
@@ -2949,15 +3060,17 @@ function AppStateProvider(_ref11) {
     });
   };
   var clearSessionPlan = function clearSessionPlan(date) {
+    var deletedAt = new Date().toISOString();
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref23) {
-              var _ref24 = _slicedToArray(_ref23, 1),
-                k = _ref24[0];
+            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref25) {
+              var _ref26 = _slicedToArray(_ref25, 1),
+                k = _ref26[0];
               return k !== date;
-            }))
+            })),
+            sessionPlanTombstones: _objectSpread(_objectSpread({}, p.sessionPlanTombstones || {}), {}, _defineProperty({}, date, deletedAt))
           }) : p;
         })
       });
@@ -3003,20 +3116,23 @@ function AppStateProvider(_ref11) {
             if (remove && existing.id) removedIds.add(existing.id);
             return !remove;
           });
-          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref25) {
-            var _ref26 = _slicedToArray(_ref25, 1),
-              id = _ref26[0];
+          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref27) {
+            var _ref28 = _slicedToArray(_ref27, 1),
+              id = _ref28[0];
             return !removedIds.has(id) && id !== stampedSession.id;
           }));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref27) {
-            var _ref28 = _slicedToArray(_ref27, 1),
-              date = _ref28[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref29) {
+            var _ref30 = _slicedToArray(_ref29, 1),
+              date = _ref30[0];
             return !clearDates.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
             loggedSessions: [stampedSession].concat(_toConsumableArray(keptSessions)),
             sessionEdits: nextEdits,
-            sessionPlansByDate: nextPlans
+            sessionPlansByDate: nextPlans,
+            sessionPlanTombstones: _objectSpread(_objectSpread({}, p.sessionPlanTombstones || {}), Object.fromEntries(Array.from(clearDates).map(function (date) {
+              return [date, stampedSession.updatedAt];
+            })))
           });
         })
       });
@@ -3063,9 +3179,9 @@ function AppStateProvider(_ref11) {
             recipes: [nextRecipe].concat(_toConsumableArray((p.recipes || []).filter(function (r) {
               return recipeIdentity(r) !== id;
             }))),
-            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref29) {
-              var _ref30 = _slicedToArray(_ref29, 1),
-                recipeId = _ref30[0];
+            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref31) {
+              var _ref32 = _slicedToArray(_ref31, 1),
+                recipeId = _ref32[0];
               return recipeId !== id;
             }))
           }) : p;
@@ -3146,9 +3262,9 @@ function AppStateProvider(_ref11) {
             recipes: Array.from(byId.values()).sort(function (a, b) {
               return String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
             }),
-            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref31) {
-              var _ref32 = _slicedToArray(_ref31, 1),
-                id = _ref32[0];
+            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref33) {
+              var _ref34 = _slicedToArray(_ref33, 1),
+                id = _ref34[0];
               return !importedIds.has(id);
             }))
           });
@@ -3945,16 +4061,19 @@ function averageKcalTarget(profile) {
 function loggedSetCount() {
   var sets = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
   return sets.filter(function (x) {
-    return x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null;
+    return x.repsNumber != null && String(x.repsNumber).trim() !== "" || x.reps != null && String(x.reps).trim() !== "" || x.durationMinutes || x.duration || x.note;
   }).length;
 }
 function sessionSetCount() {
   var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  if ((session.entries || []).length > 0) {
+    return (session.entries || []).reduce(function (sum, entry) {
+      return sum + loggedSetCount(entry.sets || []);
+    }, 0);
+  }
   var explicit = Number(session.performedSetCount);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
-  return (session.entries || []).reduce(function (sum, entry) {
-    return sum + loggedSetCount(entry.sets || []);
-  }, 0);
+  return 0;
 }
 function isPerformedSession() {
   var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -4568,9 +4687,12 @@ function Dashboard(_ref4) {
   }, "Sets"), React.createElement("th", {
     className: "num"
   }, "Status"))), React.createElement("tbody", null, recentPerformedSessions.map(function (s, i) {
-    var _top$sets;
-    var top = s.entries[0];
-    var topSet = top === null || top === void 0 || (_top$sets = top.sets) === null || _top$sets === void 0 ? void 0 : _top$sets[0];
+    var top = (s.entries || []).find(function (entry) {
+      return loggedSetCount(entry.sets || []) > 0;
+    }) || s.entries[0];
+    var topSet = ((top === null || top === void 0 ? void 0 : top.sets) || []).find(function (set) {
+      return loggedSetCount([set]) > 0;
+    });
     var topSetText = topSet !== null && topSet !== void 0 && topSet.durationMinutes || topSet !== null && topSet !== void 0 && topSet.duration ? "".concat(topSet.durationMinutes || topSet.duration, " min") : topSet ? "".concat(topSet.weight).concat(topSet.unit, " \xD7 ").concat(topSet.repsNumber || topSet.reps) : "";
     return React.createElement("tr", {
       key: i
@@ -4598,7 +4720,7 @@ function Dashboard(_ref4) {
       }
     }, topSetText))), React.createElement("td", {
       className: "num"
-    }, s.performedSetCount), React.createElement("td", {
+    }, sessionSetCount(s)), React.createElement("td", {
       className: "num"
     }, React.createElement("span", {
       className: "chip good"
@@ -5113,9 +5235,19 @@ function loggedSessionSetCount() {
   var session = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   return (session.entries || []).reduce(function (sum, entry) {
     return sum + (entry.sets || []).filter(function (set) {
-      return set.weight != null || set.repsNumber != null || set.reps != null || set.durationMinutes || set.duration || set.rpe || set.note;
+      return set.repsNumber != null || set.reps != null || set.durationMinutes || set.duration || set.note;
     }).length;
   }, 0);
+}
+function draftSetHasResult() {
+  var _set$reps4, _set$note3;
+  var set = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var durationMode = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+  if (durationMode) {
+    var _set$duration3, _set$note2;
+    return String((_set$duration3 = set.duration) !== null && _set$duration3 !== void 0 ? _set$duration3 : "").trim() !== "" || String((_set$note2 = set.note) !== null && _set$note2 !== void 0 ? _set$note2 : "").trim() !== "";
+  }
+  return String((_set$reps4 = set.reps) !== null && _set$reps4 !== void 0 ? _set$reps4 : "").trim() !== "" || String((_set$note3 = set.note) !== null && _set$note3 !== void 0 ? _set$note3 : "").trim() !== "";
 }
 function dateMs(value) {
   var ms = Date.parse(value || "");
@@ -5440,7 +5572,7 @@ function routineSessionMovedAwayFromDate() {
   });
 }
 function SetRow(_ref15) {
-  var _set$duration3;
+  var _set$duration4;
   var set = _ref15.set,
     idx = _ref15.idx,
     exercise = _ref15.exercise,
@@ -5552,7 +5684,7 @@ function SetRow(_ref15) {
     className: "sheet-actual-group"
   }, React.createElement("input", {
     className: "sheet-weight-input",
-    value: durationMode ? (_set$duration3 = set.duration) !== null && _set$duration3 !== void 0 ? _set$duration3 : "" : set.weight,
+    value: durationMode ? (_set$duration4 = set.duration) !== null && _set$duration4 !== void 0 ? _set$duration4 : "" : set.weight,
     placeholder: durationMode ? "min" : isBW ? "+kg" : "kg",
     "aria-label": "".concat(exercise.name, " set ").concat(idx, " ").concat(durationMode ? "minutes" : "weight"),
     onFocus: markEdited,
@@ -5920,6 +6052,7 @@ function LogView() {
     _useState34 = _slicedToArray(_useState33, 2),
     rulesExpanded = _useState34[0],
     setRulesExpanded = _useState34[1];
+  var skipNextPlanPersistRef = React.useRef(false);
   var currentWeekStart = window.RepsData.mondayOf(sessionDate);
   var selectedDayIndex = window.RepsData.weekdays.indexOf(selectedDay);
   var plannedDate = selectedDayIndex >= 0 ? window.RepsData.addDays(currentWeekStart, selectedDayIndex) : sessionDate;
@@ -6012,6 +6145,7 @@ function LogView() {
   };
   React.useEffect(function () {
     var _window$RepsData$norm7, _window$RepsData12;
+    skipNextPlanPersistRef.current = true;
     setHydratedPlanKey("");
     var existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     var movedAway = routineSessionMovedAwayFromDate(app.activeProfile, plannedDate, selectedDay);
@@ -6121,6 +6255,10 @@ function LogView() {
   }, [exerciseKeys, selectedDay, currentWeekStart]);
   React.useEffect(function () {
     if (hydratedPlanKey !== planHydrationKey) return;
+    if (skipNextPlanPersistRef.current) {
+      skipNextPlanPersistRef.current = false;
+      return;
+    }
     var customExerciseOrder = exerciseOrder.length > 0 && exerciseOrder.some(function (key, i) {
       return key !== baseExerciseKeys[i];
     });
@@ -6386,7 +6524,7 @@ function LogView() {
         var target = "".concat((_ex$sets = ex.sets) !== null && _ex$sets !== void 0 ? _ex$sets : "", " \xD7 ").concat((_ex$reps = ex.reps) !== null && _ex$reps !== void 0 ? _ex$reps : "").concat(ex.unit ? " \xB7 ".concat(ex.unit) : "");
         var skipLabel = (_model$skipKeys = model.skipKeys) !== null && _model$skipKeys !== void 0 && _model$skipKeys.has(ex._key) ? " · skip next" : "";
         setRows.forEach(function (set, i) {
-          var _lastEntry$sets2, _set$duration4, _set$weight3, _set$reps4, _set$reps5, _set$rpe2, _set$note2, _set$rpe3, _set$note3;
+          var _lastEntry$sets2, _set$duration5, _set$weight3, _set$reps5, _set$reps6, _set$rpe2, _set$note4, _set$rpe3, _set$note5;
           var first = i === 0;
           var edited = !!set._edited;
           var prefilled = !!set._prefilled && !edited;
@@ -6412,9 +6550,9 @@ function LogView() {
             color: c.muted
           });
           var lastValue = formatLastSetValue((lastEntry === null || lastEntry === void 0 || (_lastEntry$sets2 = lastEntry.sets) === null || _lastEntry$sets2 === void 0 ? void 0 : _lastEntry$sets2[i]) || null, durationMode);
-          var weightValue = durationMode ? (_set$duration4 = set.duration) !== null && _set$duration4 !== void 0 ? _set$duration4 : "" : (_set$weight3 = set.weight) !== null && _set$weight3 !== void 0 ? _set$weight3 : "";
+          var weightValue = durationMode ? (_set$duration5 = set.duration) !== null && _set$duration5 !== void 0 ? _set$duration5 : "" : (_set$weight3 = set.weight) !== null && _set$weight3 !== void 0 ? _set$weight3 : "";
           var unitValue = durationMode ? "min" : set.unit || "kg";
-          var repsValue = durationMode ? (_set$reps4 = set.reps) !== null && _set$reps4 !== void 0 ? _set$reps4 : "" : (_set$reps5 = set.reps) !== null && _set$reps5 !== void 0 ? _set$reps5 : "";
+          var repsValue = durationMode ? (_set$reps5 = set.reps) !== null && _set$reps5 !== void 0 ? _set$reps5 : "" : (_set$reps6 = set.reps) !== null && _set$reps6 !== void 0 ? _set$reps6 : "";
           var exerciseHtml = first ? ["<div style=\"".concat(attrEscape(inlineStyle({
             color: c.ink,
             "font-weight": "600",
@@ -6455,13 +6593,13 @@ function LogView() {
           }), clipboardCell((_set$rpe2 = set.rpe) !== null && _set$rpe2 !== void 0 ? _set$rpe2 : "", {
             base: baseCell,
             style: _objectSpread(_objectSpread({}, mono), inputStyle)
-          }), clipboardCell((_set$note2 = set.note) !== null && _set$note2 !== void 0 ? _set$note2 : "", {
+          }), clipboardCell((_set$note4 = set.note) !== null && _set$note4 !== void 0 ? _set$note4 : "", {
             base: baseCell,
             style: _objectSpread(_objectSpread({}, inputStyle), {}, {
               "font-family": '"Geist", Arial, sans-serif'
             })
           })].join(""), "</tr>"));
-          textRows.push([first ? "".concat(ex.name, " (").concat(ruleLabel(ex, progressionRules)).concat(skipLabel, ")") : "", first ? "".concat(target).concat(suggestion ? " | ".concat(suggestion.headline) : "") : "", lastValue, i + 1, weightValue, unitValue, repsValue, (_set$rpe3 = set.rpe) !== null && _set$rpe3 !== void 0 ? _set$rpe3 : "", (_set$note3 = set.note) !== null && _set$note3 !== void 0 ? _set$note3 : ""]);
+          textRows.push([first ? "".concat(ex.name, " (").concat(ruleLabel(ex, progressionRules)).concat(skipLabel, ")") : "", first ? "".concat(target).concat(suggestion ? " | ".concat(suggestion.headline) : "") : "", lastValue, i + 1, weightValue, unitValue, repsValue, (_set$rpe3 = set.rpe) !== null && _set$rpe3 !== void 0 ? _set$rpe3 : "", (_set$note5 = set.note) !== null && _set$note5 !== void 0 ? _set$note5 : ""]);
         });
         if (progressionNote) {
           var noteColor = (suggestion === null || suggestion === void 0 ? void 0 : suggestion.tone) === "good" ? c.good : (suggestion === null || suggestion === void 0 ? void 0 : suggestion.tone) === "warn" ? c.bad : c.ink2;
@@ -6535,7 +6673,7 @@ function LogView() {
     var entries = allExercises.map(function (ex) {
       var durationMode = isDurationExercise(ex);
       var sets = (setsByExercise[ex._key] || []).filter(function (s) {
-        return clipboardSetEntered(s, durationMode);
+        return clipboardSetEntered(s, durationMode) && draftSetHasResult(s, durationMode);
       });
       return {
         logKey: ex._key,
@@ -6808,7 +6946,7 @@ function LogView() {
     className: "chip good"
   }, "Session saved"), finishStatus === "empty" && React.createElement("span", {
     className: "chip warn"
-  }, "Add at least one set first"), copyState === "copied" && React.createElement("span", {
+  }, "Add reps, duration, or a note first"), copyState === "copied" && React.createElement("span", {
     className: "chip good"
   }, "Copied to Sheets"), copyState === "failed" && React.createElement("span", {
     className: "chip warn"
@@ -12437,7 +12575,7 @@ function SessionsView(_ref) {
     return true;
   });
   var totalSets = filtered.reduce(function (s, x) {
-    return s + (x.performedSetCount || 0);
+    return s + RepsData.sessionSetCount(x);
   }, 0);
   var totalVolume = filtered.reduce(function (sum, sess) {
     return sum + (sess.entries || []).reduce(function (s, e) {
@@ -12522,9 +12660,13 @@ function SessionsView(_ref) {
   }, "Sets"), React.createElement("th", {
     className: "num"
   }, "Volume"), React.createElement("th", null))), React.createElement("tbody", null, filtered.map(function (s, i) {
-    var _topEntry$sets, _RepsData$normalizeDa, _RepsData, _s$entries;
-    var topEntry = (s.entries || [])[0];
-    var topSet = topEntry === null || topEntry === void 0 || (_topEntry$sets = topEntry.sets) === null || _topEntry$sets === void 0 ? void 0 : _topEntry$sets[0];
+    var _RepsData$normalizeDa, _RepsData, _s$entries;
+    var topEntry = (s.entries || []).find(function (entry) {
+      return RepsData.loggedSetCount(entry.sets || []) > 0;
+    }) || (s.entries || [])[0];
+    var topSet = ((topEntry === null || topEntry === void 0 ? void 0 : topEntry.sets) || []).find(function (set) {
+      return RepsData.loggedSetCount([set]) > 0;
+    });
     var topSetText = topSet !== null && topSet !== void 0 && topSet.durationMinutes || topSet !== null && topSet !== void 0 && topSet.duration ? "".concat(topSet.durationMinutes || topSet.duration, " min") : topSet ? "".concat(topSet.weight).concat(topSet.unit, " \xD7 ").concat(topSet.repsNumber || topSet.reps) : "";
     var volume = (s.entries || []).reduce(function (sum, e) {
       return sum + (e.sets || []).reduce(function (a, x) {
@@ -12574,7 +12716,7 @@ function SessionsView(_ref) {
       className: "num"
     }, ((_s$entries = s.entries) === null || _s$entries === void 0 ? void 0 : _s$entries.length) || 0), React.createElement("td", {
       className: "num"
-    }, s.performedSetCount || 0), React.createElement("td", {
+    }, RepsData.sessionSetCount(s)), React.createElement("td", {
       className: "num mono"
     }, Math.round(volume).toLocaleString()), React.createElement("td", {
       className: "shrink",
@@ -12793,7 +12935,7 @@ function SessionEditModal(_ref2) {
   var save = function save() {
     var performedSetCount = entries.reduce(function (sum, e) {
       return sum + (e.sets || []).filter(function (s) {
-        return s.weight != null || s.repsNumber != null || s.reps != null || s.durationMinutes || s.duration || s.note;
+        return s.repsNumber != null || s.reps != null || s.durationMinutes || s.duration || s.note;
       }).length;
     }, 0);
     app.editSession(sessionId, {

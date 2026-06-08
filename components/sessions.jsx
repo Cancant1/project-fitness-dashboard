@@ -67,7 +67,7 @@ function SessionsView({ setView }) {
     return true;
   });
 
-  const totalSets = filtered.reduce((s, x) => s + (x.performedSetCount || 0), 0);
+  const totalSets = filtered.reduce((s, x) => s + RepsData.sessionSetCount(x), 0);
   const totalVolume = filtered.reduce((sum, sess) => {
     return sum + (sess.entries || []).reduce((s, e) => {
       return s + (e.sets || []).reduce((acc, x) => acc + ((x.weight || 0) * (x.repsNumber || x.reps || 0)), 0);
@@ -125,8 +125,8 @@ function SessionsView({ setView }) {
               </thead>
               <tbody>
                 {filtered.map((s, i) => {
-                  const topEntry = (s.entries || [])[0];
-                  const topSet = topEntry?.sets?.[0];
+                  const topEntry = (s.entries || []).find(entry => RepsData.loggedSetCount(entry.sets || []) > 0) || (s.entries || [])[0];
+                  const topSet = (topEntry?.sets || []).find(set => RepsData.loggedSetCount([set]) > 0);
                   const topSetText = topSet?.durationMinutes || topSet?.duration
                     ? `${topSet.durationMinutes || topSet.duration} min`
                     : topSet ? `${topSet.weight}${topSet.unit} × ${topSet.repsNumber || topSet.reps}` : "";
@@ -162,7 +162,7 @@ function SessionsView({ setView }) {
                         )}
                       </td>
                       <td className="num">{s.entries?.length || 0}</td>
-                      <td className="num">{s.performedSetCount || 0}</td>
+                      <td className="num">{RepsData.sessionSetCount(s)}</td>
                       <td className="num mono">{Math.round(volume).toLocaleString()}</td>
                       <td className="shrink" onClick={e => e.stopPropagation()}>
                         <div style={{display:"flex", gap:2}}>
@@ -315,7 +315,7 @@ function SessionEditModal({ sessionId, onClose }) {
 
   const save = () => {
     const performedSetCount = entries.reduce((sum, e) => sum + (e.sets || []).filter(s =>
-      s.weight != null || s.repsNumber != null || s.reps != null || s.durationMinutes || s.duration || s.note
+      s.repsNumber != null || s.reps != null || s.durationMinutes || s.duration || s.note
     ).length, 0);
     app.editSession(sessionId, {
       date,

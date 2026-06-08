@@ -41,13 +41,20 @@ function averageKcalTarget(profile, dates = []) {
 }
 
 function loggedSetCount(sets = []) {
-  return sets.filter(x => x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null).length;
+  return sets.filter(x =>
+    (x.repsNumber != null && String(x.repsNumber).trim() !== "") ||
+    (x.reps != null && String(x.reps).trim() !== "") ||
+    x.durationMinutes || x.duration || x.note
+  ).length;
 }
 
 function sessionSetCount(session = {}) {
+  if ((session.entries || []).length > 0) {
+    return (session.entries || []).reduce((sum, entry) => sum + loggedSetCount(entry.sets || []), 0);
+  }
   const explicit = Number(session.performedSetCount);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
-  return (session.entries || []).reduce((sum, entry) => sum + loggedSetCount(entry.sets || []), 0);
+  return 0;
 }
 
 function isPerformedSession(session = {}) {
@@ -422,8 +429,8 @@ function Dashboard({ setView }) {
               </thead>
               <tbody>
                 {recentPerformedSessions.map((s, i) => {
-                  const top = s.entries[0];
-                  const topSet = top?.sets?.[0];
+                  const top = (s.entries || []).find(entry => loggedSetCount(entry.sets || []) > 0) || s.entries[0];
+                  const topSet = (top?.sets || []).find(set => loggedSetCount([set]) > 0);
                   const topSetText = topSet?.durationMinutes || topSet?.duration
                     ? `${topSet.durationMinutes || topSet.duration} min`
                     : topSet ? `${topSet.weight}${topSet.unit} × ${topSet.repsNumber || topSet.reps}` : "";
@@ -440,7 +447,7 @@ function Dashboard({ setView }) {
                           {topSetText && <div className="mono" style={{fontSize:10, color:"var(--muted)"}}>{topSetText}</div>}
                         </>}
                       </td>
-                      <td className="num">{s.performedSetCount}</td>
+                      <td className="num">{sessionSetCount(s)}</td>
                       <td className="num"><span className="chip good">done</span></td>
                     </tr>
                   );

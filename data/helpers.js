@@ -118,16 +118,23 @@
     };
   }
 
+  function loggedSetHasResult(set = {}) {
+    return (set.repsNumber != null && String(set.repsNumber).trim() !== "") ||
+      (set.reps != null && String(set.reps).trim() !== "") ||
+      set.durationMinutes || set.duration || set.note;
+  }
+
   function loggedSetCount(sets = []) {
-    return (sets || []).filter(x =>
-      x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null
-    ).length;
+    return (sets || []).filter(loggedSetHasResult).length;
   }
 
   function sessionSetCount(session = {}) {
+    if ((session.entries || []).length > 0) {
+      return (session.entries || []).reduce((sum, entry) => sum + loggedSetCount(entry.sets || []), 0);
+    }
     const explicit = Number(session.performedSetCount);
     if (Number.isFinite(explicit) && explicit > 0) return explicit;
-    return (session.entries || []).reduce((sum, entry) => sum + loggedSetCount(entry.sets || []), 0);
+    return 0;
   }
 
   function sessionUpdatedMs(session = {}) {
@@ -137,17 +144,31 @@
 
   function sessionDataScore(session = {}) {
     const performed = session.status === "performed" ? 1 : 0;
-    return (sessionSetCount(session) * 1000) + (((session.entries || []).length) * 10) + performed;
+    const detail = (session.entries || []).reduce((sum, entry) =>
+      sum + (entry.sets || []).reduce((setSum, set) =>
+        setSum +
+        (set.repsNumber != null || set.reps != null ? 20 : 0) +
+        (set.durationMinutes || set.duration ? 20 : 0) +
+        (set.weight != null ? 3 : 0) +
+        (set.rpe ? 2 : 0) +
+        (set.note ? 5 : 0), 0), 0);
+    return (sessionSetCount(session) * 10000) + (detail * 10) + ((session.entries || []).length) + performed;
   }
 
   function betterSession(current, candidate) {
     if (!current) return candidate;
     if (!candidate) return current;
+    const currentSets = sessionSetCount(current);
+    const candidateSets = sessionSetCount(candidate);
+    if (candidateSets !== currentSets) return candidateSets > currentSets ? candidate : current;
+    const currentTime = sessionUpdatedMs(current);
+    const candidateTime = sessionUpdatedMs(candidate);
+    if (candidateTime !== currentTime && currentTime && candidateTime) {
+      return candidateTime > currentTime ? candidate : current;
+    }
     const currentScore = sessionDataScore(current);
     const candidateScore = sessionDataScore(candidate);
     if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
-    const currentTime = sessionUpdatedMs(current);
-    const candidateTime = sessionUpdatedMs(candidate);
     if (candidateTime !== currentTime) return candidateTime > currentTime ? candidate : current;
     return current;
   }
@@ -256,11 +277,11 @@
           custom: false
         });
         if (!row) continue;
-        const performed = (e.sets || []).filter(x => x.repsNumber || x.reps || x.durationMinutes || x.duration).length;
+        const performed = (e.sets || []).filter(loggedSetHasResult).length;
         row.sets += performed;
         if (!row.lastDate || s.date > row.lastDate) {
           row.lastDate = s.date;
-          const lastSet = (e.sets || []).filter(x => x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null).slice(-1)[0];
+          const lastSet = (e.sets || []).filter(loggedSetHasResult).slice(-1)[0];
           if (lastSet) {
             row.lastWeight = lastSet.weight;
             row.lastUnit = lastSet.unit || row.unit;
@@ -481,7 +502,7 @@
       const s = sessions[i];
       const e = s.entries.find(x => x.exercise === name && useEntryForProgression(s, x));
       if (e) {
-        const set = (e.sets || []).filter(s => s.repsNumber || s.reps || s.durationMinutes || s.duration).slice(-1)[0];
+        const set = (e.sets || []).filter(loggedSetHasResult).slice(-1)[0];
         return {
           date: s.date,
           weight: set?.weight,
@@ -502,9 +523,7 @@
     for (const s of allSessions()) {
       const entry = (s.entries || []).find(e => e.exercise === target);
       if (!entry) continue;
-      const sets = (entry.sets || []).filter(x =>
-        x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null
-      ).length;
+      const sets = (entry.sets || []).filter(loggedSetHasResult).length;
       if (!sets) continue;
       const week = s.weekStart || mondayOf(s.date);
       byWeek[week] = (byWeek[week] || 0) + sets;
@@ -532,9 +551,7 @@
   }
 
   function entrySnapshot(session, entry, beforeDate, matchLevel = "exercise", allowProgression = true) {
-    const rawSets = (entry.sets || []).filter(x =>
-      x.repsNumber || x.reps || x.durationMinutes || x.duration || x.weight != null
-    );
+    const rawSets = (entry.sets || []).filter(loggedSetHasResult);
     if (!rawSets.length) return null;
     return {
       date: session.date,

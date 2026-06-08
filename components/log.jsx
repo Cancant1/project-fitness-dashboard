@@ -396,14 +396,21 @@ function savedPlanVisibleExerciseCount(plan = {}, plannedExercises = [], routine
 function loggedSessionSetCount(session = {}) {
   return (session.entries || []).reduce((sum, entry) =>
     sum + (entry.sets || []).filter(set =>
-      set.weight != null ||
       set.repsNumber != null ||
       set.reps != null ||
       set.durationMinutes ||
       set.duration ||
-      set.rpe ||
       set.note
     ).length, 0);
+}
+
+function draftSetHasResult(set = {}, durationMode = false) {
+  if (durationMode) {
+    return String(set.duration ?? "").trim() !== "" ||
+      String(set.note ?? "").trim() !== "";
+  }
+  return String(set.reps ?? "").trim() !== "" ||
+    String(set.note ?? "").trim() !== "";
 }
 
 function dateMs(value) {
@@ -1001,6 +1008,7 @@ function LogView() {
   const [newExRule, setNewExRule] = useState("hypertrophy");
   const [hydratedPlanKey, setHydratedPlanKey] = useState("");
   const [rulesExpanded, setRulesExpanded] = useState(false);
+  const skipNextPlanPersistRef = React.useRef(false);
 
   // The Monday of the week containing the selected date — used for week navigation
   const currentWeekStart = window.RepsData.mondayOf(sessionDate);
@@ -1075,6 +1083,7 @@ function LogView() {
 
   // Hydrate from persisted per-date plan + any logged session at this date
   React.useEffect(() => {
+    skipNextPlanPersistRef.current = true;
     setHydratedPlanKey("");
     const existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     const movedAway = routineSessionMovedAwayFromDate(app.activeProfile, plannedDate, selectedDay);
@@ -1155,6 +1164,10 @@ function LogView() {
   // Persist plan adjustments to the profile whenever they change
   React.useEffect(() => {
     if (hydratedPlanKey !== planHydrationKey) return;
+    if (skipNextPlanPersistRef.current) {
+      skipNextPlanPersistRef.current = false;
+      return;
+    }
     const customExerciseOrder = exerciseOrder.length > 0 &&
       exerciseOrder.some((key, i) => key !== baseExerciseKeys[i]);
     const hasTouchedSet = Object.values(setsByExercise).some(arr =>
@@ -1501,7 +1514,9 @@ function LogView() {
     // Build entries from current state
     const entries = allExercises.map(ex => {
       const durationMode = isDurationExercise(ex);
-      const sets = (setsByExercise[ex._key] || []).filter(s => clipboardSetEntered(s, durationMode));
+      const sets = (setsByExercise[ex._key] || []).filter(s =>
+        clipboardSetEntered(s, durationMode) && draftSetHasResult(s, durationMode)
+      );
       return {
         logKey: ex._key,
         exercise: ex.name,
@@ -1738,7 +1753,7 @@ function LogView() {
           <div className="log-status-chips">
             {sessionFinished && <span className="chip good"><span className="dot ok"></span>Finished</span>}
             {finishStatus === "saved" && <span className="chip good">Session saved</span>}
-            {finishStatus === "empty" && <span className="chip warn">Add at least one set first</span>}
+            {finishStatus === "empty" && <span className="chip warn">Add reps, duration, or a note first</span>}
             {copyState === "copied" && <span className="chip good">Copied to Sheets</span>}
             {copyState === "failed" && <span className="chip warn">Copy failed</span>}
           </div>

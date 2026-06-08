@@ -1039,6 +1039,9 @@ function migrateProfile(p) {
     // Per-date Log adjustments (persisted overrides on the planned routine):
     //   sessionPlansByDate["2026-05-22"] = { extraExercises, removedKeys, setsByExercise, rpe, notes, status }
     sessionPlansByDate: p.sessionPlansByDate || {},
+    // Sync tombstones prevent a finished/reset draft from being resurrected by
+    // another device that still has the older plan.
+    sessionPlanTombstones: p.sessionPlanTombstones || {},
     // Manual entries that override the derived Daily Log values in Body:
     //   dailyOverrides["2026-05-22"] = { weight?: number|null, kcal?: number|null, protein?: number|null, note?: string }
     // A null field is an explicit blank/unlogged marker that prevents fallback to older sources.
@@ -1280,38 +1283,63 @@ function sameLoggedSessionSlot(a = {}, b = {}) {
   return false;
 }
 
+function hasSetValue(value) {
+  return value !== undefined && value !== null && String(value).trim() !== "";
+}
+
+function stateSetHasResult(set = {}) {
+  return hasSetValue(set.repsNumber) ||
+    hasSetValue(set.reps) ||
+    hasSetValue(set.durationMinutes) ||
+    hasSetValue(set.duration) ||
+    hasSetValue(set.note);
+}
+
 function stateLoggedSetCount(sets = []) {
-  return (sets || []).filter(set =>
-    set.weight != null ||
-    set.repsNumber != null ||
-    set.reps != null ||
-    set.durationMinutes ||
-    set.duration ||
-    set.rpe ||
-    set.note
-  ).length;
+  return (sets || []).filter(stateSetHasResult).length;
 }
 
 function stateSessionSetCount(session = {}) {
+  if ((session.entries || []).length > 0) {
+    return (session.entries || []).reduce((sum, entry) => sum + stateLoggedSetCount(entry.sets || []), 0);
+  }
   const explicit = Number(session.performedSetCount);
   if (Number.isFinite(explicit) && explicit > 0) return explicit;
-  return (session.entries || []).reduce((sum, entry) => sum + stateLoggedSetCount(entry.sets || []), 0);
+  return 0;
+}
+
+function stateSessionDetailScore(session = {}) {
+  return (session.entries || []).reduce((sum, entry) =>
+    sum + (entry.sets || []).reduce((setSum, set) =>
+      setSum +
+      (hasSetValue(set.repsNumber) || hasSetValue(set.reps) ? 20 : 0) +
+      (hasSetValue(set.durationMinutes) || hasSetValue(set.duration) ? 20 : 0) +
+      (hasSetValue(set.weight) ? 3 : 0) +
+      (hasSetValue(set.rpe) ? 2 : 0) +
+      (hasSetValue(set.note) ? 5 : 0), 0), 0);
 }
 
 function stateSessionScore(session = {}) {
-  return (stateSessionSetCount(session) * 1000) +
-    (((session.entries || []).length) * 10) +
+  return (stateSessionSetCount(session) * 10000) +
+    (stateSessionDetailScore(session) * 10) +
+    ((session.entries || []).length) +
     (session.status === "performed" ? 1 : 0);
 }
 
 function betterLoggedSession(current, candidate) {
   if (!current) return candidate;
   if (!candidate) return current;
+  const currentSets = stateSessionSetCount(current);
+  const candidateSets = stateSessionSetCount(candidate);
+  if (candidateSets !== currentSets) return candidateSets > currentSets ? candidate : current;
+  const currentTime = Date.parse(current.updatedAt || current.savedAt || current.createdAt || "") || 0;
+  const candidateTime = Date.parse(candidate.updatedAt || candidate.savedAt || candidate.createdAt || "") || 0;
+  if (candidateTime !== currentTime && currentTime && candidateTime) {
+    return candidateTime > currentTime ? candidate : current;
+  }
   const currentScore = stateSessionScore(current);
   const candidateScore = stateSessionScore(candidate);
   if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
-  const currentTime = Date.parse(current.updatedAt || current.savedAt || current.createdAt || "") || 0;
-  const candidateTime = Date.parse(candidate.updatedAt || candidate.savedAt || candidate.createdAt || "") || 0;
   return candidateTime > currentTime ? candidate : current;
 }
 
@@ -1340,6 +1368,78 @@ function planSetCount(plan = {}) {
     ).length : 0), 0);
 }
 
+function planResultSetCount(plan = {}) {
+  return Object.values(plan.setsByExercise || {}).reduce((sum, sets) =>
+    sum + (Array.isArray(sets) ? sets.filter(set =>
+      hasSetValue(set.reps) ||
+      hasSetValue(set.duration) ||
+      hasSetValue(set.note)
+    ).length : 0), 0);
+}
+
+function recordUpdatedMs(record = {}) {
+  return Date.parse(record.updatedAt || record.savedAt || record.createdAt || "") || 0;
+}
+
+function planDataScore(plan = {}) {
+  return (planResultSetCount(plan) * 10000) +
+    (planSetCount(plan) * 100) +
+    (Object.keys(plan.setsByExercise || {}).length * 10) +
+    ((plan.extraExercises || []).length) +
+    ((plan.removedKeys || []).length);
+}
+
+function betterSessionPlan(current, candidate) {
+  if (!current) return candidate;
+  if (!candidate) return current;
+  const currentTime = recordUpdatedMs(current);
+  const candidateTime = recordUpdatedMs(candidate);
+  if (candidateTime !== currentTime && currentTime && candidateTime) {
+    return candidateTime > currentTime ? candidate : current;
+  }
+  const currentScore = planDataScore(current);
+  const candidateScore = planDataScore(candidate);
+  if (candidateScore !== currentScore) return candidateScore > currentScore ? candidate : current;
+  if (candidateTime !== currentTime) return candidateTime > currentTime ? candidate : current;
+  return candidate;
+}
+
+function tombstoneUpdatedMs(value) {
+  if (typeof value !== "string") return 0;
+  return Date.parse(value) || 0;
+}
+
+function mergeSessionPlanTombstones(remote = {}, local = {}) {
+  const dates = new Set([...Object.keys(remote || {}), ...Object.keys(local || {})]);
+  return Object.fromEntries(Array.from(dates).map(date => {
+    const remoteValue = remote?.[date];
+    const localValue = local?.[date];
+    return [
+      date,
+      tombstoneUpdatedMs(localValue) >= tombstoneUpdatedMs(remoteValue)
+        ? (localValue || remoteValue || true)
+        : remoteValue
+    ];
+  }));
+}
+
+function planIsDeleted(date, plan = {}, tombstones = {}) {
+  const deletedAt = tombstoneUpdatedMs(tombstones?.[date]);
+  if (!deletedAt) return false;
+  const planTime = recordUpdatedMs(plan);
+  return !planTime || deletedAt >= planTime;
+}
+
+function mergeSessionPlans(remote = {}, local = {}, tombstones = {}) {
+  const dates = new Set([...Object.keys(remote || {}), ...Object.keys(local || {})]);
+  const merged = {};
+  dates.forEach(date => {
+    const plan = betterSessionPlan(remote?.[date], local?.[date]);
+    if (plan && !planIsDeleted(date, plan, tombstones)) merged[date] = plan;
+  });
+  return merged;
+}
+
 function planVisibleExerciseCount(plan = {}, profile = {}, date = "") {
   const routineDay = normalizeSessionDay(plan.routineDay) || (date ? window.RepsData?.dayName?.(date) : null) || "";
   const removed = new Set(plan.removedKeys || []);
@@ -1365,15 +1465,27 @@ function bestLoggedSessionForPlan(profile = {}, date = "", plan = {}) {
 }
 
 function sanitizeProfileForPush(profile = {}) {
+  const sessionPlanTombstones = { ...(profile.sessionPlanTombstones || {}) };
   const nextPlans = {};
   for (const [date, plan] of Object.entries(profile.sessionPlansByDate || {})) {
+    if (planIsDeleted(date, plan, sessionPlanTombstones)) continue;
     const logged = bestLoggedSessionForPlan(profile, date, plan);
     if (logged) {
       const visibleExercises = planVisibleExerciseCount(plan, profile, date);
       const loggedExercises = (logged.entries || []).length;
-      const sets = planSetCount(plan);
       const loggedSets = stateSessionSetCount(logged);
-      if (visibleExercises < loggedExercises || sets < loggedSets) continue;
+      const resultSets = planResultSetCount(plan);
+      const planTime = recordUpdatedMs(plan);
+      const loggedTime = recordUpdatedMs(logged);
+      const loggedIsNewer = loggedTime && (!planTime || loggedTime >= planTime);
+      const loggedIsAtLeastAsComplete =
+        loggedSets > resultSets ||
+        (loggedSets === resultSets && visibleExercises <= loggedExercises);
+      if (loggedIsAtLeastAsComplete && loggedIsNewer) {
+        sessionPlanTombstones[date] = logged.updatedAt || logged.savedAt || logged.createdAt || new Date().toISOString();
+        continue;
+      }
+      if (visibleExercises < loggedExercises || resultSets < loggedSets) continue;
     }
     nextPlans[date] = plan;
   }
@@ -1388,7 +1500,8 @@ function sanitizeProfileForPush(profile = {}) {
     recipes,
     deletedRecipes,
     cookingPreferences: cookingPreferencesWithDefaults(profile.cookingPreferences || {}),
-    sessionPlansByDate: nextPlans
+    sessionPlansByDate: nextPlans,
+    sessionPlanTombstones
   };
 }
 
@@ -1477,7 +1590,15 @@ function mergeProfiles(remoteProfile = {}, localProfile = {}) {
     ...(localProfile.cookingPreferences || {})
   });
   merged.dailyOverrides = { ...(remoteProfile.dailyOverrides || {}), ...(localProfile.dailyOverrides || {}) };
-  merged.sessionPlansByDate = { ...(remoteProfile.sessionPlansByDate || {}), ...(localProfile.sessionPlansByDate || {}) };
+  merged.sessionPlanTombstones = mergeSessionPlanTombstones(
+    remoteProfile.sessionPlanTombstones || {},
+    localProfile.sessionPlanTombstones || {}
+  );
+  merged.sessionPlansByDate = mergeSessionPlans(
+    remoteProfile.sessionPlansByDate || {},
+    localProfile.sessionPlansByDate || {},
+    merged.sessionPlanTombstones
+  );
   merged.loggedSessions = mergeLoggedSessions(remoteProfile.loggedSessions || [], localProfile.loggedSessions || []);
   merged.weightEntries = mergeByKey(remoteProfile.weightEntries || [], localProfile.weightEntries || [], item =>
     String(item.id ?? `${item.date}:${item.weight}:${item.note || ""}`)
@@ -1901,15 +2022,17 @@ function AppStateProvider({ children }) {
 
   const editSession = (id, patch) => {
     const { _clearSessionPlanDates, ...sessionPatch } = patch || {};
+    const editedAt = sessionPatch.updatedAt || new Date().toISOString();
+    const stampedPatch = { ...sessionPatch, updatedAt: editedAt };
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => {
         if (p.id !== s.activeProfileId) return p;
         const raw = (p.loggedSessions || []).find(x => x.id === id);
         const previousEffectiveDate = (p.sessionEdits || {})[id]?.date || raw?.date;
-        const nextEffectiveDate = sessionPatch.date || previousEffectiveDate;
+        const nextEffectiveDate = stampedPatch.date || previousEffectiveDate;
         const previousPlannedDate = (p.sessionEdits || {})[id]?.plannedDate || raw?.plannedDate;
-        const nextPlannedDate = sessionPatch.plannedDate || previousPlannedDate;
+        const nextPlannedDate = stampedPatch.plannedDate || previousPlannedDate;
         const datesToClear = new Set([
           raw?.date,
           previousEffectiveDate,
@@ -1925,9 +2048,13 @@ function AppStateProvider({ children }) {
           ...p,
           sessionEdits: {
             ...(p.sessionEdits || {}),
-            [id]: { ...((p.sessionEdits || {})[id] || {}), ...sessionPatch }
+            [id]: { ...((p.sessionEdits || {})[id] || {}), ...stampedPatch }
           },
-          sessionPlansByDate: nextPlans
+          sessionPlansByDate: nextPlans,
+          sessionPlanTombstones: {
+            ...(p.sessionPlanTombstones || {}),
+            ...Object.fromEntries(Array.from(datesToClear).map(date => [date, editedAt]))
+          }
         };
       })
     }));
@@ -1953,7 +2080,10 @@ function AppStateProvider({ children }) {
         sessionPlansByDate: {
           ...(p.sessionPlansByDate || {}),
           [date]: { ...((p.sessionPlansByDate || {})[date] || {}), ...stampedPatch }
-        }
+        },
+        sessionPlanTombstones: Object.fromEntries(
+          Object.entries(p.sessionPlanTombstones || {}).filter(([key]) => key !== date)
+        )
       } : p)
     }));
   };
@@ -2026,13 +2156,18 @@ function AppStateProvider({ children }) {
   };
 
   const clearSessionPlan = (date) => {
+    const deletedAt = new Date().toISOString();
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
         ...p,
         sessionPlansByDate: Object.fromEntries(
           Object.entries(p.sessionPlansByDate || {}).filter(([k]) => k !== date)
-        )
+        ),
+        sessionPlanTombstones: {
+          ...(p.sessionPlanTombstones || {}),
+          [date]: deletedAt
+        }
       } : p)
     }));
   };
@@ -2087,7 +2222,11 @@ function AppStateProvider({ children }) {
           ...p,
           loggedSessions: [stampedSession, ...keptSessions],
           sessionEdits: nextEdits,
-          sessionPlansByDate: nextPlans
+          sessionPlansByDate: nextPlans,
+          sessionPlanTombstones: {
+            ...(p.sessionPlanTombstones || {}),
+            ...Object.fromEntries(Array.from(clearDates).map(date => [date, stampedSession.updatedAt]))
+          }
         };
       })
     }));
