@@ -653,11 +653,10 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
   const [qSaveToLog, setQSaveToLog] = useS(false); // save as custom food item
 
   const hidden = activeProfile?.hiddenFoodItems || [];
-  const items = allFoodCatalogItems(activeProfile, RepsData.foodItems);
-  const hiddenKeys = new Set(hidden.map(foodProductKey));
+  const items = allFoodCatalogItems(activeProfile, RepsData.foodItems, { includeHidden: true });
   const dateLabel = targetDate ? RepsData.shortDate(targetDate) : "selected date";
   const filtered = items.filter(f => {
-    if (!showHidden && hiddenKeys.has(foodProductKey(f.product))) return false;
+    if (!showHidden && f._hidden) return false;
     if (q && !f.product.toLowerCase().includes(q.toLowerCase()) && !(f.category || "").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
@@ -672,10 +671,11 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
     return Array.from(map.entries());
   }, [filtered]);
 
-  const hideItem = (productName, ev) => {
+  const hideItem = (item, ev) => {
     ev?.stopPropagation();
-    updateProfile?.(activeProfile.id, { hiddenFoodItems: [...new Set([...hidden, productName])] });
-    if (picked?.product === productName) setPicked(null);
+    const key = item?._catalogKey || foodProductKey(item?.product);
+    updateProfile?.(activeProfile.id, { hiddenFoodItems: [...new Set([...hidden, key])] });
+    if (picked?._catalogKey === key) setPicked(null);
   };
 
   const submitCatalog = () => {
@@ -685,7 +685,8 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
       amount: Number(amount) || 1,
       kcal: Math.round(picked.kcalPerUnit * (Number(amount) || 1)),
       protein: Math.round(picked.proteinPerUnit * (Number(amount) || 1) * 10) / 10,
-      carbs: 0, fat: 0
+      carbs: Math.round((picked.carbs || 0) * (Number(amount) || 1) * 10) / 10,
+      fat: Math.round((picked.fat || 0) * (Number(amount) || 1) * 10) / 10
     });
     onClose();
   };
@@ -756,7 +757,7 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
                       <span>{cat}</span><span style={{color:"var(--faint)"}}>{list.length}</span>
                     </div>
                     {list.map((f, i) => {
-                      const isHidden = hiddenKeys.has(foodProductKey(f.product));
+                      const isHidden = !!f._hidden;
                       return (
                         <div key={f.product + "-" + i} onClick={() => setPicked(f)}
                           style={{display:"grid", gridTemplateColumns:"1fr auto auto auto", gap:10, alignItems:"center", padding:"5px 14px", cursor:"pointer", background:picked?.product === f.product ? "var(--accent-soft)" : "transparent", borderBottom:"1px solid var(--hairline)", opacity:isHidden ? 0.5 : 1}}>
@@ -770,7 +771,19 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
                           <div className="mono" style={{fontSize:11}}>{Math.round(f.kcalPerUnit)}k</div>
                           <div className="mono" style={{fontSize:11, color:"var(--good)", minWidth:36, textAlign:"right"}}>{f.proteinPerUnit}p</div>
                           <button className="btn ghost icon-only" style={{width:22, height:22}} title={isHidden ? "Restore" : "Hide from catalog"}
-                            onClick={(ev) => { ev.stopPropagation(); if (isHidden) { updateProfile?.(activeProfile.id, { hiddenFoodItems: hidden.filter(n => n !== f.product) }); } else { hideItem(f.product, ev); } }}>
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              if (isHidden) {
+                                updateProfile?.(activeProfile.id, {
+                                  hiddenFoodItems: hidden.filter(n => {
+                                    const key = foodProductKey(n);
+                                    return key !== f._catalogKey && key !== foodProductKey(f.product);
+                                  })
+                                });
+                              } else {
+                                hideItem(f, ev);
+                              }
+                            }}>
                             <VI.X />
                           </button>
                         </div>
@@ -785,7 +798,9 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
                 <div style={{display:"flex", alignItems:"center", gap:10}}>
                   <div style={{flex:1, minWidth:0}}>
                     <div style={{fontWeight:500, fontSize:"var(--t-sm)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{picked.product}</div>
-                    <div className="mono muted" style={{fontSize:10}}>per unit · {Math.round(picked.kcalPerUnit)} kcal · {picked.proteinPerUnit}g protein</div>
+                    <div className="mono muted" style={{fontSize:10}}>
+                      per unit · {Math.round(picked.kcalPerUnit)} kcal · {picked.proteinPerUnit}g protein · {picked.carbs || 0}g carbs · {picked.fat || 0}g fat
+                    </div>
                   </div>
                   <input type="number" min="0.25" step="0.25" value={amount} onChange={e => setAmount(e.target.value)}
                     style={{width:64, height:30, padding:"0 8px", border:"var(--hair)", borderRadius:"var(--r-sm)", background:"var(--surface)", textAlign:"right", fontFamily:"var(--font-mono)"}} />
@@ -884,6 +899,289 @@ function NewCatalogEntryForm({ onSave, onCancel }) {
       <div style={{marginTop:"auto", display:"flex", justifyContent:"flex-end", gap:8}}>
         <button className="btn ghost sm" onClick={onCancel}>Cancel</button>
         <button className="btn primary sm" onClick={submit} disabled={!name.trim() || !kcal}><VI.Plus /> Save to catalog</button>
+      </div>
+    </div>
+  );
+}
+
+function FoodLibraryModal({ activeProfile, updateProfile, catalogItems, onClose }) {
+  const makeRows = () => allFoodCatalogItems(activeProfile, catalogItems, { includeHidden: true }).map((item, index) => ({
+    ...item,
+    _rowId: item._catalogKey || `food-row-${index}`,
+    visible: !item._hidden
+  }));
+  const [rows, setRows] = useS(makeRows);
+  const [query, setQuery] = useS("");
+  const [category, setCategory] = useS("all");
+  const [showHidden, setShowHidden] = useS(true);
+  const [dragKey, setDragKey] = useS(null);
+  const [error, setError] = useS("");
+
+  useE(() => {
+    const onKey = (event) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = oldOverflow;
+    };
+  }, []);
+
+  const categories = Array.from(new Set(rows.map(row => row.category || "Other"))).sort((a, b) => a.localeCompare(b));
+  const visibleRows = rows.filter(row => {
+    if (!showHidden && !row.visible) return false;
+    if (category !== "all" && (row.category || "Other") !== category) return false;
+    const haystack = `${row.product || ""} ${row.category || ""} ${row.sourceLabel || ""}`.toLowerCase();
+    return !query.trim() || haystack.includes(query.trim().toLowerCase());
+  });
+  const updateRow = (rowId, patch) => {
+    setRows(current => current.map(row => row._rowId === rowId ? { ...row, ...patch } : row));
+    setError("");
+  };
+  const moveRow = (rowId, delta) => {
+    setRows(current => {
+      const index = current.findIndex(row => row._rowId === rowId);
+      const nextIndex = index + delta;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      const [moved] = next.splice(index, 1);
+      next.splice(nextIndex, 0, moved);
+      return next;
+    });
+  };
+  const dropRow = (targetKey) => {
+    if (!dragKey || dragKey === targetKey) return setDragKey(null);
+    setRows(current => {
+      const from = current.findIndex(row => row._rowId === dragKey);
+      const to = current.findIndex(row => row._rowId === targetKey);
+      if (from < 0 || to < 0) return current;
+      const next = [...current];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setDragKey(null);
+  };
+  const addRow = () => {
+    const stamp = Date.now().toString(36);
+    const row = {
+      _rowId: `new-${stamp}`,
+      _catalogKey: `new-${stamp}`,
+      _sourceType: "new",
+      id: `food-${stamp}`,
+      product: "New food",
+      category: "Custom",
+      kcalPerUnit: 0,
+      proteinPerUnit: 0,
+      carbs: 0,
+      fat: 0,
+      visible: true,
+      macroSource: "manual",
+      sourceLabel: "manual"
+    };
+    setRows(current => [row, ...current]);
+    setQuery("");
+    setCategory("all");
+    setShowHidden(true);
+  };
+  const removeCustomRow = (rowId) => {
+    setRows(current => current.filter(row => row._rowId !== rowId));
+  };
+  const save = () => {
+    const cleaned = rows.map(row => ({
+      ...row,
+      product: String(row.product || "").trim(),
+      category: String(row.category || "Other").trim() || "Other",
+      kcalPerUnit: Math.max(0, Number(row.kcalPerUnit) || 0),
+      proteinPerUnit: Math.max(0, Number(row.proteinPerUnit) || 0),
+      carbs: Math.max(0, Number(row.carbs) || 0),
+      fat: Math.max(0, Number(row.fat) || 0)
+    }));
+    if (cleaned.some(row => !row.product)) {
+      setError("Every food needs a name.");
+      return;
+    }
+    const productKeys = cleaned.map(row => foodProductKey(row.product));
+    if (new Set(productKeys).size !== productKeys.length) {
+      setError("Food names must be unique.");
+      return;
+    }
+
+    const foodCatalogOverrides = {};
+    const customFoodItems = [];
+    const hiddenFoodItems = [];
+    const foodCatalogOrder = [];
+    const savedRowsByKey = new Map();
+    cleaned.forEach((row, index) => {
+      const isCustom = row._sourceType === "custom" || row._sourceType === "new";
+      const key = isCustom ? foodProductKey(row.product) : (row._catalogKey || foodProductKey(row.product));
+      const values = {
+        product: row.product,
+        category: row.category,
+        kcalPerUnit: row.kcalPerUnit,
+        proteinPerUnit: row.proteinPerUnit,
+        carbs: row.carbs,
+        fat: row.fat,
+        macroSource: row.macroSource || "manual",
+        sourceLabel: row.sourceLabel || (row.macroSource === "estimate" ? "estimate" : "manual"),
+        sourceUrl: row.sourceUrl || ""
+      };
+      savedRowsByKey.set(key, values);
+      savedRowsByKey.set(foodProductKey(row.product), values);
+      foodCatalogOrder.push(key);
+      if (!row.visible) hiddenFoodItems.push(key);
+      if (isCustom) {
+        customFoodItems.push({
+          ...values,
+          id: row.id || `food-${Date.now()}-${index}`
+        });
+      } else {
+        foodCatalogOverrides[key] = values;
+      }
+    });
+    const foodByDate = Object.fromEntries(
+      Object.entries(activeProfile.foodByDate || {}).map(([date, entries]) => [
+        date,
+        (entries || []).map(entry => {
+          const values = savedRowsByKey.get(foodProductKey(entry.product));
+          if (!values) return entry;
+          const amount = Math.max(0, Number(entry.amount) || 1);
+          return {
+            ...entry,
+            kcal: Math.round(values.kcalPerUnit * amount * 10) / 10,
+            protein: Math.round(values.proteinPerUnit * amount * 10) / 10,
+            carbs: Math.round(values.carbs * amount * 10) / 10,
+            fat: Math.round(values.fat * amount * 10) / 10
+          };
+        })
+      ])
+    );
+    updateProfile(activeProfile.id, {
+      customFoodItems,
+      foodCatalogOverrides,
+      foodCatalogOrder,
+      hiddenFoodItems,
+      foodByDate
+    });
+    onClose();
+  };
+
+  const labelCount = rows.filter(row => row.macroSource === "label").length;
+  const estimateCount = rows.filter(row => row.macroSource === "estimate").length;
+
+  return (
+    <div className="food-library-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div className="food-library-modal" role="dialog" aria-modal="true" aria-label="Food library editor">
+        <div className="food-library-head">
+          <div>
+            <div className="kpi-label">Nutrition catalog</div>
+            <h2>Food library</h2>
+            <div className="body-band-sub">{rows.length} foods · {labelCount} label sourced · {estimateCount} estimates</div>
+          </div>
+          <button className="btn ghost sm icon-only" onClick={onClose} aria-label="Close food library"><VI.X /></button>
+        </div>
+
+        <div className="food-library-toolbar">
+          <input value={query} onChange={event => setQuery(event.target.value)}
+            placeholder={`Search ${rows.length} foods`}
+            aria-label="Search food library" />
+          <select value={category} onChange={event => setCategory(event.target.value)} aria-label="Filter food category">
+            <option value="all">All categories</option>
+            {categories.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+          <label className="food-library-visible-toggle">
+            <input type="checkbox" checked={showHidden} onChange={event => setShowHidden(event.target.checked)} />
+            Show hidden
+          </label>
+          <button className="btn sm" onClick={addRow}><VI.Plus /> Add food</button>
+        </div>
+
+        <div className="food-library-table-wrap">
+          <table className="food-library-table">
+            <thead>
+              <tr>
+                <th className="food-library-move-col">Move</th>
+                <th>Food</th>
+                <th>Category</th>
+                <th className="num">kcal</th>
+                <th className="num">Protein</th>
+                <th className="num">Carbs</th>
+                <th className="num">Fat</th>
+                <th>Source</th>
+                <th className="food-library-actions-col">Visible</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map(row => {
+                const index = rows.findIndex(item => item._rowId === row._rowId);
+                const canDelete = row._sourceType === "custom" || row._sourceType === "new";
+                return (
+                  <tr key={row._rowId}
+                    className={`${row.visible ? "" : "is-hidden"} ${dragKey === row._rowId ? "is-dragging" : ""}`.trim()}
+                    onDragOver={event => event.preventDefault()}
+                    onDrop={() => dropRow(row._rowId)}>
+                    <td>
+                      <div className="food-library-move">
+                        <button type="button" className="food-drag-handle" draggable
+                          onDragStart={() => setDragKey(row._rowId)}
+                          onDragEnd={() => setDragKey(null)}
+                          title="Drag to reorder">::</button>
+                        <button type="button" className="btn ghost sm" disabled={index <= 0} onClick={() => moveRow(row._rowId, -1)}>Up</button>
+                        <button type="button" className="btn ghost sm" disabled={index >= rows.length - 1} onClick={() => moveRow(row._rowId, 1)}>Dn</button>
+                      </div>
+                    </td>
+                    <td><input value={row.product} onChange={event => updateRow(row._rowId, { product: event.target.value })} /></td>
+                    <td><input value={row.category || ""} onChange={event => updateRow(row._rowId, { category: event.target.value })} /></td>
+                    {[
+                      ["kcalPerUnit", "1"],
+                      ["proteinPerUnit", "0.1"],
+                      ["carbs", "0.1"],
+                      ["fat", "0.1"]
+                    ].map(([field, step]) => (
+                      <td key={field}>
+                        <input className="num" type="number" min="0" step={step} value={row[field]}
+                          onChange={event => updateRow(row._rowId, { [field]: event.target.value })} />
+                      </td>
+                    ))}
+                    <td>
+                      {row.sourceUrl ? (
+                        <a className={`food-source ${row.macroSource || ""}`.trim()} href={row.sourceUrl} target="_blank" rel="noreferrer">
+                          {row.sourceLabel || "label"}
+                        </a>
+                      ) : (
+                        <span className={`food-source ${row.macroSource || ""}`.trim()}>{row.sourceLabel || row.macroSource || "manual"}</span>
+                      )}
+                    </td>
+                    <td>
+                      <div className="food-library-row-actions">
+                        <label className="food-visibility-check" title={row.visible ? "Visible in food pickers" : "Hidden from food pickers"}>
+                          <input type="checkbox" checked={row.visible} onChange={event => updateRow(row._rowId, { visible: event.target.checked })} />
+                          <span>{row.visible ? "On" : "Off"}</span>
+                        </label>
+                        {canDelete && (
+                          <button className="btn ghost sm icon-only" type="button" title="Delete custom food"
+                            onClick={() => removeCustomRow(row._rowId)}><VI.X /></button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {visibleRows.length === 0 && <div className="empty">No foods match these filters.</div>}
+        </div>
+
+        <div className="food-library-foot">
+          <div>
+            {error ? <span className="food-library-error">{error}</span> : (
+              <span className="kpi-label">Changes apply to quick add, food logging, daily totals, export, and synced profile data.</span>
+            )}
+          </div>
+          <button className="btn ghost sm" onClick={onClose}>Cancel</button>
+          <button className="btn primary sm" onClick={save}>Save library</button>
+        </div>
       </div>
     </div>
   );
@@ -1548,8 +1846,12 @@ function foodUsageStats(foodByDate = {}) {
   return stats;
 }
 
-function allFoodCatalogItems(profile = {}, catalogItems = []) {
+function allFoodCatalogItems(profile = {}, catalogItems = [], options = {}) {
   const hidden = new Set((profile.hiddenFoodItems || []).map(foodProductKey));
+  const overrides = profile.foodCatalogOverrides || {};
+  const manualOrder = profile.foodCatalogOrder || [];
+  const orderIndex = new Map(manualOrder.map((key, index) => [foodProductKey(key), index]));
+  const defaults = window.REPS_FOOD_MACRO_DEFAULTS || {};
   const usage = foodUsageStats(profile.foodByDate || {});
   const source = [...(profile.customFoodItems || []), ...(catalogItems || [])];
   const itemsByKey = new Map();
@@ -1557,15 +1859,38 @@ function allFoodCatalogItems(profile = {}, catalogItems = []) {
   source.forEach((item, index) => {
     const product = String(item.product || "").trim();
     const key = foodProductKey(product);
-    if (!key || hidden.has(key) || itemsByKey.has(key)) return;
+    if (!key || itemsByKey.has(key)) return;
     const used = usage.get(key);
+    const seed = defaults[key] || null;
+    const override = overrides[key] || {};
+    const isMigrated = String(item.id || "").startsWith("migrated-food-");
+    const valueFor = (field) => {
+      if (Object.prototype.hasOwnProperty.call(override, field)) return finiteFoodNumber(override[field]) ?? 0;
+      if (seed && (!item.id || isMigrated)) return finiteFoodNumber(seed[field]) ?? 0;
+      const own = finiteFoodNumber(item[field]);
+      if (own != null) return own;
+      const seeded = finiteFoodNumber(seed?.[field]);
+      if (seeded != null) return seeded;
+      return finiteFoodNumber(used?.[field]) ?? 0;
+    };
+    const effectiveProduct = String(override.product || product).trim() || product;
+    const effectiveKey = foodProductKey(effectiveProduct);
     itemsByKey.set(key, {
+      ...(seed || {}),
       ...item,
-      product,
-      kcalPerUnit: finiteFoodNumber(item.kcalPerUnit) ?? used?.kcalPerUnit ?? 0,
-      proteinPerUnit: finiteFoodNumber(item.proteinPerUnit) ?? used?.proteinPerUnit ?? 0,
-      carbs: finiteFoodNumber(item.carbs) ?? used?.carbs ?? 0,
-      fat: finiteFoodNumber(item.fat) ?? used?.fat ?? 0,
+      ...override,
+      product: effectiveProduct,
+      category: override.category || item.category || seed?.category || "Other",
+      kcalPerUnit: valueFor("kcalPerUnit"),
+      proteinPerUnit: valueFor("proteinPerUnit"),
+      carbs: valueFor("carbs"),
+      fat: valueFor("fat"),
+      macroSource: override.macroSource || item.macroSource || seed?.macroSource || "",
+      sourceLabel: override.sourceLabel || item.sourceLabel || seed?.sourceLabel || "",
+      sourceUrl: override.sourceUrl || item.sourceUrl || seed?.sourceUrl || "",
+      _catalogKey: key,
+      _sourceType: item.id ? "custom" : "catalog",
+      _hidden: hidden.has(key) || hidden.has(effectiveKey),
       _quickCount: used?.count || 0,
       _quickLastDate: used?.lastDate || "",
       _quickIndex: index
@@ -1573,14 +1898,20 @@ function allFoodCatalogItems(profile = {}, catalogItems = []) {
   });
 
   usage.forEach((used, key) => {
-    if (itemsByKey.has(key) || hidden.has(key)) return;
+    if (itemsByKey.has(key)) return;
+    const override = overrides[key] || {};
+    const effectiveProduct = String(override.product || used.product).trim() || used.product;
     itemsByKey.set(key, {
-      product: used.product,
-      category: "Logged before",
-      kcalPerUnit: used.kcalPerUnit || 0,
-      proteinPerUnit: used.proteinPerUnit || 0,
-      carbs: used.carbs || 0,
-      fat: used.fat || 0,
+      ...override,
+      product: effectiveProduct,
+      category: override.category || "Logged before",
+      kcalPerUnit: finiteFoodNumber(override.kcalPerUnit) ?? used.kcalPerUnit ?? 0,
+      proteinPerUnit: finiteFoodNumber(override.proteinPerUnit) ?? used.proteinPerUnit ?? 0,
+      carbs: finiteFoodNumber(override.carbs) ?? used.carbs ?? 0,
+      fat: finiteFoodNumber(override.fat) ?? used.fat ?? 0,
+      _catalogKey: key,
+      _sourceType: "logged",
+      _hidden: hidden.has(key) || hidden.has(foodProductKey(effectiveProduct)),
       _quickCount: used.count || 0,
       _quickLastDate: used.lastDate || "",
       _quickIndex: source.length + itemsByKey.size
@@ -1588,7 +1919,13 @@ function allFoodCatalogItems(profile = {}, catalogItems = []) {
   });
 
   return Array.from(itemsByKey.values())
+    .filter(item => options.includeHidden || !item._hidden)
     .sort((a, b) => {
+      if (orderIndex.size) {
+        const ai = orderIndex.has(a._catalogKey) ? orderIndex.get(a._catalogKey) : Number.MAX_SAFE_INTEGER;
+        const bi = orderIndex.has(b._catalogKey) ? orderIndex.get(b._catalogKey) : Number.MAX_SAFE_INTEGER;
+        if (ai !== bi) return ai - bi;
+      }
       const countDiff = (b._quickCount || 0) - (a._quickCount || 0);
       if (countDiff) return countDiff;
       const lastDiff = String(b._quickLastDate || "").localeCompare(String(a._quickLastDate || ""));
@@ -1764,6 +2101,7 @@ function Body() {
   const todayIso = window.RepsData.TODAY;
   const [selectedDate, setSelectedDate] = useS(todayIso);
   const [showWeightModal, setShowWeightModal] = useS(false);
+  const [showFoodLibrary, setShowFoodLibrary] = useS(false);
   const [tdeeWindowDays, setTdeeWindowDays] = useS(28);
   const [foodModalDate, setFoodModalDate] = useS(null);
   const selectedDayKey = window.RepsData.dayName(selectedDate);
@@ -1846,6 +2184,9 @@ function Body() {
             Adaptive energy targets · daily nutrition cockpit · bodyweight trajectory
           </div>
         </div>
+        <div className="page-actions">
+          <button className="btn sm" onClick={() => setShowFoodLibrary(true)}>Food library</button>
+        </div>
       </div>
 
       <div className="body-mobile-date-actions">
@@ -1855,6 +2196,7 @@ function Body() {
           <button className="btn ghost sm icon-only" title="Next day" onClick={() => setSelectedDate(window.RepsData.addDays(selectedDate, 1))}><VI.Chevron /></button>
           {selectedDate !== todayIso && <button className="btn ghost sm" onClick={() => setSelectedDate(todayIso)}>Today</button>}
         </div>
+        <button className="btn sm" onClick={() => setShowFoodLibrary(true)}>Food library</button>
         <button className="btn sm" onClick={() => setShowWeightModal(true)}><VI.Plus /> Weight</button>
         <button className="btn primary sm" onClick={() => openAddFoodForDate(selectedDate)}><VI.Plus /> Add food</button>
       </div>
@@ -1917,6 +2259,11 @@ function Body() {
         onClose={closeAddFood}
         onAdd={(entry) => addFoodEntry(foodModalDate || selectedDate, entry)}
         onSaveToCatalog={(item) => addCustomFoodItem && addCustomFoodItem(item)} />}
+      {showFoodLibrary && <FoodLibraryModal
+        activeProfile={activeProfile}
+        updateProfile={updateProfile}
+        catalogItems={foodItems}
+        onClose={() => setShowFoodLibrary(false)} />}
       {showWeightModal && <WeightEntryModal
         onClose={() => setShowWeightModal(false)}
         lookupExisting={(d) => {

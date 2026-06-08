@@ -691,6 +691,8 @@ const DEFAULT_STATE = {
       targetWeight: null,
       progressionRules: progressionRulesWithDefaults(),
       foodByDate: {},        // { "2026-05-21": [{id, product, kcal, protein, amount}, ...] }
+      foodCatalogOverrides: {},
+      foodCatalogOrder: [],
       recipes: [],
       deletedRecipes: {},
       cookingPreferences: { hob: DEFAULT_HOB_PREFERENCES },
@@ -962,10 +964,40 @@ function removeDeletedFoodRows(foodByDate = {}, deletedFoodEntries = {}) {
   return out;
 }
 
+function hydrateMissingFoodMacros(foodByDate = {}, catalogOverrides = {}) {
+  const defaults = window.REPS_FOOD_MACRO_DEFAULTS || {};
+  return Object.fromEntries(
+    Object.entries(foodByDate || {}).map(([date, entries]) => [
+      date,
+      (entries || []).map(entry => {
+        const key = foodCatalogKey(entry.product);
+        const source = { ...(defaults[key] || {}), ...(catalogOverrides[key] || {}) };
+        if (!source || (!Number.isFinite(Number(source.carbs)) && !Number.isFinite(Number(source.fat)))) return entry;
+        const amount = Math.max(0, Number(entry.amount) || 1);
+        const carbsMissing = entry.carbs == null || Number(entry.carbs) === 0;
+        const fatMissing = entry.fat == null || Number(entry.fat) === 0;
+        return {
+          ...entry,
+          carbs: carbsMissing && Number.isFinite(Number(source.carbs))
+            ? Math.round(Number(source.carbs) * amount * 10) / 10
+            : entry.carbs,
+          fat: fatMissing && Number.isFinite(Number(source.fat))
+            ? Math.round(Number(source.fat) * amount * 10) / 10
+            : entry.fat
+        };
+      })
+    ])
+  );
+}
+
 function migrateProfile(p) {
   const defaultMacros = PRESETS.maintain.macros;
   const deletedFoodEntries = normalizeDeletedFoodEntries(p.deletedFoodEntries || p.deletedFoodEntryIds || {});
-  const foodByDate = removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries);
+  const foodCatalogOverrides = p.foodCatalogOverrides || {};
+  const foodByDate = hydrateMissingFoodMacros(
+    removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries),
+    foodCatalogOverrides
+  );
   const deletedRecipes = normalizeDeletedRecipes(p.deletedRecipes || p.deletedRecipeIds || {});
   const recipes = recipesWithStarter(p.recipes || [], deletedRecipes);
   const routines = p.routines && p.routines.length ? p.routines : [];
@@ -992,6 +1024,8 @@ function migrateProfile(p) {
     hiddenExercises: p.hiddenExercises || [],
     hiddenFoodItems: p.hiddenFoodItems || [],
     customFoodItems: p.customFoodItems || [],
+    foodCatalogOverrides,
+    foodCatalogOrder: p.foodCatalogOrder || [],
     weightEntries: p.weightEntries || [],
     blockNames: p.blockNames || {},
     blockStartOverrides: p.blockStartOverrides || {},
@@ -1133,7 +1167,10 @@ function normalizedCatalogFoodItem(item = {}, index = 0) {
     proteinPerUnit: finiteCatalogNumber(item.proteinPerUnit ?? item.protein),
     carbs: finiteCatalogNumber(item.carbs),
     fat: finiteCatalogNumber(item.fat),
-    category: item.category || "Migrated"
+    category: item.category || "Migrated",
+    macroSource: item.macroSource || "",
+    sourceLabel: item.sourceLabel || "",
+    sourceUrl: item.sourceUrl || ""
   };
 }
 
@@ -1448,6 +1485,13 @@ function mergeProfiles(remoteProfile = {}, localProfile = {}) {
   merged.customFoodItems = mergeByKey(remoteProfile.customFoodItems || [], localProfile.customFoodItems || [], item =>
     String(item.id || foodCatalogKey(item.product || item.name))
   );
+  merged.foodCatalogOverrides = {
+    ...(remoteProfile.foodCatalogOverrides || {}),
+    ...(localProfile.foodCatalogOverrides || {})
+  };
+  merged.foodCatalogOrder = (localProfile.foodCatalogOrder || []).length
+    ? localProfile.foodCatalogOrder
+    : (remoteProfile.foodCatalogOrder || []);
   merged.customExercises = mergeByKey(remoteProfile.customExercises || [], localProfile.customExercises || [], item =>
     String(item.id || item.name)
   );

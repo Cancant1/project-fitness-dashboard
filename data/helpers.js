@@ -1244,7 +1244,7 @@
     PLANNED_WEEK,
     notableNotes: (D.workouts?.notableNotes || []).slice(0, 16),
     nutritionTargets: D.nutrition?.targets || { kcal: 2500, protein: 180 },
-    foodItems: D.nutrition?.foodItems || [],
+    foodItems: (D.nutrition?.foodItems?.length ? D.nutrition.foodItems : window.REPS_FOOD_CATALOG) || [],
     summary: D.summary || {},
     exercises: (D.workouts?.exercises || [])
   };

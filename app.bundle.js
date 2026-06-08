@@ -1231,6 +1231,8 @@ var DEFAULT_STATE = {
     targetWeight: null,
     progressionRules: progressionRulesWithDefaults(),
     foodByDate: {},
+    foodCatalogOverrides: {},
+    foodCatalogOrder: [],
     recipes: [],
     deletedRecipes: {},
     cookingPreferences: {
@@ -1596,11 +1598,34 @@ function removeDeletedFoodRows() {
   }
   return out;
 }
+function hydrateMissingFoodMacros() {
+  var foodByDate = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var catalogOverrides = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var defaults = window.REPS_FOOD_MACRO_DEFAULTS || {};
+  return Object.fromEntries(Object.entries(foodByDate || {}).map(function (_ref1) {
+    var _ref10 = _slicedToArray(_ref1, 2),
+      date = _ref10[0],
+      entries = _ref10[1];
+    return [date, (entries || []).map(function (entry) {
+      var key = foodCatalogKey(entry.product);
+      var source = _objectSpread(_objectSpread({}, defaults[key] || {}), catalogOverrides[key] || {});
+      if (!source || !Number.isFinite(Number(source.carbs)) && !Number.isFinite(Number(source.fat))) return entry;
+      var amount = Math.max(0, Number(entry.amount) || 1);
+      var carbsMissing = entry.carbs == null || Number(entry.carbs) === 0;
+      var fatMissing = entry.fat == null || Number(entry.fat) === 0;
+      return _objectSpread(_objectSpread({}, entry), {}, {
+        carbs: carbsMissing && Number.isFinite(Number(source.carbs)) ? Math.round(Number(source.carbs) * amount * 10) / 10 : entry.carbs,
+        fat: fatMissing && Number.isFinite(Number(source.fat)) ? Math.round(Number(source.fat) * amount * 10) / 10 : entry.fat
+      });
+    })];
+  }));
+}
 function migrateProfile(p) {
   var _routines$, _p$targetWeight;
   var defaultMacros = PRESETS.maintain.macros;
   var deletedFoodEntries = normalizeDeletedFoodEntries(p.deletedFoodEntries || p.deletedFoodEntryIds || {});
-  var foodByDate = removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries);
+  var foodCatalogOverrides = p.foodCatalogOverrides || {};
+  var foodByDate = hydrateMissingFoodMacros(removeDeletedFoodRows(p.foodByDate || {}, deletedFoodEntries), foodCatalogOverrides);
   var deletedRecipes = normalizeDeletedRecipes(p.deletedRecipes || p.deletedRecipeIds || {});
   var recipes = recipesWithStarter(p.recipes || [], deletedRecipes);
   var routines = p.routines && p.routines.length ? p.routines : [];
@@ -1627,6 +1652,8 @@ function migrateProfile(p) {
     hiddenExercises: p.hiddenExercises || [],
     hiddenFoodItems: p.hiddenFoodItems || [],
     customFoodItems: p.customFoodItems || [],
+    foodCatalogOverrides: foodCatalogOverrides,
+    foodCatalogOrder: p.foodCatalogOrder || [],
     weightEntries: p.weightEntries || [],
     blockNames: p.blockNames || {},
     blockStartOverrides: p.blockStartOverrides || {},
@@ -1811,7 +1838,10 @@ function normalizedCatalogFoodItem() {
     proteinPerUnit: finiteCatalogNumber((_item$proteinPerUnit = item.proteinPerUnit) !== null && _item$proteinPerUnit !== void 0 ? _item$proteinPerUnit : item.protein),
     carbs: finiteCatalogNumber(item.carbs),
     fat: finiteCatalogNumber(item.fat),
-    category: item.category || "Migrated"
+    category: item.category || "Migrated",
+    macroSource: item.macroSource || "",
+    sourceLabel: item.sourceLabel || "",
+    sourceUrl: item.sourceUrl || ""
   };
 }
 function materializeEffectiveState(rawState, activeProfileId) {
@@ -2163,6 +2193,8 @@ function mergeProfiles() {
   merged.customFoodItems = mergeByKey(remoteProfile.customFoodItems || [], localProfile.customFoodItems || [], function (item) {
     return String(item.id || foodCatalogKey(item.product || item.name));
   });
+  merged.foodCatalogOverrides = _objectSpread(_objectSpread({}, remoteProfile.foodCatalogOverrides || {}), localProfile.foodCatalogOverrides || {});
+  merged.foodCatalogOrder = (localProfile.foodCatalogOrder || []).length ? localProfile.foodCatalogOrder : remoteProfile.foodCatalogOrder || [];
   merged.customExercises = mergeByKey(remoteProfile.customExercises || [], localProfile.customExercises || [], function (item) {
     return String(item.id || item.name);
   });
@@ -2201,8 +2233,8 @@ function load() {
   }
   return migrateState(DEFAULT_STATE);
 }
-function AppStateProvider(_ref1) {
-  var children = _ref1.children;
+function AppStateProvider(_ref11) {
+  var children = _ref11.children;
   var _useState = useState(load),
     _useState2 = _slicedToArray(_useState, 2),
     state = _useState2[0],
@@ -2364,7 +2396,7 @@ function AppStateProvider(_ref1) {
     });
   };
   var pullRemoteState = function () {
-    var _ref10 = _asyncToGenerator(_regenerator().m(function _callee() {
+    var _ref12 = _asyncToGenerator(_regenerator().m(function _callee() {
       var options,
         config,
         _syncMetaRef$current,
@@ -2427,11 +2459,11 @@ function AppStateProvider(_ref1) {
       }, _callee, null, [[1, 4]]);
     }));
     return function pullRemoteState() {
-      return _ref10.apply(this, arguments);
+      return _ref12.apply(this, arguments);
     };
   }();
   var pushRemoteState = function () {
-    var _ref11 = _asyncToGenerator(_regenerator().m(function _callee3() {
+    var _ref13 = _asyncToGenerator(_regenerator().m(function _callee3() {
       var options,
         config,
         runPush,
@@ -2467,7 +2499,7 @@ function AppStateProvider(_ref1) {
             return _context3.a(2, null);
           case 2:
             runPush = function () {
-              var _ref12 = _asyncToGenerator(_regenerator().m(function _callee2() {
+              var _ref14 = _asyncToGenerator(_regenerator().m(function _callee2() {
                 var remote, remoteSha, pushState, nextSha, attempt, isShaConflict, latestRemote, _t2;
                 return _regenerator().w(function (_context2) {
                   while (1) switch (_context2.p = _context2.n) {
@@ -2546,7 +2578,7 @@ function AppStateProvider(_ref1) {
                 }, _callee2, null, [[3, 5]]);
               }));
               return function runPush() {
-                return _ref12.apply(this, arguments);
+                return _ref14.apply(this, arguments);
               };
             }();
             promise = runPush();
@@ -2574,11 +2606,11 @@ function AppStateProvider(_ref1) {
       }, _callee3, null, [[3, 5, 6, 7]]);
     }));
     return function pushRemoteState() {
-      return _ref11.apply(this, arguments);
+      return _ref13.apply(this, arguments);
     };
   }();
   var resolveSyncConflict = function () {
-    var _ref13 = _asyncToGenerator(_regenerator().m(function _callee4(choice) {
+    var _ref15 = _asyncToGenerator(_regenerator().m(function _callee4(choice) {
       return _regenerator().w(function (_context4) {
         while (1) switch (_context4.n) {
           case 0:
@@ -2609,7 +2641,7 @@ function AppStateProvider(_ref1) {
       }, _callee4);
     }));
     return function resolveSyncConflict(_x4) {
-      return _ref13.apply(this, arguments);
+      return _ref15.apply(this, arguments);
     };
   }();
   var updateProfile = function updateProfile(id, patch) {
@@ -2790,9 +2822,9 @@ function AppStateProvider(_ref1) {
     });
   };
   var editSession = function editSession(id, patch) {
-    var _ref14 = patch || {},
-      _clearSessionPlanDates = _ref14._clearSessionPlanDates,
-      sessionPatch = _objectWithoutProperties(_ref14, _excluded);
+    var _ref16 = patch || {},
+      _clearSessionPlanDates = _ref16._clearSessionPlanDates,
+      sessionPatch = _objectWithoutProperties(_ref16, _excluded);
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
@@ -2806,9 +2838,9 @@ function AppStateProvider(_ref1) {
           var previousPlannedDate = ((_id2 = (p.sessionEdits || {})[id]) === null || _id2 === void 0 ? void 0 : _id2.plannedDate) || (raw === null || raw === void 0 ? void 0 : raw.plannedDate);
           var nextPlannedDate = sessionPatch.plannedDate || previousPlannedDate;
           var datesToClear = new Set([raw === null || raw === void 0 ? void 0 : raw.date, previousEffectiveDate, nextEffectiveDate, previousPlannedDate, nextPlannedDate].concat(_toConsumableArray(_clearSessionPlanDates || [])).filter(Boolean));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref15) {
-            var _ref16 = _slicedToArray(_ref15, 1),
-              date = _ref16[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref17) {
+            var _ref18 = _slicedToArray(_ref17, 1),
+              date = _ref18[0];
             return !datesToClear.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
@@ -2824,9 +2856,9 @@ function AppStateProvider(_ref1) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref17) {
-              var _ref18 = _slicedToArray(_ref17, 1),
-                k = _ref18[0];
+            sessionEdits: Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref19) {
+              var _ref20 = _slicedToArray(_ref19, 1),
+                k = _ref20[0];
               return k !== id;
             }))
           }) : p;
@@ -2867,9 +2899,9 @@ function AppStateProvider(_ref1) {
           var current = (p.dailyOverrides || {})[date] || {};
           if (!field) {
             return _objectSpread(_objectSpread({}, p), {}, {
-              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref19) {
-                var _ref20 = _slicedToArray(_ref19, 1),
-                  k = _ref20[0];
+              dailyOverrides: Object.fromEntries(Object.entries(p.dailyOverrides || {}).filter(function (_ref21) {
+                var _ref22 = _slicedToArray(_ref21, 1),
+                  k = _ref22[0];
                 return k !== date;
               }))
             });
@@ -2921,9 +2953,9 @@ function AppStateProvider(_ref1) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
-            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref21) {
-              var _ref22 = _slicedToArray(_ref21, 1),
-                k = _ref22[0];
+            sessionPlansByDate: Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref23) {
+              var _ref24 = _slicedToArray(_ref23, 1),
+                k = _ref24[0];
               return k !== date;
             }))
           }) : p;
@@ -2971,14 +3003,14 @@ function AppStateProvider(_ref1) {
             if (remove && existing.id) removedIds.add(existing.id);
             return !remove;
           });
-          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref23) {
-            var _ref24 = _slicedToArray(_ref23, 1),
-              id = _ref24[0];
+          var nextEdits = Object.fromEntries(Object.entries(p.sessionEdits || {}).filter(function (_ref25) {
+            var _ref26 = _slicedToArray(_ref25, 1),
+              id = _ref26[0];
             return !removedIds.has(id) && id !== stampedSession.id;
           }));
-          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref25) {
-            var _ref26 = _slicedToArray(_ref25, 1),
-              date = _ref26[0];
+          var nextPlans = Object.fromEntries(Object.entries(p.sessionPlansByDate || {}).filter(function (_ref27) {
+            var _ref28 = _slicedToArray(_ref27, 1),
+              date = _ref28[0];
             return !clearDates.has(date);
           }));
           return _objectSpread(_objectSpread({}, p), {}, {
@@ -3031,9 +3063,9 @@ function AppStateProvider(_ref1) {
             recipes: [nextRecipe].concat(_toConsumableArray((p.recipes || []).filter(function (r) {
               return recipeIdentity(r) !== id;
             }))),
-            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref27) {
-              var _ref28 = _slicedToArray(_ref27, 1),
-                recipeId = _ref28[0];
+            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref29) {
+              var _ref30 = _slicedToArray(_ref29, 1),
+                recipeId = _ref30[0];
               return recipeId !== id;
             }))
           }) : p;
@@ -3114,9 +3146,9 @@ function AppStateProvider(_ref1) {
             recipes: Array.from(byId.values()).sort(function (a, b) {
               return String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
             }),
-            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref29) {
-              var _ref30 = _slicedToArray(_ref29, 1),
-                id = _ref30[0];
+            deletedRecipes: Object.fromEntries(Object.entries(normalizeDeletedRecipes(p.deletedRecipes || {})).filter(function (_ref31) {
+              var _ref32 = _slicedToArray(_ref31, 1),
+                id = _ref32[0];
               return !importedIds.has(id);
             }))
           });
@@ -3420,7 +3452,7 @@ var NAV_ITEMS = [{
   icon: I.Export,
   kbd: "9"
 }];
-var BUILD_LABEL = "05 Jun 2026 14:21";
+var BUILD_LABEL = "08 Jun 2026";
 function SyncQuickActions(_ref) {
   var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
   var onAfterAction = _ref.onAfterAction;
@@ -8310,11 +8342,12 @@ function AddFoodModal(_ref5) {
     qSaveToLog = _useS20[0],
     setQSaveToLog = _useS20[1];
   var hidden = (activeProfile === null || activeProfile === void 0 ? void 0 : activeProfile.hiddenFoodItems) || [];
-  var items = allFoodCatalogItems(activeProfile, RepsData.foodItems);
-  var hiddenKeys = new Set(hidden.map(foodProductKey));
+  var items = allFoodCatalogItems(activeProfile, RepsData.foodItems, {
+    includeHidden: true
+  });
   var dateLabel = targetDate ? RepsData.shortDate(targetDate) : "selected date";
   var filtered = items.filter(function (f) {
-    if (!showHidden && hiddenKeys.has(foodProductKey(f.product))) return false;
+    if (!showHidden && f._hidden) return false;
     if (q && !f.product.toLowerCase().includes(q.toLowerCase()) && !(f.category || "").toLowerCase().includes(q.toLowerCase())) return false;
     return true;
   });
@@ -8336,12 +8369,13 @@ function AddFoodModal(_ref5) {
     }
     return Array.from(map.entries());
   }, [filtered]);
-  var hideItem = function hideItem(productName, ev) {
+  var hideItem = function hideItem(item, ev) {
     ev === null || ev === void 0 || ev.stopPropagation();
+    var key = (item === null || item === void 0 ? void 0 : item._catalogKey) || foodProductKey(item === null || item === void 0 ? void 0 : item.product);
     updateProfile === null || updateProfile === void 0 || updateProfile(activeProfile.id, {
-      hiddenFoodItems: _toConsumableArray(new Set([].concat(_toConsumableArray(hidden), [productName])))
+      hiddenFoodItems: _toConsumableArray(new Set([].concat(_toConsumableArray(hidden), [key])))
     });
-    if ((picked === null || picked === void 0 ? void 0 : picked.product) === productName) setPicked(null);
+    if ((picked === null || picked === void 0 ? void 0 : picked._catalogKey) === key) setPicked(null);
   };
   var submitCatalog = function submitCatalog() {
     if (!picked) return;
@@ -8350,8 +8384,8 @@ function AddFoodModal(_ref5) {
       amount: Number(amount) || 1,
       kcal: Math.round(picked.kcalPerUnit * (Number(amount) || 1)),
       protein: Math.round(picked.proteinPerUnit * (Number(amount) || 1) * 10) / 10,
-      carbs: 0,
-      fat: 0
+      carbs: Math.round((picked.carbs || 0) * (Number(amount) || 1) * 10) / 10,
+      fat: Math.round((picked.fat || 0) * (Number(amount) || 1) * 10) / 10
     });
     onClose();
   };
@@ -8508,7 +8542,7 @@ function AddFoodModal(_ref5) {
         color: "var(--faint)"
       }
     }, list.length)), list.map(function (f, i) {
-      var isHidden = hiddenKeys.has(foodProductKey(f.product));
+      var isHidden = !!f._hidden;
       return React.createElement("div", {
         key: f.product + "-" + i,
         onClick: function onClick() {
@@ -8574,11 +8608,12 @@ function AddFoodModal(_ref5) {
           if (isHidden) {
             updateProfile === null || updateProfile === void 0 || updateProfile(activeProfile.id, {
               hiddenFoodItems: hidden.filter(function (n) {
-                return n !== f.product;
+                var key = foodProductKey(n);
+                return key !== f._catalogKey && key !== foodProductKey(f.product);
               })
             });
           } else {
-            hideItem(f.product, ev);
+            hideItem(f, ev);
           }
         }
       }, React.createElement(VI.X, null)));
@@ -8613,7 +8648,7 @@ function AddFoodModal(_ref5) {
     style: {
       fontSize: 10
     }
-  }, "per unit \xB7 ", Math.round(picked.kcalPerUnit), " kcal \xB7 ", picked.proteinPerUnit, "g protein")), React.createElement("input", {
+  }, "per unit \xB7 ", Math.round(picked.kcalPerUnit), " kcal \xB7 ", picked.proteinPerUnit, "g protein \xB7 ", picked.carbs || 0, "g carbs \xB7 ", picked.fat || 0, "g fat")), React.createElement("input", {
     type: "number",
     min: "0.25",
     step: "0.25",
@@ -8897,23 +8932,428 @@ function NewCatalogEntryForm(_ref0) {
     disabled: !name.trim() || !kcal
   }, React.createElement(VI.Plus, null), " Save to catalog")));
 }
-function WeightEntryModal(_ref11) {
-  var onClose = _ref11.onClose,
-    onSave = _ref11.onSave,
-    lookupExisting = _ref11.lookupExisting;
-  var _useS33 = useS(window.RepsData.TODAY),
+function FoodLibraryModal(_ref11) {
+  var activeProfile = _ref11.activeProfile,
+    updateProfile = _ref11.updateProfile,
+    catalogItems = _ref11.catalogItems,
+    onClose = _ref11.onClose;
+  var makeRows = function makeRows() {
+    return allFoodCatalogItems(activeProfile, catalogItems, {
+      includeHidden: true
+    }).map(function (item, index) {
+      return _objectSpread(_objectSpread({}, item), {}, {
+        _rowId: item._catalogKey || "food-row-".concat(index),
+        visible: !item._hidden
+      });
+    });
+  };
+  var _useS33 = useS(makeRows),
     _useS34 = _slicedToArray(_useS33, 2),
-    date = _useS34[0],
-    setDate = _useS34[1];
-  var initial = lookupExisting ? lookupExisting(window.RepsData.TODAY) : null;
-  var _useS35 = useS(initial && initial.value != null ? String(initial.value) : ""),
+    rows = _useS34[0],
+    setRows = _useS34[1];
+  var _useS35 = useS(""),
     _useS36 = _slicedToArray(_useS35, 2),
-    weight = _useS36[0],
-    setWeight = _useS36[1];
-  var _useS37 = useS(initial && initial.note ? initial.note : ""),
+    query = _useS36[0],
+    setQuery = _useS36[1];
+  var _useS37 = useS("all"),
     _useS38 = _slicedToArray(_useS37, 2),
-    note = _useS38[0],
-    setNote = _useS38[1];
+    category = _useS38[0],
+    setCategory = _useS38[1];
+  var _useS39 = useS(true),
+    _useS40 = _slicedToArray(_useS39, 2),
+    showHidden = _useS40[0],
+    setShowHidden = _useS40[1];
+  var _useS41 = useS(null),
+    _useS42 = _slicedToArray(_useS41, 2),
+    dragKey = _useS42[0],
+    setDragKey = _useS42[1];
+  var _useS43 = useS(""),
+    _useS44 = _slicedToArray(_useS43, 2),
+    error = _useS44[0],
+    setError = _useS44[1];
+  useE(function () {
+    var onKey = function onKey(event) {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    var oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return function () {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = oldOverflow;
+    };
+  }, []);
+  var categories = Array.from(new Set(rows.map(function (row) {
+    return row.category || "Other";
+  }))).sort(function (a, b) {
+    return a.localeCompare(b);
+  });
+  var visibleRows = rows.filter(function (row) {
+    if (!showHidden && !row.visible) return false;
+    if (category !== "all" && (row.category || "Other") !== category) return false;
+    var haystack = "".concat(row.product || "", " ").concat(row.category || "", " ").concat(row.sourceLabel || "").toLowerCase();
+    return !query.trim() || haystack.includes(query.trim().toLowerCase());
+  });
+  var updateRow = function updateRow(rowId, patch) {
+    setRows(function (current) {
+      return current.map(function (row) {
+        return row._rowId === rowId ? _objectSpread(_objectSpread({}, row), patch) : row;
+      });
+    });
+    setError("");
+  };
+  var moveRow = function moveRow(rowId, delta) {
+    setRows(function (current) {
+      var index = current.findIndex(function (row) {
+        return row._rowId === rowId;
+      });
+      var nextIndex = index + delta;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      var next = _toConsumableArray(current);
+      var _next$splice = next.splice(index, 1),
+        _next$splice2 = _slicedToArray(_next$splice, 1),
+        moved = _next$splice2[0];
+      next.splice(nextIndex, 0, moved);
+      return next;
+    });
+  };
+  var dropRow = function dropRow(targetKey) {
+    if (!dragKey || dragKey === targetKey) return setDragKey(null);
+    setRows(function (current) {
+      var from = current.findIndex(function (row) {
+        return row._rowId === dragKey;
+      });
+      var to = current.findIndex(function (row) {
+        return row._rowId === targetKey;
+      });
+      if (from < 0 || to < 0) return current;
+      var next = _toConsumableArray(current);
+      var _next$splice3 = next.splice(from, 1),
+        _next$splice4 = _slicedToArray(_next$splice3, 1),
+        moved = _next$splice4[0];
+      next.splice(to, 0, moved);
+      return next;
+    });
+    setDragKey(null);
+  };
+  var addRow = function addRow() {
+    var stamp = Date.now().toString(36);
+    var row = {
+      _rowId: "new-".concat(stamp),
+      _catalogKey: "new-".concat(stamp),
+      _sourceType: "new",
+      id: "food-".concat(stamp),
+      product: "New food",
+      category: "Custom",
+      kcalPerUnit: 0,
+      proteinPerUnit: 0,
+      carbs: 0,
+      fat: 0,
+      visible: true,
+      macroSource: "manual",
+      sourceLabel: "manual"
+    };
+    setRows(function (current) {
+      return [row].concat(_toConsumableArray(current));
+    });
+    setQuery("");
+    setCategory("all");
+    setShowHidden(true);
+  };
+  var removeCustomRow = function removeCustomRow(rowId) {
+    setRows(function (current) {
+      return current.filter(function (row) {
+        return row._rowId !== rowId;
+      });
+    });
+  };
+  var save = function save() {
+    var cleaned = rows.map(function (row) {
+      return _objectSpread(_objectSpread({}, row), {}, {
+        product: String(row.product || "").trim(),
+        category: String(row.category || "Other").trim() || "Other",
+        kcalPerUnit: Math.max(0, Number(row.kcalPerUnit) || 0),
+        proteinPerUnit: Math.max(0, Number(row.proteinPerUnit) || 0),
+        carbs: Math.max(0, Number(row.carbs) || 0),
+        fat: Math.max(0, Number(row.fat) || 0)
+      });
+    });
+    if (cleaned.some(function (row) {
+      return !row.product;
+    })) {
+      setError("Every food needs a name.");
+      return;
+    }
+    var productKeys = cleaned.map(function (row) {
+      return foodProductKey(row.product);
+    });
+    if (new Set(productKeys).size !== productKeys.length) {
+      setError("Food names must be unique.");
+      return;
+    }
+    var foodCatalogOverrides = {};
+    var customFoodItems = [];
+    var hiddenFoodItems = [];
+    var foodCatalogOrder = [];
+    var savedRowsByKey = new Map();
+    cleaned.forEach(function (row, index) {
+      var isCustom = row._sourceType === "custom" || row._sourceType === "new";
+      var key = isCustom ? foodProductKey(row.product) : row._catalogKey || foodProductKey(row.product);
+      var values = {
+        product: row.product,
+        category: row.category,
+        kcalPerUnit: row.kcalPerUnit,
+        proteinPerUnit: row.proteinPerUnit,
+        carbs: row.carbs,
+        fat: row.fat,
+        macroSource: row.macroSource || "manual",
+        sourceLabel: row.sourceLabel || (row.macroSource === "estimate" ? "estimate" : "manual"),
+        sourceUrl: row.sourceUrl || ""
+      };
+      savedRowsByKey.set(key, values);
+      savedRowsByKey.set(foodProductKey(row.product), values);
+      foodCatalogOrder.push(key);
+      if (!row.visible) hiddenFoodItems.push(key);
+      if (isCustom) {
+        customFoodItems.push(_objectSpread(_objectSpread({}, values), {}, {
+          id: row.id || "food-".concat(Date.now(), "-").concat(index)
+        }));
+      } else {
+        foodCatalogOverrides[key] = values;
+      }
+    });
+    var foodByDate = Object.fromEntries(Object.entries(activeProfile.foodByDate || {}).map(function (_ref12) {
+      var _ref13 = _slicedToArray(_ref12, 2),
+        date = _ref13[0],
+        entries = _ref13[1];
+      return [date, (entries || []).map(function (entry) {
+        var values = savedRowsByKey.get(foodProductKey(entry.product));
+        if (!values) return entry;
+        var amount = Math.max(0, Number(entry.amount) || 1);
+        return _objectSpread(_objectSpread({}, entry), {}, {
+          kcal: Math.round(values.kcalPerUnit * amount * 10) / 10,
+          protein: Math.round(values.proteinPerUnit * amount * 10) / 10,
+          carbs: Math.round(values.carbs * amount * 10) / 10,
+          fat: Math.round(values.fat * amount * 10) / 10
+        });
+      })];
+    }));
+    updateProfile(activeProfile.id, {
+      customFoodItems: customFoodItems,
+      foodCatalogOverrides: foodCatalogOverrides,
+      foodCatalogOrder: foodCatalogOrder,
+      hiddenFoodItems: hiddenFoodItems,
+      foodByDate: foodByDate
+    });
+    onClose();
+  };
+  var labelCount = rows.filter(function (row) {
+    return row.macroSource === "label";
+  }).length;
+  var estimateCount = rows.filter(function (row) {
+    return row.macroSource === "estimate";
+  }).length;
+  return React.createElement("div", {
+    className: "food-library-backdrop",
+    onMouseDown: function onMouseDown(event) {
+      if (event.target === event.currentTarget) onClose();
+    }
+  }, React.createElement("div", {
+    className: "food-library-modal",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "Food library editor"
+  }, React.createElement("div", {
+    className: "food-library-head"
+  }, React.createElement("div", null, React.createElement("div", {
+    className: "kpi-label"
+  }, "Nutrition catalog"), React.createElement("h2", null, "Food library"), React.createElement("div", {
+    className: "body-band-sub"
+  }, rows.length, " foods \xB7 ", labelCount, " label sourced \xB7 ", estimateCount, " estimates")), React.createElement("button", {
+    className: "btn ghost sm icon-only",
+    onClick: onClose,
+    "aria-label": "Close food library"
+  }, React.createElement(VI.X, null))), React.createElement("div", {
+    className: "food-library-toolbar"
+  }, React.createElement("input", {
+    value: query,
+    onChange: function onChange(event) {
+      return setQuery(event.target.value);
+    },
+    placeholder: "Search ".concat(rows.length, " foods"),
+    "aria-label": "Search food library"
+  }), React.createElement("select", {
+    value: category,
+    onChange: function onChange(event) {
+      return setCategory(event.target.value);
+    },
+    "aria-label": "Filter food category"
+  }, React.createElement("option", {
+    value: "all"
+  }, "All categories"), categories.map(function (name) {
+    return React.createElement("option", {
+      key: name,
+      value: name
+    }, name);
+  })), React.createElement("label", {
+    className: "food-library-visible-toggle"
+  }, React.createElement("input", {
+    type: "checkbox",
+    checked: showHidden,
+    onChange: function onChange(event) {
+      return setShowHidden(event.target.checked);
+    }
+  }), "Show hidden"), React.createElement("button", {
+    className: "btn sm",
+    onClick: addRow
+  }, React.createElement(VI.Plus, null), " Add food")), React.createElement("div", {
+    className: "food-library-table-wrap"
+  }, React.createElement("table", {
+    className: "food-library-table"
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", {
+    className: "food-library-move-col"
+  }, "Move"), React.createElement("th", null, "Food"), React.createElement("th", null, "Category"), React.createElement("th", {
+    className: "num"
+  }, "kcal"), React.createElement("th", {
+    className: "num"
+  }, "Protein"), React.createElement("th", {
+    className: "num"
+  }, "Carbs"), React.createElement("th", {
+    className: "num"
+  }, "Fat"), React.createElement("th", null, "Source"), React.createElement("th", {
+    className: "food-library-actions-col"
+  }, "Visible"))), React.createElement("tbody", null, visibleRows.map(function (row) {
+    var index = rows.findIndex(function (item) {
+      return item._rowId === row._rowId;
+    });
+    var canDelete = row._sourceType === "custom" || row._sourceType === "new";
+    return React.createElement("tr", {
+      key: row._rowId,
+      className: "".concat(row.visible ? "" : "is-hidden", " ").concat(dragKey === row._rowId ? "is-dragging" : "").trim(),
+      onDragOver: function onDragOver(event) {
+        return event.preventDefault();
+      },
+      onDrop: function onDrop() {
+        return dropRow(row._rowId);
+      }
+    }, React.createElement("td", null, React.createElement("div", {
+      className: "food-library-move"
+    }, React.createElement("button", {
+      type: "button",
+      className: "food-drag-handle",
+      draggable: true,
+      onDragStart: function onDragStart() {
+        return setDragKey(row._rowId);
+      },
+      onDragEnd: function onDragEnd() {
+        return setDragKey(null);
+      },
+      title: "Drag to reorder"
+    }, "::"), React.createElement("button", {
+      type: "button",
+      className: "btn ghost sm",
+      disabled: index <= 0,
+      onClick: function onClick() {
+        return moveRow(row._rowId, -1);
+      }
+    }, "Up"), React.createElement("button", {
+      type: "button",
+      className: "btn ghost sm",
+      disabled: index >= rows.length - 1,
+      onClick: function onClick() {
+        return moveRow(row._rowId, 1);
+      }
+    }, "Dn"))), React.createElement("td", null, React.createElement("input", {
+      value: row.product,
+      onChange: function onChange(event) {
+        return updateRow(row._rowId, {
+          product: event.target.value
+        });
+      }
+    })), React.createElement("td", null, React.createElement("input", {
+      value: row.category || "",
+      onChange: function onChange(event) {
+        return updateRow(row._rowId, {
+          category: event.target.value
+        });
+      }
+    })), [["kcalPerUnit", "1"], ["proteinPerUnit", "0.1"], ["carbs", "0.1"], ["fat", "0.1"]].map(function (_ref14) {
+      var _ref15 = _slicedToArray(_ref14, 2),
+        field = _ref15[0],
+        step = _ref15[1];
+      return React.createElement("td", {
+        key: field
+      }, React.createElement("input", {
+        className: "num",
+        type: "number",
+        min: "0",
+        step: step,
+        value: row[field],
+        onChange: function onChange(event) {
+          return updateRow(row._rowId, _defineProperty({}, field, event.target.value));
+        }
+      }));
+    }), React.createElement("td", null, row.sourceUrl ? React.createElement("a", {
+      className: "food-source ".concat(row.macroSource || "").trim(),
+      href: row.sourceUrl,
+      target: "_blank",
+      rel: "noreferrer"
+    }, row.sourceLabel || "label") : React.createElement("span", {
+      className: "food-source ".concat(row.macroSource || "").trim()
+    }, row.sourceLabel || row.macroSource || "manual")), React.createElement("td", null, React.createElement("div", {
+      className: "food-library-row-actions"
+    }, React.createElement("label", {
+      className: "food-visibility-check",
+      title: row.visible ? "Visible in food pickers" : "Hidden from food pickers"
+    }, React.createElement("input", {
+      type: "checkbox",
+      checked: row.visible,
+      onChange: function onChange(event) {
+        return updateRow(row._rowId, {
+          visible: event.target.checked
+        });
+      }
+    }), React.createElement("span", null, row.visible ? "On" : "Off")), canDelete && React.createElement("button", {
+      className: "btn ghost sm icon-only",
+      type: "button",
+      title: "Delete custom food",
+      onClick: function onClick() {
+        return removeCustomRow(row._rowId);
+      }
+    }, React.createElement(VI.X, null)))));
+  }))), visibleRows.length === 0 && React.createElement("div", {
+    className: "empty"
+  }, "No foods match these filters.")), React.createElement("div", {
+    className: "food-library-foot"
+  }, React.createElement("div", null, error ? React.createElement("span", {
+    className: "food-library-error"
+  }, error) : React.createElement("span", {
+    className: "kpi-label"
+  }, "Changes apply to quick add, food logging, daily totals, export, and synced profile data.")), React.createElement("button", {
+    className: "btn ghost sm",
+    onClick: onClose
+  }, "Cancel"), React.createElement("button", {
+    className: "btn primary sm",
+    onClick: save
+  }, "Save library"))));
+}
+function WeightEntryModal(_ref16) {
+  var onClose = _ref16.onClose,
+    onSave = _ref16.onSave,
+    lookupExisting = _ref16.lookupExisting;
+  var _useS45 = useS(window.RepsData.TODAY),
+    _useS46 = _slicedToArray(_useS45, 2),
+    date = _useS46[0],
+    setDate = _useS46[1];
+  var initial = lookupExisting ? lookupExisting(window.RepsData.TODAY) : null;
+  var _useS47 = useS(initial && initial.value != null ? String(initial.value) : ""),
+    _useS48 = _slicedToArray(_useS47, 2),
+    weight = _useS48[0],
+    setWeight = _useS48[1];
+  var _useS49 = useS(initial && initial.note ? initial.note : ""),
+    _useS50 = _slicedToArray(_useS49, 2),
+    note = _useS50[0],
+    setNote = _useS50[1];
   React.useEffect(function () {
     if (!lookupExisting) return;
     var existing = lookupExisting(date);
@@ -9049,24 +9489,24 @@ function WeightEntryModal(_ref11) {
     disabled: !weight
   }, React.createElement(VI.Plus, null), " Log")))));
 }
-function EditableNumberCell(_ref12) {
-  var value = _ref12.value,
-    placeholder = _ref12.placeholder,
-    suffix = _ref12.suffix,
-    onSave = _ref12.onSave,
-    onClear = _ref12.onClear,
-    color = _ref12.color,
-    allowDecimals = _ref12.allowDecimals,
-    _ref12$alignRight = _ref12.alignRight,
-    alignRight = _ref12$alignRight === void 0 ? true : _ref12$alignRight;
-  var _useS39 = useS(false),
-    _useS40 = _slicedToArray(_useS39, 2),
-    editing = _useS40[0],
-    setEditing = _useS40[1];
-  var _useS41 = useS(""),
-    _useS42 = _slicedToArray(_useS41, 2),
-    draft = _useS42[0],
-    setDraft = _useS42[1];
+function EditableNumberCell(_ref17) {
+  var value = _ref17.value,
+    placeholder = _ref17.placeholder,
+    suffix = _ref17.suffix,
+    onSave = _ref17.onSave,
+    onClear = _ref17.onClear,
+    color = _ref17.color,
+    allowDecimals = _ref17.allowDecimals,
+    _ref17$alignRight = _ref17.alignRight,
+    alignRight = _ref17$alignRight === void 0 ? true : _ref17$alignRight;
+  var _useS51 = useS(false),
+    _useS52 = _slicedToArray(_useS51, 2),
+    editing = _useS52[0],
+    setEditing = _useS52[1];
+  var _useS53 = useS(""),
+    _useS54 = _slicedToArray(_useS53, 2),
+    draft = _useS54[0],
+    setDraft = _useS54[1];
   var start = function start() {
     setDraft(value != null && value !== "" ? String(value) : "");
     setEditing(true);
@@ -9140,18 +9580,18 @@ function EditableNumberCell(_ref12) {
     }
   }, placeholder || "—"));
 }
-function EditableTextCell(_ref13) {
-  var value = _ref13.value,
-    placeholder = _ref13.placeholder,
-    onSave = _ref13.onSave;
-  var _useS43 = useS(false),
-    _useS44 = _slicedToArray(_useS43, 2),
-    editing = _useS44[0],
-    setEditing = _useS44[1];
-  var _useS45 = useS(""),
-    _useS46 = _slicedToArray(_useS45, 2),
-    draft = _useS46[0],
-    setDraft = _useS46[1];
+function EditableTextCell(_ref18) {
+  var value = _ref18.value,
+    placeholder = _ref18.placeholder,
+    onSave = _ref18.onSave;
+  var _useS55 = useS(false),
+    _useS56 = _slicedToArray(_useS55, 2),
+    editing = _useS56[0],
+    setEditing = _useS56[1];
+  var _useS57 = useS(""),
+    _useS58 = _slicedToArray(_useS57, 2),
+    draft = _useS58[0],
+    setDraft = _useS58[1];
   var start = function start() {
     setDraft(value || "");
     setEditing(true);
@@ -9211,11 +9651,11 @@ function roundLedgerMacro(value) {
   var scale = Math.pow(10, decimals);
   return Math.round(n * scale) / scale;
 }
-function LedgerFoodDetails(_ref14) {
-  var date = _ref14.date,
-    foods = _ref14.foods,
-    onAddFood = _ref14.onAddFood,
-    onRemoveFood = _ref14.onRemoveFood;
+function LedgerFoodDetails(_ref19) {
+  var date = _ref19.date,
+    foods = _ref19.foods,
+    onAddFood = _ref19.onAddFood,
+    onRemoveFood = _ref19.onRemoveFood;
   var totals = foods.reduce(function (sum, f) {
     return {
       kcal: sum.kcal + (Number(f.kcal) || 0),
@@ -9282,27 +9722,27 @@ function LedgerFoodDetails(_ref14) {
     }, React.createElement(VI.X, null)));
   })));
 }
-function DailyLogTable(_ref15) {
-  var bodyD = _ref15.bodyD,
-    kcal = _ref15.kcal,
-    protein = _ref15.protein,
-    activeProfile = _ref15.activeProfile,
-    updateProfile = _ref15.updateProfile,
-    updateDailyOverride = _ref15.updateDailyOverride,
-    clearDailyOverride = _ref15.clearDailyOverride,
-    selectedDate = _ref15.selectedDate,
-    onSelectDate = _ref15.onSelectDate,
-    onAddFoodForDate = _ref15.onAddFoodForDate,
-    onRemoveFoodForDate = _ref15.onRemoveFoodForDate,
-    _ref15$foodsOpen = _ref15.foodsOpen,
-    foodsOpen = _ref15$foodsOpen === void 0 ? true : _ref15$foodsOpen,
-    onFoodsOpenChange = _ref15.onFoodsOpenChange,
-    _ref15$className = _ref15.className,
-    className = _ref15$className === void 0 ? "" : _ref15$className;
-  var _useS47 = useS("14"),
-    _useS48 = _slicedToArray(_useS47, 2),
-    rangeDays = _useS48[0],
-    setRangeDays = _useS48[1];
+function DailyLogTable(_ref20) {
+  var bodyD = _ref20.bodyD,
+    kcal = _ref20.kcal,
+    protein = _ref20.protein,
+    activeProfile = _ref20.activeProfile,
+    updateProfile = _ref20.updateProfile,
+    updateDailyOverride = _ref20.updateDailyOverride,
+    clearDailyOverride = _ref20.clearDailyOverride,
+    selectedDate = _ref20.selectedDate,
+    onSelectDate = _ref20.onSelectDate,
+    onAddFoodForDate = _ref20.onAddFoodForDate,
+    onRemoveFoodForDate = _ref20.onRemoveFoodForDate,
+    _ref20$foodsOpen = _ref20.foodsOpen,
+    foodsOpen = _ref20$foodsOpen === void 0 ? true : _ref20$foodsOpen,
+    onFoodsOpenChange = _ref20.onFoodsOpenChange,
+    _ref20$className = _ref20.className,
+    className = _ref20$className === void 0 ? "" : _ref20$className;
+  var _useS59 = useS("14"),
+    _useS60 = _slicedToArray(_useS59, 2),
+    rangeDays = _useS60[0],
+    setRangeDays = _useS60[1];
   var today = window.RepsData.TODAY;
   var overrides = activeProfile.dailyOverrides || {};
   var foodByDate = activeProfile.foodByDate || {};
@@ -9731,14 +10171,14 @@ function buildTrajectoryModel(profile, estimate, bodyD) {
     endDate: endDate
   };
 }
-function EnergyCommandBand(_ref16) {
+function EnergyCommandBand(_ref21) {
   var _window$RepsState2, _estimate$confidence, _estimate$confidence2, _profile$targetWeight;
-  var profile = _ref16.profile,
-    estimate = _ref16.estimate,
-    windowDays = _ref16.windowDays,
-    setWindowDays = _ref16.setWindowDays,
-    updateProfile = _ref16.updateProfile,
-    onApply = _ref16.onApply;
+  var profile = _ref21.profile,
+    estimate = _ref21.estimate,
+    windowDays = _ref21.windowDays,
+    setWindowDays = _ref21.setWindowDays,
+    updateProfile = _ref21.updateProfile,
+    onApply = _ref21.onApply;
   var phases = ((_window$RepsState2 = window.RepsState) === null || _window$RepsState2 === void 0 ? void 0 : _window$RepsState2.PHASES) || {};
   var savedTarget = avgMacroKcal(profile);
   var targetDelta = estimate !== null && estimate !== void 0 && estimate.ready && savedTarget != null ? estimate.recommendedTargetKcal - savedTarget : null;
@@ -9809,10 +10249,10 @@ function EnergyCommandBand(_ref16) {
         phase: e.target.value
       });
     }
-  }, Object.entries(phases).map(function (_ref17) {
-    var _ref18 = _slicedToArray(_ref17, 2),
-      key = _ref18[0],
-      p = _ref18[1];
+  }, Object.entries(phases).map(function (_ref22) {
+    var _ref23 = _slicedToArray(_ref22, 2),
+      key = _ref23[0],
+      p = _ref23[1];
     return React.createElement("option", {
       key: key,
       value: key
@@ -9838,14 +10278,14 @@ function EnergyCommandBand(_ref16) {
     className: "tnum"
   }, Number.isFinite(targetWeight) ? "".concat(targetWeight.toFixed(1), " kg") : "—"))));
 }
-function MacroProgressRow(_ref19) {
-  var label = _ref19.label,
-    value = _ref19.value,
-    target = _ref19.target,
-    _ref19$unit = _ref19.unit,
-    unit = _ref19$unit === void 0 ? "" : _ref19$unit,
-    _ref19$fillClass = _ref19.fillClass,
-    fillClass = _ref19$fillClass === void 0 ? "" : _ref19$fillClass;
+function MacroProgressRow(_ref24) {
+  var label = _ref24.label,
+    value = _ref24.value,
+    target = _ref24.target,
+    _ref24$unit = _ref24.unit,
+    unit = _ref24$unit === void 0 ? "" : _ref24$unit,
+    _ref24$fillClass = _ref24.fillClass,
+    fillClass = _ref24$fillClass === void 0 ? "" : _ref24$fillClass;
   var roundedValue = Math.round(Number(value) || 0);
   var roundedTarget = Math.round(Number(target) || 0);
   return React.createElement("div", {
@@ -9909,42 +10349,83 @@ function foodUsageStats() {
 function allFoodCatalogItems() {
   var profile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var catalogItems = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
+  var options = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : {};
   var hidden = new Set((profile.hiddenFoodItems || []).map(foodProductKey));
+  var overrides = profile.foodCatalogOverrides || {};
+  var manualOrder = profile.foodCatalogOrder || [];
+  var orderIndex = new Map(manualOrder.map(function (key, index) {
+    return [foodProductKey(key), index];
+  }));
+  var defaults = window.REPS_FOOD_MACRO_DEFAULTS || {};
   var usage = foodUsageStats(profile.foodByDate || {});
   var source = [].concat(_toConsumableArray(profile.customFoodItems || []), _toConsumableArray(catalogItems || []));
   var itemsByKey = new Map();
   source.forEach(function (item, index) {
-    var _ref20, _finiteFoodNumber5, _ref21, _finiteFoodNumber6, _ref22, _finiteFoodNumber7, _ref23, _finiteFoodNumber8;
     var product = String(item.product || "").trim();
     var key = foodProductKey(product);
-    if (!key || hidden.has(key) || itemsByKey.has(key)) return;
+    if (!key || itemsByKey.has(key)) return;
     var used = usage.get(key);
-    itemsByKey.set(key, _objectSpread(_objectSpread({}, item), {}, {
-      product: product,
-      kcalPerUnit: (_ref20 = (_finiteFoodNumber5 = finiteFoodNumber(item.kcalPerUnit)) !== null && _finiteFoodNumber5 !== void 0 ? _finiteFoodNumber5 : used === null || used === void 0 ? void 0 : used.kcalPerUnit) !== null && _ref20 !== void 0 ? _ref20 : 0,
-      proteinPerUnit: (_ref21 = (_finiteFoodNumber6 = finiteFoodNumber(item.proteinPerUnit)) !== null && _finiteFoodNumber6 !== void 0 ? _finiteFoodNumber6 : used === null || used === void 0 ? void 0 : used.proteinPerUnit) !== null && _ref21 !== void 0 ? _ref21 : 0,
-      carbs: (_ref22 = (_finiteFoodNumber7 = finiteFoodNumber(item.carbs)) !== null && _finiteFoodNumber7 !== void 0 ? _finiteFoodNumber7 : used === null || used === void 0 ? void 0 : used.carbs) !== null && _ref22 !== void 0 ? _ref22 : 0,
-      fat: (_ref23 = (_finiteFoodNumber8 = finiteFoodNumber(item.fat)) !== null && _finiteFoodNumber8 !== void 0 ? _finiteFoodNumber8 : used === null || used === void 0 ? void 0 : used.fat) !== null && _ref23 !== void 0 ? _ref23 : 0,
+    var seed = defaults[key] || null;
+    var override = overrides[key] || {};
+    var isMigrated = String(item.id || "").startsWith("migrated-food-");
+    var valueFor = function valueFor(field) {
+      var _finiteFoodNumber5, _finiteFoodNumber6, _finiteFoodNumber7;
+      if (Object.prototype.hasOwnProperty.call(override, field)) return (_finiteFoodNumber5 = finiteFoodNumber(override[field])) !== null && _finiteFoodNumber5 !== void 0 ? _finiteFoodNumber5 : 0;
+      if (seed && (!item.id || isMigrated)) return (_finiteFoodNumber6 = finiteFoodNumber(seed[field])) !== null && _finiteFoodNumber6 !== void 0 ? _finiteFoodNumber6 : 0;
+      var own = finiteFoodNumber(item[field]);
+      if (own != null) return own;
+      var seeded = finiteFoodNumber(seed === null || seed === void 0 ? void 0 : seed[field]);
+      if (seeded != null) return seeded;
+      return (_finiteFoodNumber7 = finiteFoodNumber(used === null || used === void 0 ? void 0 : used[field])) !== null && _finiteFoodNumber7 !== void 0 ? _finiteFoodNumber7 : 0;
+    };
+    var effectiveProduct = String(override.product || product).trim() || product;
+    var effectiveKey = foodProductKey(effectiveProduct);
+    itemsByKey.set(key, _objectSpread(_objectSpread(_objectSpread(_objectSpread({}, seed || {}), item), override), {}, {
+      product: effectiveProduct,
+      category: override.category || item.category || (seed === null || seed === void 0 ? void 0 : seed.category) || "Other",
+      kcalPerUnit: valueFor("kcalPerUnit"),
+      proteinPerUnit: valueFor("proteinPerUnit"),
+      carbs: valueFor("carbs"),
+      fat: valueFor("fat"),
+      macroSource: override.macroSource || item.macroSource || (seed === null || seed === void 0 ? void 0 : seed.macroSource) || "",
+      sourceLabel: override.sourceLabel || item.sourceLabel || (seed === null || seed === void 0 ? void 0 : seed.sourceLabel) || "",
+      sourceUrl: override.sourceUrl || item.sourceUrl || (seed === null || seed === void 0 ? void 0 : seed.sourceUrl) || "",
+      _catalogKey: key,
+      _sourceType: item.id ? "custom" : "catalog",
+      _hidden: hidden.has(key) || hidden.has(effectiveKey),
       _quickCount: (used === null || used === void 0 ? void 0 : used.count) || 0,
       _quickLastDate: (used === null || used === void 0 ? void 0 : used.lastDate) || "",
       _quickIndex: index
     }));
   });
   usage.forEach(function (used, key) {
-    if (itemsByKey.has(key) || hidden.has(key)) return;
-    itemsByKey.set(key, {
-      product: used.product,
-      category: "Logged before",
-      kcalPerUnit: used.kcalPerUnit || 0,
-      proteinPerUnit: used.proteinPerUnit || 0,
-      carbs: used.carbs || 0,
-      fat: used.fat || 0,
+    var _ref25, _finiteFoodNumber8, _ref26, _finiteFoodNumber9, _ref27, _finiteFoodNumber0, _ref28, _finiteFoodNumber1;
+    if (itemsByKey.has(key)) return;
+    var override = overrides[key] || {};
+    var effectiveProduct = String(override.product || used.product).trim() || used.product;
+    itemsByKey.set(key, _objectSpread(_objectSpread({}, override), {}, {
+      product: effectiveProduct,
+      category: override.category || "Logged before",
+      kcalPerUnit: (_ref25 = (_finiteFoodNumber8 = finiteFoodNumber(override.kcalPerUnit)) !== null && _finiteFoodNumber8 !== void 0 ? _finiteFoodNumber8 : used.kcalPerUnit) !== null && _ref25 !== void 0 ? _ref25 : 0,
+      proteinPerUnit: (_ref26 = (_finiteFoodNumber9 = finiteFoodNumber(override.proteinPerUnit)) !== null && _finiteFoodNumber9 !== void 0 ? _finiteFoodNumber9 : used.proteinPerUnit) !== null && _ref26 !== void 0 ? _ref26 : 0,
+      carbs: (_ref27 = (_finiteFoodNumber0 = finiteFoodNumber(override.carbs)) !== null && _finiteFoodNumber0 !== void 0 ? _finiteFoodNumber0 : used.carbs) !== null && _ref27 !== void 0 ? _ref27 : 0,
+      fat: (_ref28 = (_finiteFoodNumber1 = finiteFoodNumber(override.fat)) !== null && _finiteFoodNumber1 !== void 0 ? _finiteFoodNumber1 : used.fat) !== null && _ref28 !== void 0 ? _ref28 : 0,
+      _catalogKey: key,
+      _sourceType: "logged",
+      _hidden: hidden.has(key) || hidden.has(foodProductKey(effectiveProduct)),
       _quickCount: used.count || 0,
       _quickLastDate: used.lastDate || "",
       _quickIndex: source.length + itemsByKey.size
-    });
+    }));
   });
-  return Array.from(itemsByKey.values()).sort(function (a, b) {
+  return Array.from(itemsByKey.values()).filter(function (item) {
+    return options.includeHidden || !item._hidden;
+  }).sort(function (a, b) {
+    if (orderIndex.size) {
+      var ai = orderIndex.has(a._catalogKey) ? orderIndex.get(a._catalogKey) : Number.MAX_SAFE_INTEGER;
+      var bi = orderIndex.has(b._catalogKey) ? orderIndex.get(b._catalogKey) : Number.MAX_SAFE_INTEGER;
+      if (ai !== bi) return ai - bi;
+    }
     var countDiff = (b._quickCount || 0) - (a._quickCount || 0);
     if (countDiff) return countDiff;
     var lastDiff = String(b._quickLastDate || "").localeCompare(String(a._quickLastDate || ""));
@@ -9958,25 +10439,25 @@ function quickFoodSuggestions() {
   var limit = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : 10;
   return allFoodCatalogItems(profile, catalogItems).slice(0, limit);
 }
-function TodayRailBand(_ref24) {
-  var selectedDate = _ref24.selectedDate,
-    setSelectedDate = _ref24.setSelectedDate,
-    todayIso = _ref24.todayIso,
-    selectedDayKey = _ref24.selectedDayKey,
-    targets = _ref24.targets,
-    todayKcal = _ref24.todayKcal,
-    todayProtein = _ref24.todayProtein,
-    todayCarbs = _ref24.todayCarbs,
-    todayFat = _ref24.todayFat,
-    trackCarbs = _ref24.trackCarbs,
-    trackFat = _ref24.trackFat,
-    entries = _ref24.entries,
-    activeProfile = _ref24.activeProfile,
-    foodItems = _ref24.foodItems,
-    addFoodEntry = _ref24.addFoodEntry,
-    removeFoodEntry = _ref24.removeFoodEntry,
-    setShowWeightModal = _ref24.setShowWeightModal,
-    onAddFoodForDate = _ref24.onAddFoodForDate;
+function TodayRailBand(_ref29) {
+  var selectedDate = _ref29.selectedDate,
+    setSelectedDate = _ref29.setSelectedDate,
+    todayIso = _ref29.todayIso,
+    selectedDayKey = _ref29.selectedDayKey,
+    targets = _ref29.targets,
+    todayKcal = _ref29.todayKcal,
+    todayProtein = _ref29.todayProtein,
+    todayCarbs = _ref29.todayCarbs,
+    todayFat = _ref29.todayFat,
+    trackCarbs = _ref29.trackCarbs,
+    trackFat = _ref29.trackFat,
+    entries = _ref29.entries,
+    activeProfile = _ref29.activeProfile,
+    foodItems = _ref29.foodItems,
+    addFoodEntry = _ref29.addFoodEntry,
+    removeFoodEntry = _ref29.removeFoodEntry,
+    setShowWeightModal = _ref29.setShowWeightModal,
+    onAddFoodForDate = _ref29.onAddFoodForDate;
   var loggedLabel = selectedDate === todayIso ? "Today" : RepsData.shortDate(selectedDate);
   var quickFoods = _um(function () {
     return quickFoodSuggestions(activeProfile, foodItems, 10);
@@ -10121,11 +10602,11 @@ function TodayRailBand(_ref24) {
     }, React.createElement("span", null, f.product), React.createElement("em", null, Math.round(f.kcalPerUnit), "k \xB7 ", f.proteinPerUnit, "p"));
   })))));
 }
-function GoalTrajectoryBand(_ref25) {
+function GoalTrajectoryBand(_ref30) {
   var _model$eta, _estimate$confidence3, _estimate$confidence4;
-  var profile = _ref25.profile,
-    estimate = _ref25.estimate,
-    bodyD = _ref25.bodyD;
+  var profile = _ref30.profile,
+    estimate = _ref30.estimate,
+    bodyD = _ref30.bodyD;
   var model = buildTrajectoryModel(profile, estimate, bodyD);
   var latest = model.latest;
   var targetWeight = Number(model.targetWeight);
@@ -10197,22 +10678,26 @@ function Body() {
     updateDailyOverride = _window$RepsState$use.updateDailyOverride,
     clearDailyOverride = _window$RepsState$use.clearDailyOverride;
   var todayIso = window.RepsData.TODAY;
-  var _useS49 = useS(todayIso),
-    _useS50 = _slicedToArray(_useS49, 2),
-    selectedDate = _useS50[0],
-    setSelectedDate = _useS50[1];
-  var _useS51 = useS(false),
-    _useS52 = _slicedToArray(_useS51, 2),
-    showWeightModal = _useS52[0],
-    setShowWeightModal = _useS52[1];
-  var _useS53 = useS(28),
-    _useS54 = _slicedToArray(_useS53, 2),
-    tdeeWindowDays = _useS54[0],
-    setTdeeWindowDays = _useS54[1];
-  var _useS55 = useS(null),
-    _useS56 = _slicedToArray(_useS55, 2),
-    foodModalDate = _useS56[0],
-    setFoodModalDate = _useS56[1];
+  var _useS61 = useS(todayIso),
+    _useS62 = _slicedToArray(_useS61, 2),
+    selectedDate = _useS62[0],
+    setSelectedDate = _useS62[1];
+  var _useS63 = useS(false),
+    _useS64 = _slicedToArray(_useS63, 2),
+    showWeightModal = _useS64[0],
+    setShowWeightModal = _useS64[1];
+  var _useS65 = useS(false),
+    _useS66 = _slicedToArray(_useS65, 2),
+    showFoodLibrary = _useS66[0],
+    setShowFoodLibrary = _useS66[1];
+  var _useS67 = useS(28),
+    _useS68 = _slicedToArray(_useS67, 2),
+    tdeeWindowDays = _useS68[0],
+    setTdeeWindowDays = _useS68[1];
+  var _useS69 = useS(null),
+    _useS70 = _slicedToArray(_useS69, 2),
+    foodModalDate = _useS70[0],
+    setFoodModalDate = _useS70[1];
   var selectedDayKey = window.RepsData.dayName(selectedDate);
   var targets = activeProfile.macros[selectedDayKey] || {
     kcal: 2000,
@@ -10282,10 +10767,10 @@ function Body() {
   }, [activeProfile]);
   var foodItems = RepsData.foodItems;
   var selectedOverride = dailyOverrides[selectedDate] || {};
-  var _useS57 = useS(false),
-    _useS58 = _slicedToArray(_useS57, 2),
-    showAddFood = _useS58[0],
-    setShowAddFood = _useS58[1];
+  var _useS71 = useS(false),
+    _useS72 = _slicedToArray(_useS71, 2),
+    showAddFood = _useS72[0],
+    setShowAddFood = _useS72[1];
   var ledgerFoodsOpen = activeProfile.bodyLedgerFoodsOpen !== false;
   var entries = (activeProfile.foodByDate || {})[selectedDate] || [];
   var foodKcal = entries.reduce(function (s, f) {
@@ -10336,7 +10821,14 @@ function Body() {
     className: "page-title"
   }, "Body"), React.createElement("div", {
     className: "page-sub"
-  }, "Adaptive energy targets \xB7 daily nutrition cockpit \xB7 bodyweight trajectory"))), React.createElement("div", {
+  }, "Adaptive energy targets \xB7 daily nutrition cockpit \xB7 bodyweight trajectory")), React.createElement("div", {
+    className: "page-actions"
+  }, React.createElement("button", {
+    className: "btn sm",
+    onClick: function onClick() {
+      return setShowFoodLibrary(true);
+    }
+  }, "Food library"))), React.createElement("div", {
     className: "body-mobile-date-actions"
   }, React.createElement("div", {
     className: "body-date-nav"
@@ -10364,6 +10856,11 @@ function Body() {
       return setSelectedDate(todayIso);
     }
   }, "Today")), React.createElement("button", {
+    className: "btn sm",
+    onClick: function onClick() {
+      return setShowFoodLibrary(true);
+    }
+  }, "Food library"), React.createElement("button", {
     className: "btn sm",
     onClick: function onClick() {
       return setShowWeightModal(true);
@@ -10434,6 +10931,13 @@ function Body() {
     onSaveToCatalog: function onSaveToCatalog(item) {
       return addCustomFoodItem && addCustomFoodItem(item);
     }
+  }), showFoodLibrary && React.createElement(FoodLibraryModal, {
+    activeProfile: activeProfile,
+    updateProfile: updateProfile,
+    catalogItems: foodItems,
+    onClose: function onClose() {
+      return setShowFoodLibrary(false);
+    }
   }), showWeightModal && React.createElement(WeightEntryModal, {
     onClose: function onClose() {
       return setShowWeightModal(false);
@@ -10476,10 +10980,10 @@ function Body() {
     }
   }));
 }
-function MacroCell(_ref26) {
-  var value = _ref26.value,
-    _onChange = _ref26.onChange,
-    suffix = _ref26.suffix;
+function MacroCell(_ref31) {
+  var value = _ref31.value,
+    _onChange = _ref31.onChange,
+    suffix = _ref31.suffix;
   return React.createElement("div", {
     className: "set-cell",
     style: {
@@ -10505,28 +11009,28 @@ function MacroCell(_ref26) {
     }
   }, suffix));
 }
-function AddBlockModal(_ref27) {
-  var initialBlock = _ref27.initialBlock,
-    onClose = _ref27.onClose,
-    onSave = _ref27.onSave,
-    onDelete = _ref27.onDelete;
+function AddBlockModal(_ref32) {
+  var initialBlock = _ref32.initialBlock,
+    onClose = _ref32.onClose,
+    onSave = _ref32.onSave,
+    onDelete = _ref32.onDelete;
   var isEdit = !!initialBlock;
-  var _useS59 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.name) || "Block " + new Date().getFullYear()),
-    _useS60 = _slicedToArray(_useS59, 2),
-    name = _useS60[0],
-    setName = _useS60[1];
-  var _useS61 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.startDate) || window.RepsData.TODAY),
-    _useS62 = _slicedToArray(_useS61, 2),
-    startDate = _useS62[0],
-    setStartDate = _useS62[1];
-  var _useS63 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.weeks) || 8),
-    _useS64 = _slicedToArray(_useS63, 2),
-    weeks = _useS64[0],
-    setWeeks = _useS64[1];
-  var _useS65 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.goal) || ""),
-    _useS66 = _slicedToArray(_useS65, 2),
-    goal = _useS66[0],
-    setGoal = _useS66[1];
+  var _useS73 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.name) || "Block " + new Date().getFullYear()),
+    _useS74 = _slicedToArray(_useS73, 2),
+    name = _useS74[0],
+    setName = _useS74[1];
+  var _useS75 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.startDate) || window.RepsData.TODAY),
+    _useS76 = _slicedToArray(_useS75, 2),
+    startDate = _useS76[0],
+    setStartDate = _useS76[1];
+  var _useS77 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.weeks) || 8),
+    _useS78 = _slicedToArray(_useS77, 2),
+    weeks = _useS78[0],
+    setWeeks = _useS78[1];
+  var _useS79 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.goal) || ""),
+    _useS80 = _slicedToArray(_useS79, 2),
+    goal = _useS80[0],
+    setGoal = _useS80[1];
   var submit = function submit() {
     if (!name.trim()) return;
     var parsedWeeks = Math.max(1, Math.min(52, Number(weeks) || 8));
@@ -11345,11 +11849,11 @@ function saveExportPrefs(prefs) {
     localStorage.setItem("reps-export-prefs-v1", JSON.stringify(prefs));
   } catch (e) {}
 }
-function ToggleRow(_ref28) {
-  var label = _ref28.label,
-    sub = _ref28.sub,
-    checked = _ref28.checked,
-    _onChange2 = _ref28.onChange;
+function ToggleRow(_ref33) {
+  var label = _ref33.label,
+    sub = _ref33.sub,
+    checked = _ref33.checked,
+    _onChange2 = _ref33.onChange;
   return React.createElement("label", {
     style: {
       display: "flex",
@@ -11507,9 +12011,9 @@ function ExportView() {
     if (prefs.includeFoodLog) {
       var food = app.activeProfile.foodByDate || {};
       var cutoff = range === "all" ? "0000-01-01" : RepsData.addDays(RepsData.TODAY, -Number(range));
-      out.food_log = Object.fromEntries(Object.entries(food).filter(function (_ref29) {
-        var _ref30 = _slicedToArray(_ref29, 1),
-          d = _ref30[0];
+      out.food_log = Object.fromEntries(Object.entries(food).filter(function (_ref34) {
+        var _ref35 = _slicedToArray(_ref34, 1),
+          d = _ref35[0];
         return d >= cutoff;
       }));
     }
@@ -11583,7 +12087,7 @@ function ExportView() {
     }, 100);
   };
   var handleCopy = function () {
-    var _ref31 = _asyncToGenerator(_regenerator().m(function _callee() {
+    var _ref36 = _asyncToGenerator(_regenerator().m(function _callee() {
       var ta, _t;
       return _regenerator().w(function (_context) {
         while (1) switch (_context.p = _context.n) {
@@ -11619,7 +12123,7 @@ function ExportView() {
       }, _callee, null, [[0, 2]]);
     }));
     return function handleCopy() {
-      return _ref31.apply(this, arguments);
+      return _ref36.apply(this, arguments);
     };
   }();
   var handleReset = function handleReset() {
