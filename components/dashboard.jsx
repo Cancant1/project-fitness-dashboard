@@ -404,7 +404,12 @@ function Dashboard({ setView }) {
             <span className="chip">{app.activeProfile.targetWeight != null ? `target ${app.activeProfile.targetWeight.toFixed(1)}kg` : "set target in Settings"}</span>
           </div>
           <div className="panel-body chart-card">
-            <LineArea data={bodyD} width={420} height={200} target={app.activeProfile.targetWeight} />
+            <LineArea
+              data={bodyD}
+              width={420}
+              height={200}
+              target={app.activeProfile.targetWeight}
+              current={latestWeight?.value} />
           </div>
         </div>
       </div>

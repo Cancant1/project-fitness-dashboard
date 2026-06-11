@@ -2302,10 +2302,26 @@ table { border-collapse: collapse; }
   height: 186px;
   border: var(--hair);
   border-radius: var(--r);
-  background:
-    linear-gradient(to bottom, transparent calc(50% - 0.5px), var(--hairline) calc(50% - 0.5px), var(--hairline) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
-    var(--surface);
+  background: var(--surface);
   overflow: hidden;
+}
+.trajectory-grid {
+  stroke: var(--hairline);
+  stroke-dasharray: 2 4;
+  vector-effect: non-scaling-stroke;
+}
+.trajectory-grid.vertical {
+  opacity: 0.7;
+}
+.trajectory-axis-label,
+.trajectory-target-label {
+  fill: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+}
+.trajectory-target-label {
+  fill: var(--accent-ink);
+  font-weight: 600;
 }
 .trajectory-path,
 .trajectory-projection {
@@ -2324,13 +2340,11 @@ table { border-collapse: collapse; }
   stroke-dasharray: 4 4;
   vector-effect: non-scaling-stroke;
 }
-.trajectory-axis {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 6px;
-  color: var(--muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
+.trajectory-current-dot {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
 }
 .trajectory-metrics {
   display: grid;
@@ -3568,6 +3582,29 @@ table { border-collapse: collapse; }
 .chart-card svg { display: block; width: 100%; height: auto; overflow: visible; }
 .chart-axis { font-family: var(--font-mono); font-size: 9px; fill: var(--muted); }
 .chart-grid { stroke: var(--hairline); stroke-dasharray: 2 4; }
+.chart-month-grid { stroke: var(--hairline); opacity: 0.6; }
+.chart-target-line {
+  stroke: var(--accent);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+  opacity: 0.65;
+  vector-effect: non-scaling-stroke;
+}
+.chart-current-line {
+  stroke: var(--ink);
+  stroke-dasharray: 5 3;
+  stroke-width: 1;
+  opacity: 0.72;
+  vector-effect: non-scaling-stroke;
+}
+.chart-reference-label {
+  fill: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 8px;
+}
+.chart-reference-label.current {
+  fill: var(--ink);
+}
 .chart-line { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .chart-line.accent { stroke: var(--accent); }
 .chart-area { fill: var(--accent-soft); }

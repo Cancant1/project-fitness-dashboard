@@ -146,6 +146,12 @@ I.Edit = function () {
 window.RepsIcons = I;
 
 /* ---- components/charts.jsx ---- */
+function _typeof(o) { "@babel/helpers - typeof"; return _typeof = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function (o) { return typeof o; } : function (o) { return o && "function" == typeof Symbol && o.constructor === Symbol && o !== Symbol.prototype ? "symbol" : typeof o; }, _typeof(o); }
+function ownKeys(e, r) { var t = Object.keys(e); if (Object.getOwnPropertySymbols) { var o = Object.getOwnPropertySymbols(e); r && (o = o.filter(function (r) { return Object.getOwnPropertyDescriptor(e, r).enumerable; })), t.push.apply(t, o); } return t; }
+function _objectSpread(e) { for (var r = 1; r < arguments.length; r++) { var t = null != arguments[r] ? arguments[r] : {}; r % 2 ? ownKeys(Object(t), !0).forEach(function (r) { _defineProperty(e, r, t[r]); }) : Object.getOwnPropertyDescriptors ? Object.defineProperties(e, Object.getOwnPropertyDescriptors(t)) : ownKeys(Object(t)).forEach(function (r) { Object.defineProperty(e, r, Object.getOwnPropertyDescriptor(t, r)); }); } return e; }
+function _defineProperty(e, r, t) { return (r = _toPropertyKey(r)) in e ? Object.defineProperty(e, r, { value: t, enumerable: !0, configurable: !0, writable: !0 }) : e[r] = t, e; }
+function _toPropertyKey(t) { var i = _toPrimitive(t, "string"); return "symbol" == _typeof(i) ? i : i + ""; }
+function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e = t[Symbol.toPrimitive]; if (void 0 !== e) { var i = e.call(t, r || "default"); if ("object" != _typeof(i)) return i; throw new TypeError("@@toPrimitive must return a primitive value."); } return ("string" === r ? String : Number)(t); }
 function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
 function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -281,6 +287,36 @@ function StackedBars(_ref2) {
     }, d.label));
   }));
 }
+function chartDateMs(date) {
+  var timestamp = Date.parse("".concat(date, "T00:00:00Z"));
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+function monthlyChartTicks(startMs, endMs) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return [];
+  var spansYears = new Date(startMs).getUTCFullYear() !== new Date(endMs).getUTCFullYear();
+  var format = function format(timestamp) {
+    return new Intl.DateTimeFormat("en-GB", _objectSpread({
+      month: "short"
+    }, spansYears ? {
+      year: "2-digit"
+    } : {})).format(new Date(timestamp));
+  };
+  var ticks = [{
+    timestamp: startMs,
+    label: format(startMs)
+  }];
+  var start = new Date(startMs);
+  var cursor = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1);
+  while (cursor <= endMs) {
+    ticks.push({
+      timestamp: cursor,
+      label: format(cursor)
+    });
+    var date = new Date(cursor);
+    cursor = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
+  }
+  return ticks;
+}
 function LineArea(_ref3) {
   var data = _ref3.data,
     _ref3$width = _ref3.width,
@@ -290,51 +326,76 @@ function LineArea(_ref3) {
     _ref3$accent = _ref3.accent,
     accent = _ref3$accent === void 0 ? true : _ref3$accent,
     _ref3$target = _ref3.target,
-    target = _ref3$target === void 0 ? null : _ref3$target;
+    target = _ref3$target === void 0 ? null : _ref3$target,
+    _ref3$current = _ref3.current,
+    current = _ref3$current === void 0 ? null : _ref3$current;
   if (!data || data.length < 2) return null;
-  var values = data.map(function (d) {
-    return d.value;
-  }).filter(function (v) {
-    return v !== null && v !== undefined;
+  var plotted = data.filter(function (d) {
+    return (d === null || d === void 0 ? void 0 : d.value) !== null && (d === null || d === void 0 ? void 0 : d.value) !== undefined && (d === null || d === void 0 ? void 0 : d.value) !== "";
+  }).map(function (d) {
+    return _objectSpread(_objectSpread({}, d), {}, {
+      value: Number(d.value),
+      timestamp: chartDateMs(d.date)
+    });
+  }).filter(function (d) {
+    return Number.isFinite(d.value);
   });
-  var min = Math.floor(Math.min.apply(Math, _toConsumableArray(values)) - 0.5);
-  var max = Math.ceil(Math.max.apply(Math, _toConsumableArray(values)) + 0.5);
+  if (plotted.length < 2) return null;
+  var targetValue = target == null || target === "" ? null : Number(target);
+  var currentValue = current == null || current === "" ? plotted[plotted.length - 1].value : Number(current);
+  var values = plotted.map(function (d) {
+    return d.value;
+  });
+  if (Number.isFinite(targetValue)) values.push(targetValue);
+  if (Number.isFinite(currentValue)) values.push(currentValue);
+  var min = Math.floor(Math.min.apply(Math, _toConsumableArray(values)));
+  var max = Math.ceil(Math.max.apply(Math, _toConsumableArray(values)));
+  if (min === max) {
+    min -= 1;
+    max += 1;
+  }
   var range = max - min || 1;
-  var padL = 28,
-    padB = 22,
-    padT = 6,
-    padR = 6;
+  var padL = 40,
+    padB = 28,
+    padT = 12,
+    padR = 82;
   var innerW = width - padL - padR;
   var innerH = height - padT - padB;
-  var xScale = function xScale(i) {
-    return padL + i / (data.length - 1) * innerW;
+  var dated = plotted.filter(function (d) {
+    return Number.isFinite(d.timestamp);
+  });
+  var startMs = dated.length ? dated[0].timestamp : 0;
+  var endMs = dated.length ? dated[dated.length - 1].timestamp : plotted.length - 1;
+  var dateRange = Math.max(1, endMs - startMs);
+  var xScale = function xScale(d, i) {
+    return Number.isFinite(d.timestamp) ? padL + (d.timestamp - startMs) / dateRange * innerW : padL + i / (plotted.length - 1) * innerW;
   };
   var yScale = function yScale(v) {
     return padT + innerH - (v - min) / range * innerH;
   };
-  var pts = data.map(function (d, i) {
-    return d.value !== null && d.value !== undefined ? [xScale(i), yScale(d.value)] : null;
+  var pts = plotted.map(function (d, i) {
+    return [xScale(d, i), yScale(d.value)];
   });
   var path = "";
   pts.forEach(function (p, i) {
-    if (!p) return;
     path += (path ? " L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1);
   });
-  var lastIdx = pts.map(function (p, i) {
-    return p ? i : -1;
-  }).filter(function (i) {
-    return i >= 0;
-  }).pop();
-  var gridLines = [0, 0.5, 1].map(function (t) {
-    var v = min + range * (1 - t);
+  var lastIdx = pts.length - 1;
+  var gridLines = Array.from({
+    length: max - min + 1
+  }, function (_, index) {
+    var value = min + index;
     return {
-      y: padT + t * innerH,
-      label: v.toFixed(0)
+      y: yScale(value),
+      label: value.toFixed(0)
     };
   });
+  var monthTicks = monthlyChartTicks(startMs, endMs);
+  var targetY = Number.isFinite(targetValue) ? yScale(targetValue) : null;
+  var currentY = Number.isFinite(currentValue) ? yScale(currentValue) : null;
+  var referencesOverlap = targetY != null && currentY != null && Math.abs(targetY - currentY) < 12;
   return React.createElement("svg", {
-    viewBox: "0 0 ".concat(width, " ").concat(height),
-    preserveAspectRatio: "none"
+    viewBox: "0 0 ".concat(width, " ").concat(height)
   }, gridLines.map(function (g, i) {
     return React.createElement("g", {
       key: i
@@ -350,36 +411,54 @@ function LineArea(_ref3) {
       className: "chart-axis",
       textAnchor: "end"
     }, g.label));
-  }), target !== null && React.createElement("line", {
+  }), monthTicks.map(function (tick, index) {
+    var x = padL + (tick.timestamp - startMs) / dateRange * innerW;
+    return React.createElement("g", {
+      key: "".concat(tick.timestamp, "-").concat(index)
+    }, React.createElement("line", {
+      x1: x,
+      x2: x,
+      y1: padT,
+      y2: height - padB,
+      className: "chart-month-grid"
+    }), React.createElement("text", {
+      x: x,
+      y: height - 7,
+      className: "chart-axis",
+      textAnchor: index === 0 ? "start" : "middle"
+    }, tick.label));
+  }), targetY != null && React.createElement("g", null, React.createElement("line", {
     x1: padL,
     x2: width - padR,
-    y1: yScale(target),
-    y2: yScale(target),
-    stroke: "var(--accent)",
-    strokeDasharray: "3 3",
-    strokeWidth: "1",
-    opacity: "0.6"
-  }), React.createElement("path", {
+    y1: targetY,
+    y2: targetY,
+    className: "chart-target-line"
+  }), React.createElement("text", {
+    x: width - padR + 6,
+    y: targetY + (referencesOverlap ? -5 : 3),
+    className: "chart-reference-label"
+  }, targetValue.toFixed(1), " kg target")), currentY != null && React.createElement("g", null, React.createElement("line", {
+    x1: padL,
+    x2: width - padR,
+    y1: currentY,
+    y2: currentY,
+    className: "chart-current-line"
+  }), React.createElement("text", {
+    x: width - padR + 6,
+    y: currentY + (referencesOverlap ? 10 : 3),
+    className: "chart-reference-label current"
+  }, currentValue.toFixed(1), " kg current")), React.createElement("path", {
     d: path,
     className: "chart-line ".concat(accent ? "accent" : "")
   }), pts.map(function (p, i) {
-    return p && React.createElement("circle", {
+    return React.createElement("circle", {
       key: i,
       cx: p[0],
       cy: p[1],
       r: i === lastIdx ? 3 : 1.5,
       className: "chart-dot"
     });
-  }), data.length > 1 && React.createElement(React.Fragment, null, React.createElement("text", {
-    x: padL,
-    y: height - 6,
-    className: "chart-axis"
-  }, data[0].label), React.createElement("text", {
-    x: width - padR,
-    y: height - 6,
-    className: "chart-axis",
-    textAnchor: "end"
-  }, data[data.length - 1].label)));
+  }));
 }
 function Heatmap(_ref4) {
   var data = _ref4.data,
@@ -4668,7 +4747,8 @@ function Dashboard(_ref4) {
     data: bodyD,
     width: 420,
     height: 200,
-    target: app.activeProfile.targetWeight
+    target: app.activeProfile.targetWeight,
+    current: latestWeight === null || latestWeight === void 0 ? void 0 : latestWeight.value
   })))), React.createElement("div", null, React.createElement("div", {
     className: "panel"
   }, React.createElement("div", {
@@ -10277,23 +10357,66 @@ function buildTrajectoryModel(profile, estimate, bodyD) {
   var min = Math.min.apply(Math, _toConsumableArray(values));
   var max = Math.max.apply(Math, _toConsumableArray(values));
   var spread = Math.max(1, max - min);
-  var yMin = min - spread * 0.18;
-  var yMax = max + spread * 0.18;
-  var width = 800;
+  var yMin = Math.floor(min - spread * 0.18);
+  var yMax = Math.ceil(max + spread * 0.18);
+  if (yMin === yMax) {
+    yMin -= 1;
+    yMax += 1;
+  }
+  var width = typeof window !== "undefined" && window.innerWidth <= 720 ? 360 : 800;
   var height = 168;
-  var padX = 14;
-  var padY = 12;
+  var plotLeft = 44;
+  var plotRight = width - 16;
+  var plotTop = 12;
+  var plotBottom = height - 28;
   var xFor = function xFor(date) {
-    return padX + (RepsData.daysBetween(startDate, date) || 0) / spanDays * (width - padX * 2);
+    return plotLeft + (RepsData.daysBetween(startDate, date) || 0) / spanDays * (plotRight - plotLeft);
   };
   var yFor = function yFor(value) {
-    return height - padY - (Number(value) - yMin) / Math.max(yMax - yMin, 1) * (height - padY * 2);
+    return plotBottom - (Number(value) - yMin) / Math.max(yMax - yMin, 1) * (plotBottom - plotTop);
   };
   var path = history.map(function (d, i) {
     return "".concat(i ? "L" : "M", " ").concat(xFor(d.date).toFixed(1), " ").concat(yFor(d.value).toFixed(1));
   }).join(" ");
   var projectionPath = Number.isFinite(projectedWeight) && latest ? "M ".concat(xFor(latest.date).toFixed(1), " ").concat(yFor(latest.value).toFixed(1), " L ").concat(xFor(endDate).toFixed(1), " ").concat(yFor(projectedWeight).toFixed(1)) : "";
   var targetY = Number.isFinite(targetWeight) ? yFor(targetWeight) : null;
+  var currentX = latest ? xFor(latest.date) : null;
+  var currentY = latest ? yFor(latest.value) : null;
+  var yRange = yMax - yMin;
+  var yStep = yRange <= 6 ? 1 : yRange <= 12 ? 2 : yRange <= 30 ? 5 : 10;
+  var yTicks = [];
+  for (var value = Math.ceil(yMin / yStep) * yStep; value <= yMax; value += yStep) {
+    yTicks.push({
+      value: value,
+      y: yFor(value)
+    });
+  }
+  var start = new Date("".concat(startDate, "T00:00:00Z"));
+  var end = new Date("".concat(endDate, "T00:00:00Z"));
+  var spansYears = start.getUTCFullYear() !== end.getUTCFullYear();
+  var monthLabel = function monthLabel(date) {
+    return new Intl.DateTimeFormat("en-GB", _objectSpread({
+      month: "short"
+    }, spansYears ? {
+      year: "2-digit"
+    } : {})).format(date);
+  };
+  var xTicks = [{
+    date: startDate,
+    x: xFor(startDate),
+    label: monthLabel(start)
+  }];
+  var monthCursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+  while (monthCursor <= end) {
+    var date = monthCursor.toISOString().slice(0, 10);
+    xTicks.push({
+      date: date,
+      x: xFor(date),
+      label: monthLabel(monthCursor)
+    });
+    monthCursor = new Date(Date.UTC(monthCursor.getUTCFullYear(), monthCursor.getUTCMonth() + 1, 1));
+  }
+  if (xTicks.length > 1 && xTicks[1].x - xTicks[0].x < 30) xTicks.shift();
   return {
     ready: true,
     history: history,
@@ -10305,6 +10428,14 @@ function buildTrajectoryModel(profile, estimate, bodyD) {
     path: path,
     projectionPath: projectionPath,
     targetY: targetY,
+    currentX: currentX,
+    currentY: currentY,
+    plotLeft: plotLeft,
+    plotRight: plotRight,
+    plotTop: plotTop,
+    plotBottom: plotBottom,
+    xTicks: xTicks,
+    yTicks: yTicks,
     startDate: startDate,
     endDate: endDate
   };
@@ -10763,27 +10894,64 @@ function GoalTrajectoryBand(_ref30) {
     className: "trajectory-layout"
   }, React.createElement("div", {
     className: "trajectory-chart-block"
-  }, model.ready ? React.createElement(React.Fragment, null, React.createElement("svg", {
+  }, model.ready ? React.createElement("svg", {
     className: "trajectory-chart",
     viewBox: "0 0 ".concat(model.width, " ").concat(model.height),
     preserveAspectRatio: "none",
     role: "img",
-    "aria-label": "Weight trajectory chart"
-  }, model.targetY != null && React.createElement("line", {
+    "aria-label": "Weight trajectory chart with monthly dates and kilogram values"
+  }, model.yTicks.map(function (tick) {
+    return React.createElement("g", {
+      key: tick.value
+    }, React.createElement("line", {
+      className: "trajectory-grid",
+      x1: model.plotLeft,
+      x2: model.plotRight,
+      y1: tick.y,
+      y2: tick.y
+    }), React.createElement("text", {
+      className: "trajectory-axis-label",
+      x: model.plotLeft - 8,
+      y: tick.y + 3,
+      textAnchor: "end"
+    }, tick.value, " kg"));
+  }), model.xTicks.map(function (tick, index) {
+    return React.createElement("g", {
+      key: tick.date
+    }, React.createElement("line", {
+      className: "trajectory-grid vertical",
+      x1: tick.x,
+      x2: tick.x,
+      y1: model.plotTop,
+      y2: model.plotBottom
+    }), React.createElement("text", {
+      className: "trajectory-axis-label",
+      x: tick.x,
+      y: model.height - 8,
+      textAnchor: index === 0 ? "start" : "middle"
+    }, tick.label));
+  }), model.targetY != null && React.createElement("g", null, React.createElement("line", {
     className: "trajectory-target-line",
-    x1: "0",
-    x2: model.width,
+    x1: model.plotLeft,
+    x2: model.plotRight,
     y1: model.targetY,
     y2: model.targetY
-  }), React.createElement("path", {
+  }), React.createElement("text", {
+    className: "trajectory-target-label",
+    x: model.plotLeft + 4,
+    y: model.targetY - 4
+  }, targetWeight.toFixed(1), " kg target")), React.createElement("path", {
     className: "trajectory-path",
     d: model.path
   }), model.projectionPath && React.createElement("path", {
     className: "trajectory-projection",
     d: model.projectionPath
-  })), React.createElement("div", {
-    className: "trajectory-axis"
-  }, React.createElement("span", null, RepsData.shortDate(model.startDate)), React.createElement("span", null, RepsData.shortDate(model.endDate)))) : React.createElement("div", {
+  }), model.currentX != null && model.currentY != null && React.createElement("circle", {
+    className: "trajectory-current-dot",
+    cx: model.currentX,
+    cy: model.currentY,
+    r: "3.5"
+  })) : React.createElement("div", {
     className: "trajectory-empty"
   }, "Need at least two weight entries for a trajectory.")), React.createElement("div", {
     className: "trajectory-metrics"

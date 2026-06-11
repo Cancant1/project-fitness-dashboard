@@ -74,52 +74,118 @@ function StackedBars({ data, width = 600, height = 200, keys = ["Push","Pull","L
   );
 }
 
-function LineArea({ data, width = 600, height = 200, accent = true, target = null }) {
+function chartDateMs(date) {
+  const timestamp = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function monthlyChartTicks(startMs, endMs) {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return [];
+  const spansYears = new Date(startMs).getUTCFullYear() !== new Date(endMs).getUTCFullYear();
+  const format = (timestamp) => new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    ...(spansYears ? { year: "2-digit" } : {})
+  }).format(new Date(timestamp));
+  const ticks = [{ timestamp: startMs, label: format(startMs) }];
+  const start = new Date(startMs);
+  let cursor = Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1);
+  while (cursor <= endMs) {
+    ticks.push({ timestamp: cursor, label: format(cursor) });
+    const date = new Date(cursor);
+    cursor = Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1);
+  }
+  return ticks;
+}
+
+function LineArea({ data, width = 600, height = 200, accent = true, target = null, current = null }) {
   if (!data || data.length < 2) return null;
-  const values = data.map(d => d.value).filter(v => v !== null && v !== undefined);
-  const min = Math.floor(Math.min(...values) - 0.5);
-  const max = Math.ceil(Math.max(...values) + 0.5);
+  const plotted = data
+    .filter(d => d?.value !== null && d?.value !== undefined && d?.value !== "")
+    .map(d => ({ ...d, value: Number(d.value), timestamp: chartDateMs(d.date) }))
+    .filter(d => Number.isFinite(d.value));
+  if (plotted.length < 2) return null;
+  const targetValue = target == null || target === "" ? null : Number(target);
+  const currentValue = current == null || current === "" ? plotted[plotted.length - 1].value : Number(current);
+  const values = plotted.map(d => d.value);
+  if (Number.isFinite(targetValue)) values.push(targetValue);
+  if (Number.isFinite(currentValue)) values.push(currentValue);
+  let min = Math.floor(Math.min(...values));
+  let max = Math.ceil(Math.max(...values));
+  if (min === max) {
+    min -= 1;
+    max += 1;
+  }
   const range = max - min || 1;
-  const padL = 28, padB = 22, padT = 6, padR = 6;
+  const padL = 40, padB = 28, padT = 12, padR = 82;
   const innerW = width - padL - padR;
   const innerH = height - padT - padB;
-  const xScale = i => padL + (i / (data.length - 1)) * innerW;
+  const dated = plotted.filter(d => Number.isFinite(d.timestamp));
+  const startMs = dated.length ? dated[0].timestamp : 0;
+  const endMs = dated.length ? dated[dated.length - 1].timestamp : plotted.length - 1;
+  const dateRange = Math.max(1, endMs - startMs);
+  const xScale = (d, i) => Number.isFinite(d.timestamp)
+    ? padL + ((d.timestamp - startMs) / dateRange) * innerW
+    : padL + (i / (plotted.length - 1)) * innerW;
   const yScale = v => padT + innerH - ((v - min) / range) * innerH;
 
-  const pts = data.map((d, i) => d.value !== null && d.value !== undefined ? [xScale(i), yScale(d.value)] : null);
+  const pts = plotted.map((d, i) => [xScale(d, i), yScale(d.value)]);
   let path = "";
   pts.forEach((p, i) => {
-    if (!p) return;
     path += (path ? " L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1);
   });
-  const lastIdx = pts.map((p,i)=>p?i:-1).filter(i=>i>=0).pop();
-
-  const gridLines = [0, 0.5, 1].map(t => {
-    const v = min + range * (1 - t);
-    return { y: padT + t * innerH, label: v.toFixed(0) };
+  const lastIdx = pts.length - 1;
+  const gridLines = Array.from({ length: max - min + 1 }, (_, index) => {
+    const value = min + index;
+    return { y: yScale(value), label: value.toFixed(0) };
   });
+  const monthTicks = monthlyChartTicks(startMs, endMs);
+  const targetY = Number.isFinite(targetValue) ? yScale(targetValue) : null;
+  const currentY = Number.isFinite(currentValue) ? yScale(currentValue) : null;
+  const referencesOverlap = targetY != null && currentY != null && Math.abs(targetY - currentY) < 12;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+    <svg viewBox={`0 0 ${width} ${height}`}>
       {gridLines.map((g, i) => (
         <g key={i}>
           <line x1={padL} x2={width - padR} y1={g.y} y2={g.y} className="chart-grid" />
           <text x={padL - 6} y={g.y + 3} className="chart-axis" textAnchor="end">{g.label}</text>
         </g>
       ))}
-      {target !== null && (
-        <line x1={padL} x2={width - padR} y1={yScale(target)} y2={yScale(target)} stroke="var(--accent)" strokeDasharray="3 3" strokeWidth="1" opacity="0.6" />
+      {monthTicks.map((tick, index) => {
+        const x = padL + ((tick.timestamp - startMs) / dateRange) * innerW;
+        return (
+          <g key={`${tick.timestamp}-${index}`}>
+            <line x1={x} x2={x} y1={padT} y2={height - padB} className="chart-month-grid" />
+            <text
+              x={x}
+              y={height - 7}
+              className="chart-axis"
+              textAnchor={index === 0 ? "start" : "middle"}>
+              {tick.label}
+            </text>
+          </g>
+        );
+      })}
+      {targetY != null && (
+        <g>
+          <line x1={padL} x2={width - padR} y1={targetY} y2={targetY} className="chart-target-line" />
+          <text x={width - padR + 6} y={targetY + (referencesOverlap ? -5 : 3)} className="chart-reference-label">
+            {targetValue.toFixed(1)} kg target
+          </text>
+        </g>
+      )}
+      {currentY != null && (
+        <g>
+          <line x1={padL} x2={width - padR} y1={currentY} y2={currentY} className="chart-current-line" />
+          <text x={width - padR + 6} y={currentY + (referencesOverlap ? 10 : 3)} className="chart-reference-label current">
+            {currentValue.toFixed(1)} kg current
+          </text>
+        </g>
       )}
       <path d={path} className={`chart-line ${accent ? "accent" : ""}`} />
-      {pts.map((p, i) => p && (
+      {pts.map((p, i) => (
         <circle key={i} cx={p[0]} cy={p[1]} r={i === lastIdx ? 3 : 1.5} className="chart-dot" />
       ))}
-      {data.length > 1 && (
-        <>
-          <text x={padL} y={height - 6} className="chart-axis">{data[0].label}</text>
-          <text x={width - padR} y={height - 6} className="chart-axis" textAnchor="end">{data[data.length-1].label}</text>
-        </>
-      )}
     </svg>
   );
 }

@@ -1656,14 +1656,20 @@ function buildTrajectoryModel(profile, estimate, bodyD) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const spread = Math.max(1, max - min);
-  const yMin = min - spread * 0.18;
-  const yMax = max + spread * 0.18;
-  const width = 800;
+  let yMin = Math.floor(min - spread * 0.18);
+  let yMax = Math.ceil(max + spread * 0.18);
+  if (yMin === yMax) {
+    yMin -= 1;
+    yMax += 1;
+  }
+  const width = typeof window !== "undefined" && window.innerWidth <= 720 ? 360 : 800;
   const height = 168;
-  const padX = 14;
-  const padY = 12;
-  const xFor = (date) => padX + ((RepsData.daysBetween(startDate, date) || 0) / spanDays) * (width - padX * 2);
-  const yFor = (value) => height - padY - ((Number(value) - yMin) / Math.max(yMax - yMin, 1)) * (height - padY * 2);
+  const plotLeft = 44;
+  const plotRight = width - 16;
+  const plotTop = 12;
+  const plotBottom = height - 28;
+  const xFor = (date) => plotLeft + ((RepsData.daysBetween(startDate, date) || 0) / spanDays) * (plotRight - plotLeft);
+  const yFor = (value) => plotBottom - ((Number(value) - yMin) / Math.max(yMax - yMin, 1)) * (plotBottom - plotTop);
   const path = history
     .map((d, i) => `${i ? "L" : "M"} ${xFor(d.date).toFixed(1)} ${yFor(d.value).toFixed(1)}`)
     .join(" ");
@@ -1671,6 +1677,29 @@ function buildTrajectoryModel(profile, estimate, bodyD) {
     ? `M ${xFor(latest.date).toFixed(1)} ${yFor(latest.value).toFixed(1)} L ${xFor(endDate).toFixed(1)} ${yFor(projectedWeight).toFixed(1)}`
     : "";
   const targetY = Number.isFinite(targetWeight) ? yFor(targetWeight) : null;
+  const currentX = latest ? xFor(latest.date) : null;
+  const currentY = latest ? yFor(latest.value) : null;
+  const yRange = yMax - yMin;
+  const yStep = yRange <= 6 ? 1 : yRange <= 12 ? 2 : yRange <= 30 ? 5 : 10;
+  const yTicks = [];
+  for (let value = Math.ceil(yMin / yStep) * yStep; value <= yMax; value += yStep) {
+    yTicks.push({ value, y: yFor(value) });
+  }
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const spansYears = start.getUTCFullYear() !== end.getUTCFullYear();
+  const monthLabel = (date) => new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    ...(spansYears ? { year: "2-digit" } : {})
+  }).format(date);
+  const xTicks = [{ date: startDate, x: xFor(startDate), label: monthLabel(start) }];
+  let monthCursor = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+  while (monthCursor <= end) {
+    const date = monthCursor.toISOString().slice(0, 10);
+    xTicks.push({ date, x: xFor(date), label: monthLabel(monthCursor) });
+    monthCursor = new Date(Date.UTC(monthCursor.getUTCFullYear(), monthCursor.getUTCMonth() + 1, 1));
+  }
+  if (xTicks.length > 1 && xTicks[1].x - xTicks[0].x < 30) xTicks.shift();
 
   return {
     ready: true,
@@ -1683,6 +1712,14 @@ function buildTrajectoryModel(profile, estimate, bodyD) {
     path,
     projectionPath,
     targetY,
+    currentX,
+    currentY,
+    plotLeft,
+    plotRight,
+    plotTop,
+    plotBottom,
+    xTicks,
+    yTicks,
     startDate,
     endDate
   };
@@ -2058,17 +2095,39 @@ function GoalTrajectoryBand({ profile, estimate, bodyD }) {
       <div className="trajectory-layout">
         <div className="trajectory-chart-block">
           {model.ready ? (
-            <>
-              <svg className="trajectory-chart" viewBox={`0 0 ${model.width} ${model.height}`} preserveAspectRatio="none" role="img" aria-label="Weight trajectory chart">
-                {model.targetY != null && <line className="trajectory-target-line" x1="0" x2={model.width} y1={model.targetY} y2={model.targetY} />}
-                <path className="trajectory-path" d={model.path} />
-                {model.projectionPath && <path className="trajectory-projection" d={model.projectionPath} />}
-              </svg>
-              <div className="trajectory-axis">
-                <span>{RepsData.shortDate(model.startDate)}</span>
-                <span>{RepsData.shortDate(model.endDate)}</span>
-              </div>
-            </>
+            <svg className="trajectory-chart" viewBox={`0 0 ${model.width} ${model.height}`} preserveAspectRatio="none" role="img" aria-label="Weight trajectory chart with monthly dates and kilogram values">
+              {model.yTicks.map(tick => (
+                <g key={tick.value}>
+                  <line className="trajectory-grid" x1={model.plotLeft} x2={model.plotRight} y1={tick.y} y2={tick.y} />
+                  <text className="trajectory-axis-label" x={model.plotLeft - 8} y={tick.y + 3} textAnchor="end">{tick.value} kg</text>
+                </g>
+              ))}
+              {model.xTicks.map((tick, index) => (
+                <g key={tick.date}>
+                  <line className="trajectory-grid vertical" x1={tick.x} x2={tick.x} y1={model.plotTop} y2={model.plotBottom} />
+                  <text
+                    className="trajectory-axis-label"
+                    x={tick.x}
+                    y={model.height - 8}
+                    textAnchor={index === 0 ? "start" : "middle"}>
+                    {tick.label}
+                  </text>
+                </g>
+              ))}
+              {model.targetY != null && (
+                <g>
+                  <line className="trajectory-target-line" x1={model.plotLeft} x2={model.plotRight} y1={model.targetY} y2={model.targetY} />
+                  <text className="trajectory-target-label" x={model.plotLeft + 4} y={model.targetY - 4}>
+                    {targetWeight.toFixed(1)} kg target
+                  </text>
+                </g>
+              )}
+              <path className="trajectory-path" d={model.path} />
+              {model.projectionPath && <path className="trajectory-projection" d={model.projectionPath} />}
+              {model.currentX != null && model.currentY != null && (
+                <circle className="trajectory-current-dot" cx={model.currentX} cy={model.currentY} r="3.5" />
+              )}
+            </svg>
           ) : (
             <div className="trajectory-empty">Need at least two weight entries for a trajectory.</div>
           )}
