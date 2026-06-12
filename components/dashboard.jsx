@@ -27,6 +27,31 @@ function Delta({ value, suffix = "", positive = true }) {
   return <span className={`delta ${cls}`}>{isUp ? "▲" : "▼"} {text}{suffix}</span>;
 }
 
+function LatestPrStrip({ setView }) {
+  const pr = useMemo(() => window.RepsRecords?.latestPR?.() || null, []);
+  if (!pr) return null;
+  const days = RepsData.daysBetween(pr.date) ?? 0;
+  const when = days === 0 ? "today" : days === 1 ? "yesterday" : `${RepsData.shortDate(pr.date)}`;
+  return (
+    <div className="panel pr-strip">
+      <div className="pr-strip-left">
+        <span className="pr-strip-icon"><RI.Trophy /></span>
+        <div>
+          <div className="pr-strip-title">
+            Latest PR — {pr.exercise} <span className="mono tnum">
+              {Math.round(pr.maxWeight * 10) / 10}kg{Number.isFinite(Number(pr.topReps)) && Number(pr.topReps) > 0 ? ` × ${Number(pr.topReps)}` : ""}
+            </span>
+          </div>
+          <div className="pr-strip-sub mono">
+            {pr.kinds.map(k => k === "e1rm" ? "e1RM" : k).join(" + ")} · {when}
+          </div>
+        </div>
+      </div>
+      <button className="btn ghost sm" onClick={() => setView?.("records")}>All records <RI.Chevron /></button>
+    </div>
+  );
+}
+
 function macroTargetForDate(profile, date) {
   const day = RepsData.dayName(date);
   const fromMacros = profile.macros?.[day]?.kcal;
@@ -389,9 +414,9 @@ function Dashboard({ setView }) {
               <div className="kpi-label" style={{marginTop:2}}>Last 12 weeks · Push / Pull / Legs</div>
             </div>
             <div className="chips">
-              <span className="chip" style={{background:"oklch(70% 0.06 30 / 0.18)", color:"oklch(50% 0.08 30)", border:"none"}}><span className="dot" style={{background:"oklch(70% 0.06 30)"}}></span>Push</span>
-              <span className="chip" style={{background:"oklch(72% 0.05 245 / 0.18)", color:"oklch(50% 0.06 245)", border:"none"}}><span className="dot" style={{background:"oklch(72% 0.05 245)"}}></span>Pull</span>
-              <span className="chip" style={{background:"oklch(74% 0.06 150 / 0.18)", color:"oklch(50% 0.07 150)", border:"none"}}><span className="dot" style={{background:"oklch(74% 0.06 150)"}}></span>Legs</span>
+              <span className="chip split-chip"><span className="dot" style={{background:"var(--split-push)"}}></span>Push</span>
+              <span className="chip split-chip"><span className="dot" style={{background:"var(--split-pull)"}}></span>Pull</span>
+              <span className="chip split-chip"><span className="dot" style={{background:"var(--split-legs)"}}></span>Legs</span>
             </div>
           </div>
           <div className="panel-body chart-card">
@@ -417,6 +442,8 @@ function Dashboard({ setView }) {
           </div>
         </div>
       </div>
+
+      <LatestPrStrip setView={setView} />
 
       {/* Recent sessions */}
       <div>

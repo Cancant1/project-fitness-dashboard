@@ -843,8 +843,9 @@
       const maxW = Math.max(...sets.map(setWeightKg));
       const totalReps = sets.reduce((sum, x) => sum + (x.repsNumber || x.reps || 0), 0);
       const volume = sets.reduce((sum, x) => sum + setVolumeKg(x), 0);
-      // Best estimated 1RM via Epley: w * (1 + reps/30)
-      const est1rm = Math.max(...sets.map(x => setWeightKg(x) * (1 + (x.repsNumber || x.reps || 0) / 30)));
+      // Best estimated 1RM via Epley: w * (1 + reps/30).
+      // Workbook reps can be strings ("8-12", set notes) — coerce, never NaN.
+      const est1rm = Math.max(...sets.map(x => setWeightKg(x) * (1 + (Number(x.repsNumber || x.reps) || 0) / 30)));
       const topSet = sets.find(x => setWeightKg(x) === maxW) || sets[0];
       perSession.push({
         date: s.date, weekStart: s.weekStart, split: s.split,
