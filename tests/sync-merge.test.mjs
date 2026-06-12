@@ -193,6 +193,59 @@ const sanitized = sanitizeProfileForPush({
 assert.deepEqual(Object.keys(sanitized.sessionPlansByDate), []);
 assert.ok(sanitized.sessionPlanTombstones[date]);
 
+// --- mergeProfiles gap fixes: fields that used to fall through to wholesale
+// local-wins must now merge per item / per key. ---
+
+// Deleted sessions stay deleted: remote deleted it, local still has it.
+const delMerge = mergeRemoteAndLocalState(
+  stateWith({ loggedSessions: [withReps], deletedSessionIds: [withReps.id] }),
+  stateWith({ loggedSessions: [withReps], deletedSessionIds: [] })
+);
+assert.ok(
+  delMerge.profiles[0].deletedSessionIds.includes(withReps.id),
+  "a session deleted on the remote device must stay deleted after a local push merge"
+);
+
+// Routine edits: newer remote routine beats stale local copy; per-item, not wholesale.
+const remoteRoutine = { id: "routine", name: "PPL v2", updatedAt: "2026-06-10T10:00:00.000Z", days: [{ day: "Mon", exercises: [{ name: "Squat" }] }] };
+const staleLocalRoutine = { id: "routine", name: "PPL v1", updatedAt: "2026-06-01T10:00:00.000Z", days: [{ day: "Mon", exercises: [{ name: "DB Incline Press" }] }] };
+const localOnlyRoutine = { id: "routine-local", name: "Local extra", updatedAt: "2026-06-09T10:00:00.000Z", days: [] };
+const routineMerge = mergeRemoteAndLocalState(
+  stateWith({ routines: [remoteRoutine] }),
+  stateWith({ routines: [staleLocalRoutine, localOnlyRoutine] })
+);
+const mergedRoutines = routineMerge.profiles[0].routines;
+assert.equal(mergedRoutines.find(r => r.id === "routine").name, "PPL v2", "newer remote routine edit must win");
+assert.ok(mergedRoutines.some(r => r.id === "routine-local"), "local-only routine must survive the merge");
+
+// Deleted routines stay deleted across devices.
+const routineDeleteMerge = mergeRemoteAndLocalState(
+  stateWith({ routines: [], deletedRoutineIds: ["routine"] }),
+  stateWith({ routines: [staleLocalRoutine] })
+);
+assert.equal(
+  routineDeleteMerge.profiles[0].routines.filter(r => r.id === "routine").length, 0,
+  "a routine deleted remotely must not be resurrected by a stale local copy"
+);
+
+// Exercise annotations union per exercise/date instead of local-wins wholesale.
+const annotationMerge = mergeRemoteAndLocalState(
+  stateWith({ exerciseAnnotations: { "Squat": { "2026-06-01": { type: "pr", note: "from phone" } } } }),
+  stateWith({ exerciseAnnotations: { "Squat": { "2026-06-08": { type: "deload", note: "from laptop" } } } })
+);
+const squatNotes = annotationMerge.profiles[0].exerciseAnnotations["Squat"];
+assert.ok(squatNotes["2026-06-01"] && squatNotes["2026-06-08"], "annotations from both devices must survive");
+
+// sessionEdits newest-wins per session id.
+const editsMerge = mergeRemoteAndLocalState(
+  stateWith({ sessionEdits: { s1: { date: "2026-06-02", updatedAt: "2026-06-10T08:00:00.000Z" } } }),
+  stateWith({ sessionEdits: { s1: { date: "2026-06-01", updatedAt: "2026-06-05T08:00:00.000Z" }, s2: { date: "2026-06-03", updatedAt: "2026-06-06T08:00:00.000Z" } } })
+);
+assert.equal(editsMerge.profiles[0].sessionEdits.s1.date, "2026-06-02", "newer remote session edit must win");
+assert.equal(editsMerge.profiles[0].sessionEdits.s2.date, "2026-06-03", "local-only session edit must survive");
+
+console.log("mergeProfiles gap regression tests passed");
+
 // --- GitHub pull: files over 1MB come back with empty content from the
 // contents API and must be re-fetched through the git blobs API. ---
 const { fetchGithubState } = runtime.__syncMergeTests;
