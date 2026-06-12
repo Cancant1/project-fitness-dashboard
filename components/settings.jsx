@@ -59,7 +59,7 @@ function SettingsView({ theme, setTheme, themes = [] }) {
                   </div>
                   {!isActive && state.profiles.length > 1 && (
                     <button className="btn ghost sm" style={{alignSelf:"flex-start"}}
-                      onClick={() => { if (confirm(`Delete profile "${p.name}" and all of its data?`)) deleteProfile(p.id); }}><SI.X /> Delete</button>
+                      onClick={async () => { if (await window.RepsUI.confirm(`Delete profile "${p.name}" and all of its data?`, { confirmLabel: "Delete profile" })) deleteProfile(p.id); }}><SI.X /> Delete</button>
                   )}
                 </div>
               );
@@ -105,7 +105,7 @@ function SettingsView({ theme, setTheme, themes = [] }) {
                 ))}
               </div>
               <div className="kpi-label" style={{marginTop: 8, fontSize:10}}>
-                Accent and density live in the <strong style={{color:"var(--ink)"}}>Tweaks</strong> toggle in the toolbar.
+                Theme choice is stored locally per device and synced status-bar color follows it.
               </div>
             </div>
           </div>
@@ -157,7 +157,7 @@ function DataStoragePanel() {
       const parsed = JSON.parse(text);
       const next = parsed?.app === "reps-dashboard" && parsed.state ? parsed.state : parsed;
       if (!next?.profiles?.length) throw new Error("Backup JSON does not contain profiles.");
-      if (!confirm("Import this dashboard state and replace the local state in this browser?")) return;
+      if (!(await window.RepsUI.confirm("Import this dashboard state and replace the local state in this browser?", { confirmLabel: "Import" }))) return;
       app.replaceState(next);
       setImportStatus("Imported");
       setTimeout(() => setImportStatus(""), 2200);
@@ -170,8 +170,8 @@ function DataStoragePanel() {
     try { await navigator.clipboard.writeText(blob); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {}
   };
 
-  const clearData = () => {
-    if (confirm("This wipes all local profiles, food log, custom exercises, sync metadata, and settings in this browser. Continue?")) {
+  const clearData = async () => {
+    if (await window.RepsUI.confirm("This wipes all local profiles, food log, custom exercises, sync metadata, and settings in this browser. Continue?", { confirmLabel: "Wipe data" })) {
       localStorage.removeItem("reps-app-state-v1");
       localStorage.removeItem("reps-github-sync-config-v1");
       localStorage.removeItem("reps-github-sync-meta-v1");

@@ -364,7 +364,7 @@ function Routines() {
               )}
               <button className="btn ghost sm" onClick={() => { setEditingId(routine.id); setShowNew(false); }}>Edit</button>
               <button className="btn ghost sm icon-only"
-                onClick={() => { if (confirm(`Delete routine "${routine.name}"?`)) deleteRoutine(routine.id); }}><VI.X /></button>
+                onClick={async () => { if (await window.RepsUI.confirm(`Delete routine "${routine.name}"?`, { confirmLabel: "Delete" })) deleteRoutine(routine.id); }}><VI.X /></button>
             </div>
           </div>
 
@@ -622,7 +622,7 @@ function Exercises() {
                         <button className="btn ghost sm" title="Rename everywhere"
                           onClick={(ev) => { ev.stopPropagation(); startRename(e.name); }}>Rename</button>
                         <button className="btn ghost sm icon-only" title="Hide this exercise"
-                          onClick={(ev) => { ev.stopPropagation(); if (confirm(`Hide "${e.name}" from the list?`)) app.hideExercise(e.name); }}>
+                          onClick={async (ev) => { ev.stopPropagation(); if (await window.RepsUI.confirm(`Hide "${e.name}" from the list?`, { confirmLabel: "Hide" })) app.hideExercise(e.name); }}>
                           <VI.X />
                         </button>
                       </div>
@@ -1554,7 +1554,7 @@ function DailyLogTable({ bodyD, kcal, protein, activeProfile, updateProfile, upd
                       {hasOverride && (
                         <button className="btn ghost sm icon-only" style={{width: 20, height: 20, color:"var(--faint)"}}
                           title="Reset manual entries for this date"
-                          onClick={() => { if (confirm(`Clear manual entries for ${RepsData.shortDate(date)}?`)) clearDailyOverride(date); }}>
+                          onClick={async () => { if (await window.RepsUI.confirm(`Clear manual entries for ${RepsData.shortDate(date)}?`, { confirmLabel: "Clear" })) clearDailyOverride(date); }}>
                           <VI.X />
                         </button>
                       )}
@@ -2417,7 +2417,7 @@ function AddBlockModal({ initialBlock, onClose, onSave, onDelete }) {
             <div>
               {onDelete && (
                 <button className="btn ghost sm" style={{color:"var(--bad)"}}
-                  onClick={() => { if (confirm(`Delete block "${initialBlock.name}"?`)) { onDelete(); onClose(); } }}>
+                  onClick={async () => { if (await window.RepsUI.confirm(`Delete block "${initialBlock.name}"?`, { confirmLabel: "Delete" })) { onDelete(); onClose(); } }}>
                   Delete
                 </button>
               )}
@@ -2739,7 +2739,7 @@ function Plan() {
                       {effectiveWeeks} wk · {blockSessions.length} sessions completed
                     </div>
                     <button className="btn ghost sm icon-only" style={{width:18, height:18}}
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`Remove block "${displayName}" from ${activeProfile.name}'s profile?`)) removeWorkbookBlock(b.sheet); }}
+                      onClick={async (e) => { e.stopPropagation(); if (await window.RepsUI.confirm(`Remove block "${displayName}" from ${activeProfile.name}'s profile?`, { confirmLabel: "Remove" })) removeWorkbookBlock(b.sheet); }}
                       title="Remove block from this profile"><VI.X /></button>
                   </div>
                 </div>
@@ -2771,7 +2771,7 @@ function Plan() {
                   <div style={{display:"flex", gap:4, alignItems:"center"}}>
                     <div className="mono" style={{color:"var(--faint)"}}>{b.weeks||8} wk · {blockSessions.length} sessions completed</div>
                     <button className="btn ghost sm icon-only" style={{width:18, height:18}}
-                      onClick={(e) => { e.stopPropagation(); if (confirm(`Delete block "${b.name}"?`)) deleteCustomBlock(b.id); }}><VI.X /></button>
+                      onClick={async (e) => { e.stopPropagation(); if (await window.RepsUI.confirm(`Delete block "${b.name}"?`, { confirmLabel: "Delete" })) deleteCustomBlock(b.id); }}><VI.X /></button>
                   </div>
                 </div>
                 <div>

@@ -5385,3 +5385,19 @@ table { border-collapse: collapse; }
   .grid-2:not(.uneven) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .m-drawer { width: min(60vw, 340px); }
 }
+
+/* ── In-app confirm dialog (replaces window.confirm) ─────────────────────── */
+.ui-confirm-scrim {
+  position: fixed; inset: 0; z-index: 1200;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in oklab, var(--ink) 32%, transparent);
+  padding: 20px;
+}
+.ui-confirm {
+  background: var(--bg); border: var(--hair); border-radius: var(--r-sm);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  padding: 16px; width: min(380px, 100%);
+}
+.ui-confirm-message { font-size: var(--t-md); line-height: 1.55; color: var(--ink); }
+.ui-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.ui-confirm-danger { background: var(--bad); border-color: var(--bad); }

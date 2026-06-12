@@ -173,7 +173,7 @@ function SessionsView({ setView }) {
                               <button className="btn ghost sm icon-only" title="Edit"
                                 onClick={() => setOpenEdit(s.id)}><SVI.Settings /></button>
                               <button className="btn ghost sm icon-only" title="Delete session"
-                                onClick={() => { if (confirm(`Delete session on ${RepsData.shortDate(s.date)} (${s.split})? This can be restored.`)) app.deleteSession(s.id); }}><SVI.X /></button>
+                                onClick={async () => { if (await window.RepsUI.confirm(`Delete session on ${RepsData.shortDate(s.date)} (${s.split})? This can be restored.`, { confirmLabel: "Delete" })) app.deleteSession(s.id); }}><SVI.X /></button>
                             </>
                           )}
                         </div>
@@ -336,8 +336,8 @@ function SessionEditModal({ sessionId, onClose }) {
     onClose();
   };
 
-  const reset = () => {
-    if (confirm("Discard all your edits and revert this session to the original data?")) {
+  const reset = async () => {
+    if (await window.RepsUI.confirm("Discard all your edits and revert this session to the original data?", { confirmLabel: "Revert" })) {
       app.clearSessionEdit(sessionId);
       onClose();
     }
@@ -347,7 +347,7 @@ function SessionEditModal({ sessionId, onClose }) {
     <div onClick={onClose}
       style={{position:"fixed", inset:0, zIndex:50, background:"rgba(10,10,10,0.5)", display:"grid", placeItems:"center", padding:20}}>
       <div onClick={e => e.stopPropagation()}
-        style={{width:"min(820px,100%)", height:"min(800px,92vh)", background:"var(--surface)", border:"var(--hair)", borderRadius:"var(--r-lg)", boxShadow:"var(--shadow-2)", display:"flex", flexDirection:"column", overflow:"hidden"}}>
+        style={{width:"min(820px,100%)", height:"min(800px, 92dvh)", maxHeight:"100dvh", background:"var(--surface)", border:"var(--hair)", borderRadius:"var(--r-lg)", boxShadow:"var(--shadow-2)", display:"flex", flexDirection:"column", overflow:"hidden"}}>
         <div className="panel-head" style={{padding:"12px 16px"}}>
           <div>
             <h2 style={{margin:0, fontSize:"var(--t-xl)", fontWeight:600, letterSpacing:"-0.015em"}}>Edit session</h2>
@@ -458,7 +458,7 @@ function SessionEditModal({ sessionId, onClose }) {
                     <span>skip next</span>
                   </label>
                   <button className="btn ghost sm icon-only" title="Remove exercise"
-                    onClick={() => { if (confirm(`Remove ${entry.exercise} from this session?`)) removeEntry(eIdx); }}>
+                    onClick={async () => { if (await window.RepsUI.confirm(`Remove ${entry.exercise} from this session?`, { confirmLabel: "Remove" })) removeEntry(eIdx); }}>
                     <SVI.X />
                   </button>
                 </div>
@@ -482,11 +482,11 @@ function SessionEditModal({ sessionId, onClose }) {
                           <span style={{marginLeft: 4, color: "var(--faint)", fontSize: 10, fontFamily: "var(--font-mono)"}}>min</span>
                         </div>
                         <div className="set-cell">
-                          <input value={set.repsNumber ?? set.reps ?? 0} placeholder="0"
+                          <input inputMode="numeric" value={set.repsNumber ?? set.reps ?? 0} placeholder="0"
                             onChange={e => updateSet(eIdx, sIdx, "repsNumber", e.target.value)} />
                         </div>
                         <div className="set-cell">
-                          <input value={set.rpe ?? ""} placeholder="RPE"
+                          <input inputMode="decimal" value={set.rpe ?? ""} placeholder="RPE"
                             onChange={e => updateSet(eIdx, sIdx, "rpe", e.target.value)} />
                         </div>
                         <div className="set-cell">
@@ -500,7 +500,7 @@ function SessionEditModal({ sessionId, onClose }) {
                       <div className="set-row is-done" key={sIdx}>
                         <div className="set-cell label-only mono">{sIdx + 1}</div>
                         <div className="set-cell">
-                          <input value={set.weight ?? ""} placeholder="weight"
+                          <input inputMode="decimal" value={set.weight ?? ""} placeholder="weight"
                             onChange={e => updateSet(eIdx, sIdx, "weight", e.target.value)} />
                         </div>
                         <div className="set-cell" style={{padding:0}}>
@@ -510,11 +510,11 @@ function SessionEditModal({ sessionId, onClose }) {
                           </select>
                         </div>
                         <div className="set-cell">
-                          <input value={set.repsNumber ?? set.reps ?? ""} placeholder="reps"
+                          <input inputMode="numeric" value={set.repsNumber ?? set.reps ?? ""} placeholder="reps"
                             onChange={e => updateSet(eIdx, sIdx, "repsNumber", e.target.value)} />
                         </div>
                         <div className="set-cell">
-                          <input value={set.rpe ?? ""} placeholder="RPE"
+                          <input inputMode="decimal" value={set.rpe ?? ""} placeholder="RPE"
                             onChange={e => updateSet(eIdx, sIdx, "rpe", e.target.value)} />
                         </div>
                         <div className="set-cell">

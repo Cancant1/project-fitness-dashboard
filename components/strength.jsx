@@ -101,10 +101,13 @@ function HeroChart({ history, compareHistory, blockRanges, profile, visibleRange
     }));
   }, [compareHistory]);
 
-  // Reset hover/pin on exercise change (visibleRange managed by parent)
+  // Reset hover/pin on exercise change (visibleRange managed by parent).
+  // Also drop the cached hero scales so the light hover updater can never
+  // position the crosshair with the previous exercise's x-scale.
   useStrE(() => {
     setPinned(null);
     setHover(null);
+    if (svgRef.current) svgRef.current.__heroState = null;
   }, [history?.name]);
 
   // Live reference to `pinned` for drawHero's contextmenu handler (no re-render needed).
@@ -677,21 +680,27 @@ function drawBrush({ svg, sessions, visibleRange, blockRanges, onBrush }) {
   xa.selectAll("text").attr("font-family", "var(--font-mono)").attr("font-size", 9).attr("fill", "currentColor").attr("fill-opacity", 0.45);
   xa.select(".domain").remove();
 
-  // Brush — only react to user-initiated brushes (sourceEvent set). Programmatic
-  // brush.move(...) calls below would otherwise feedback-loop with React state.
-  const brush = d3.brushX()
-    .extent([[0, 0], [iw, ih]])
-    .on("brush end", function (event) {
-      if (!event.sourceEvent) return;
-      if (!event.selection) {
-        onBrush([sessions[0]._date, sessions[sessions.length - 1]._date]);
-        return;
-      }
-      const [a, b] = event.selection;
-      onBrush([xFull.invert(a), xFull.invert(b)]);
-    });
+  // Brush — created ONCE per svg node and re-used: re-creating it on every
+  // redraw re-installed D3's internal drag listeners and made fast drags fire
+  // duplicated events. Only the user handler is refreshed per draw so it
+  // closes over the current sessions/xFull. Programmatic brush.move(...) calls
+  // below are ignored via the sourceEvent guard to avoid a React feedback loop.
   const brushG = root.select("g.brush");
-  brushG.call(brush);
+  let brush = svg.node().__miniBrush;
+  if (!brush) {
+    brush = d3.brushX().extent([[0, 0], [iw, ih]]);
+    svg.node().__miniBrush = brush;
+    brushG.call(brush);
+  }
+  brush.on("brush end", function (event) {
+    if (!event.sourceEvent) return;
+    if (!event.selection) {
+      onBrush([sessions[0]._date, sessions[sessions.length - 1]._date]);
+      return;
+    }
+    const [a, b] = event.selection;
+    onBrush([xFull.invert(a), xFull.invert(b)]);
+  });
 
   // Set initial selection from visibleRange
   if (visibleRange) {

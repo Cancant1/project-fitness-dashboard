@@ -299,7 +299,7 @@ function ExerciseModal({ name, onClose, onRemove }) {
             </div>
           </div>
           <div style={{display:"flex", gap:6}}>
-            <button className="btn ghost sm" onClick={() => { if (confirm(`Hide "${name}" from your exercise list?`)) { onRemove?.(name); onClose(); } }}>
+            <button className="btn ghost sm" onClick={async () => { if (await window.RepsUI.confirm(`Hide "${name}" from your exercise list?`, { confirmLabel: "Hide" })) { onRemove?.(name); onClose(); } }}>
               <EMI.X /> Remove
             </button>
             <button className="btn ghost sm icon-only" onClick={onClose}><EMI.X /></button>
