@@ -7,7 +7,12 @@ const I = RepsIcons;
 // resolves false on Escape/scrim tap.
 function repsConfirm(message, options = {}) {
   return new Promise(resolve => {
-    document.querySelectorAll(".ui-confirm-scrim").forEach(el => el.remove());
+    // Resolve (false) any dialog we're replacing — removing it without
+    // resolving would leave its awaiting caller suspended forever.
+    document.querySelectorAll(".ui-confirm-scrim").forEach(el => {
+      el.__resolveConfirm?.(false);
+      el.remove();
+    });
     const scrim = document.createElement("div");
     scrim.className = "ui-confirm-scrim";
     const box = document.createElement("div");
@@ -19,11 +24,15 @@ function repsConfirm(message, options = {}) {
     text.textContent = message;
     const actions = document.createElement("div");
     actions.className = "ui-confirm-actions";
+    let settled = false;
     const done = (value) => {
+      if (settled) return;
+      settled = true;
       document.removeEventListener("keydown", onKey, true);
       scrim.remove();
       resolve(value);
     };
+    scrim.__resolveConfirm = done;
     const onKey = (e) => {
       if (e.key === "Escape") { e.preventDefault(); done(false); }
       if (e.key === "Enter") { e.preventDefault(); done(true); }
