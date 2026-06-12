@@ -241,13 +241,14 @@ function GitHubSyncPanel() {
   const [form, setForm] = useS(app.syncConfig);
   const [tokenDraft, setTokenDraft] = useS(app.syncConfig.token || "");
   const [tokenCopied, setTokenCopied] = useS(false);
+  const [tokenVisible, setTokenVisible] = useS(false);
   useE(() => {
     setForm(app.syncConfig);
     setTokenDraft(app.syncConfig.token || "");
-  }, [app.syncConfig.owner, app.syncConfig.repo, app.syncConfig.branch, app.syncConfig.path, app.syncConfig.enabled]);
+  }, [app.syncConfig.owner, app.syncConfig.repo, app.syncConfig.branch, app.syncConfig.path, app.syncConfig.enabled, app.syncConfig.token, app.syncConfig.autoSync]);
 
   const patchForm = (patch) => setForm(prev => ({ ...prev, ...patch }));
-  const saveConfig = (enabled = true) => {
+  const saveConfig = (enabled = app.syncConfig.enabled) => {
     const next = {
       ...app.syncConfig,
       owner: form.owner.trim(),
@@ -255,10 +256,11 @@ function GitHubSyncPanel() {
       branch: form.branch.trim() || "main",
       path: form.path.trim() || "state/reps-app-state.json",
       token: tokenDraft.trim(),
+      autoSync: form.autoSync !== false,
       enabled
     };
-    const changed = ["owner", "repo", "branch", "path", "token", "enabled"]
-      .some(key => (app.syncConfig[key] || "") !== (next[key] || ""));
+    const changed = ["owner", "repo", "branch", "path", "token", "enabled", "autoSync"]
+      .some(key => (app.syncConfig[key] ?? "") !== (next[key] ?? ""));
     if (changed) app.updateSyncConfig(next);
     return next;
   };
@@ -288,7 +290,8 @@ function GitHubSyncPanel() {
       <div className="panel-body" style={{display:"flex", flexDirection:"column", gap: 12}}>
         <div className="kpi-label" style={{lineHeight: 1.6}}>
           Sync uses one private repo file and one token per device. Use a fine-grained GitHub token with Contents read/write for your private data repository.
-          Push first merges this browser with GitHub and retries SHA conflicts. Pull applies GitHub; if this browser has unsynced edits, it keeps them and leaves the app marked unsynced until you push.
+          With auto-sync on, the app pulls the latest state when opened or focused and pushes about 20 seconds after your last change — no buttons needed.
+          Push merges this browser with GitHub and retries SHA conflicts; Pull keeps unsynced local edits and marks the app unsynced until the next push.
         </div>
         <div style={{display:"grid", gridTemplateColumns:"repeat(2, minmax(0, 1fr))", gap: 8}}>
           <label>
@@ -315,19 +318,30 @@ function GitHubSyncPanel() {
         <label>
           <div className="kpi-label">Fine-grained token for this device</div>
           <div style={{display:"flex", gap: 6}}>
-            <input type="text" value={tokenDraft} onChange={e => setTokenDraft(e.target.value)}
+            <input type={tokenVisible ? "text" : "password"} value={tokenDraft} onChange={e => setTokenDraft(e.target.value)}
               placeholder="github_pat_..."
               spellCheck="false"
+              autoComplete="off"
               style={{flex:1, minWidth:0, height:32, padding:"0 8px", border:"var(--hair)", borderRadius:"var(--r-sm)", background:"var(--bg)", fontFamily:"var(--font-mono)"}} />
+            <button className="btn sm" type="button" onClick={() => setTokenVisible(v => !v)} disabled={!tokenDraft}>
+              {tokenVisible ? "Hide" : "Show"}
+            </button>
             <button className="btn sm" type="button" onClick={copyToken} disabled={!tokenDraft}>
-              <SI.Download /> {tokenCopied ? "Copied" : "Copy token"}
+              {tokenCopied ? "Copied" : "Copy"}
             </button>
           </div>
         </label>
+        <label style={{display:"flex", alignItems:"center", gap: 8, cursor:"pointer"}}>
+          <input type="checkbox" checked={form.autoSync !== false}
+            onChange={e => patchForm({ autoSync: e.target.checked })} />
+          <span className="kpi-label" style={{margin: 0}}>
+            Sync automatically — pull on open/focus, push ~20s after changes
+          </span>
+        </label>
         <div style={{display:"flex", gap: 6, flexWrap:"wrap", alignItems:"center"}}>
           <button className="btn primary sm" onClick={() => saveConfig(true)}><SI.Check /> Save & enable</button>
-          <button className="btn sm" onClick={() => app.pullRemoteState({ config: saveConfig(true) })}>Pull</button>
-          <button className="btn sm" onClick={() => app.pushRemoteState({ config: saveConfig(true) })}>Push</button>
+          <button className="btn sm" onClick={() => app.pullRemoteState({ config: saveConfig() })}>Pull</button>
+          <button className="btn sm" onClick={() => app.pushRemoteState({ config: saveConfig() })}>Push</button>
           <button className="btn ghost sm" onClick={app.disableSync}>Disable</button>
           <span className={`chip ${statusClass}`.trim()}>{app.syncStatus.message}</span>
           {app.syncMeta.lastSyncAt && <span className="mono muted" style={{fontSize: 10}}>last sync {new Date(app.syncMeta.lastSyncAt).toLocaleString()}</span>}
