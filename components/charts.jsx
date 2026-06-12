@@ -14,8 +14,11 @@ function Sparkline({ data, width = 120, height = 28, accent = false }) {
   });
   const path = "M" + points.map(p => p.map(n => n.toFixed(1)).join(",")).join(" L");
   const last = points[points.length - 1];
+  const first = points[0];
+  const areaPath = `${path} L${last[0].toFixed(1)},${height} L${first[0].toFixed(1)},${height} Z`;
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{display:"block"}}>
+      <path d={areaPath} className="chart-spark-fill" />
       <path d={path} className={`chart-line ${accent ? "accent" : ""}`} />
       <circle cx={last[0]} cy={last[1]} r="2" className="chart-dot" />
     </svg>
@@ -60,7 +63,7 @@ function StackedBars({ data, width = 600, height = 200, keys = ["Push","Pull","L
               const h = (v / max) * innerH;
               const y = yScale(running + v);
               running += v;
-              return <rect key={k} x={x} y={y} width={w} height={h} className={`chart-bar ${colorClass[k] || ""}`} />;
+              return <rect key={k} x={x} y={y} width={w} height={h} rx="2" className={`chart-bar ${colorClass[k] || ""}`} />;
             })}
             {i % Math.ceil(data.length / 6) === 0 && (
               <text x={x + w / 2} y={height - 6} className="chart-axis" textAnchor="middle">
@@ -184,6 +187,9 @@ function LineArea({ data, width = 600, height = 200, accent = true, target = nul
           </text>
         </g>
       )}
+      <path
+        d={`${path} L${pts[lastIdx][0].toFixed(1)},${padT + innerH} L${pts[0][0].toFixed(1)},${padT + innerH} Z`}
+        className="chart-area-soft" />
       <path d={path} className={`chart-line ${accent ? "accent" : ""}`} />
       {pts.map((p, i) => (
         <circle key={i} cx={p[0]} cy={p[1]} r={i === lastIdx ? 3 : 1.5} className="chart-dot" />
