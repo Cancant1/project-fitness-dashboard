@@ -1740,6 +1740,8 @@ function migrateProfile(p) {
     hiddenBlockSheets: p.hiddenBlockSheets || [],
     customBlocks: p.customBlocks || [],
     deletedSessionIds: p.deletedSessionIds || [],
+    deletedRoutineIds: p.deletedRoutineIds || [],
+    deletedBlockIds: p.deletedBlockIds || [],
     sessionEdits: p.sessionEdits || {},
     loggedSessions: p.loggedSessions || [],
     bodyLedgerFoodsOpen: p.bodyLedgerFoodsOpen !== undefined ? !!p.bodyLedgerFoodsOpen : true,
@@ -2366,6 +2368,34 @@ function newerByUpdatedAt() {
   var localTime = Date.parse(localItem.updatedAt || localItem.createdAt || "") || 0;
   return localTime >= remoteTime ? localItem : remoteItem;
 }
+function mergeKeyedRecords() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  return _objectSpread(_objectSpread({}, remote || {}), local || {});
+}
+function mergeExerciseAnnotations() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var names = new Set([].concat(_toConsumableArray(Object.keys(remote || {})), _toConsumableArray(Object.keys(local || {}))));
+  var out = {};
+  names.forEach(function (name) {
+    var mergedDates = _objectSpread(_objectSpread({}, (remote === null || remote === void 0 ? void 0 : remote[name]) || {}), (local === null || local === void 0 ? void 0 : local[name]) || {});
+    if (Object.keys(mergedDates).length) out[name] = mergedDates;
+  });
+  return out;
+}
+function mergeSessionEdits() {
+  var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
+  var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  var ids = new Set([].concat(_toConsumableArray(Object.keys(remote || {})), _toConsumableArray(Object.keys(local || {}))));
+  return Object.fromEntries(Array.from(ids).map(function (id) {
+    var remoteEdit = remote === null || remote === void 0 ? void 0 : remote[id];
+    var localEdit = local === null || local === void 0 ? void 0 : local[id];
+    if (!remoteEdit) return [id, localEdit];
+    if (!localEdit) return [id, remoteEdit];
+    return [id, newerByUpdatedAt(remoteEdit, localEdit)];
+  }));
+}
 function mergeRecipes() {
   var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
   var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
@@ -2397,7 +2427,7 @@ function mergeFoodByDate() {
 function mergeLoggedSessions() {
   var remote = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : [];
   var local = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-  return [].concat(_toConsumableArray(remote || []), _toConsumableArray(local || [])).reduce(function (list, session) {
+  var merged = [].concat(_toConsumableArray(remote || []), _toConsumableArray(local || [])).reduce(function (list, session) {
     var index = list.findIndex(function (existing) {
       return sameLoggedSessionSlot(existing, session);
     });
@@ -2406,6 +2436,9 @@ function mergeLoggedSessions() {
     next[index] = betterLoggedSession(next[index], session);
     return next;
   }, []);
+  return merged.sort(function (a, b) {
+    return String(b.date || b.plannedDate || "").localeCompare(String(a.date || a.plannedDate || "")) || recordUpdatedMs(b) - recordUpdatedMs(a);
+  });
 }
 function mergeProfiles() {
   var remoteProfile = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
@@ -2434,6 +2467,33 @@ function mergeProfiles() {
   });
   merged.hiddenExercises = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfile.hiddenExercises || []), _toConsumableArray(localProfile.hiddenExercises || []))));
   merged.hiddenFoodItems = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfile.hiddenFoodItems || []), _toConsumableArray(localProfile.hiddenFoodItems || []))));
+  merged.deletedSessionIds = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfile.deletedSessionIds || []), _toConsumableArray(localProfile.deletedSessionIds || []))));
+  merged.sessionEdits = mergeSessionEdits(remoteProfile.sessionEdits || {}, localProfile.sessionEdits || {});
+  merged.deletedRoutineIds = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfile.deletedRoutineIds || []), _toConsumableArray(localProfile.deletedRoutineIds || []))));
+  merged.deletedBlockIds = _toConsumableArray(new Set([].concat(_toConsumableArray(remoteProfile.deletedBlockIds || []), _toConsumableArray(localProfile.deletedBlockIds || []))));
+  var deletedRoutines = new Set(merged.deletedRoutineIds);
+  var deletedBlocks = new Set(merged.deletedBlockIds);
+  merged.routines = mergeByKey(remoteProfile.routines || [], localProfile.routines || [], function (routine) {
+    return String(routine.id || routine.name);
+  }, newerByUpdatedAt).filter(function (routine) {
+    return !deletedRoutines.has(String(routine.id));
+  });
+  merged.customBlocks = mergeByKey(remoteProfile.customBlocks || [], localProfile.customBlocks || [], function (block) {
+    return String(block.id || block.name);
+  }, newerByUpdatedAt).filter(function (block) {
+    return !deletedBlocks.has(String(block.id));
+  });
+  if (merged.activeRoutineId && deletedRoutines.has(String(merged.activeRoutineId))) {
+    var _merged$routines$;
+    merged.activeRoutineId = ((_merged$routines$ = merged.routines[0]) === null || _merged$routines$ === void 0 ? void 0 : _merged$routines$.id) || null;
+  }
+  merged.exerciseAnnotations = mergeExerciseAnnotations(remoteProfile.exerciseAnnotations, localProfile.exerciseAnnotations);
+  merged.exerciseRenames = mergeKeyedRecords(remoteProfile.exerciseRenames, localProfile.exerciseRenames);
+  merged.blockGoals = mergeKeyedRecords(remoteProfile.blockGoals, localProfile.blockGoals);
+  merged.blockNames = mergeKeyedRecords(remoteProfile.blockNames, localProfile.blockNames);
+  merged.blockStartOverrides = mergeKeyedRecords(remoteProfile.blockStartOverrides, localProfile.blockStartOverrides);
+  merged.blockWeeksOverride = mergeKeyedRecords(remoteProfile.blockWeeksOverride, localProfile.blockWeeksOverride);
+  merged.macros = mergeKeyedRecords(remoteProfile.macros, localProfile.macros);
   return sanitizeProfileForPush(merged);
 }
 function mergeRemoteAndLocalState() {
@@ -3411,7 +3471,8 @@ function AppStateProvider(_ref11) {
   var addRoutine = function addRoutine(routine) {
     var id = "routine-" + Date.now().toString(36);
     var newRoutine = _objectSpread(_objectSpread({}, routine), {}, {
-      id: id
+      id: id,
+      updatedAt: new Date().toISOString()
     });
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
@@ -3426,12 +3487,15 @@ function AppStateProvider(_ref11) {
     return id;
   };
   var updateRoutine = function updateRoutine(id, patch) {
+    var stamped = _objectSpread(_objectSpread({}, patch), {}, {
+      updatedAt: new Date().toISOString()
+    });
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
             routines: (p.routines || []).map(function (r) {
-              return r.id === id ? _objectSpread(_objectSpread({}, r), patch) : r;
+              return r.id === id ? _objectSpread(_objectSpread({}, r), stamped) : r;
             })
           }) : p;
         })
@@ -3447,6 +3511,7 @@ function AppStateProvider(_ref11) {
             routines: (p.routines || []).filter(function (r) {
               return r.id !== id;
             }),
+            deletedRoutineIds: _toConsumableArray(new Set([].concat(_toConsumableArray(p.deletedRoutineIds || []), [id]))),
             activeRoutineId: p.activeRoutineId === id ? ((_filter$ = (p.routines || []).filter(function (r) {
               return r.id !== id;
             })[0]) === null || _filter$ === void 0 ? void 0 : _filter$.id) || null : p.activeRoutineId
@@ -3472,7 +3537,8 @@ function AppStateProvider(_ref11) {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
             customBlocks: [].concat(_toConsumableArray(p.customBlocks || []), [_objectSpread(_objectSpread({}, block), {}, {
-              id: "block-" + Date.now().toString(36)
+              id: "block-" + Date.now().toString(36),
+              updatedAt: new Date().toISOString()
             })])
           }) : p;
         })
@@ -3480,12 +3546,15 @@ function AppStateProvider(_ref11) {
     });
   };
   var updateCustomBlock = function updateCustomBlock(id, patch) {
+    var stamped = _objectSpread(_objectSpread({}, patch), {}, {
+      updatedAt: new Date().toISOString()
+    });
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
         profiles: s.profiles.map(function (p) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
             customBlocks: (p.customBlocks || []).map(function (b) {
-              return b.id === id ? _objectSpread(_objectSpread({}, b), patch) : b;
+              return b.id === id ? _objectSpread(_objectSpread({}, b), stamped) : b;
             })
           }) : p;
         })
@@ -3499,7 +3568,8 @@ function AppStateProvider(_ref11) {
           return p.id === s.activeProfileId ? _objectSpread(_objectSpread({}, p), {}, {
             customBlocks: (p.customBlocks || []).filter(function (b) {
               return b.id !== id;
-            })
+            }),
+            deletedBlockIds: _toConsumableArray(new Set([].concat(_toConsumableArray(p.deletedBlockIds || []), [id])))
           }) : p;
         })
       });
@@ -5376,14 +5446,20 @@ function loggedSessionSetCount() {
   }, 0);
 }
 function draftSetHasResult() {
-  var _set$reps4, _set$note3;
+  var _set$reps4, _set$weight3, _set$note3;
   var set = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : {};
   var durationMode = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
   if (durationMode) {
     var _set$duration3, _set$note2;
     return String((_set$duration3 = set.duration) !== null && _set$duration3 !== void 0 ? _set$duration3 : "").trim() !== "" || String((_set$note2 = set.note) !== null && _set$note2 !== void 0 ? _set$note2 : "").trim() !== "";
   }
-  return String((_set$reps4 = set.reps) !== null && _set$reps4 !== void 0 ? _set$reps4 : "").trim() !== "" || String((_set$note3 = set.note) !== null && _set$note3 !== void 0 ? _set$note3 : "").trim() !== "";
+  return String((_set$reps4 = set.reps) !== null && _set$reps4 !== void 0 ? _set$reps4 : "").trim() !== "" || String((_set$weight3 = set.weight) !== null && _set$weight3 !== void 0 ? _set$weight3 : "").trim() !== "" || String((_set$note3 = set.note) !== null && _set$note3 !== void 0 ? _set$note3 : "").trim() !== "";
+}
+function parseLoggedNumber(value) {
+  var text = String(value !== null && value !== void 0 ? value : "").trim();
+  if (text === "") return null;
+  var match = text.replace(/,/g, ".").match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
 }
 function dateMs(value) {
   var ms = Date.parse(value || "");
@@ -5406,8 +5482,8 @@ function shouldHydrateSavedPlan(savedPlan, existingLogged) {
   if (draftSets > loggedSets || draftExercises > loggedExercises) return true;
   var planTime = dateMs(savedPlan.updatedAt || savedPlan.savedAt);
   var sessionTime = dateMs(existingLogged.updatedAt || existingLogged.savedAt || existingLogged.createdAt);
-  if (planTime && sessionTime) return planTime >= sessionTime;
-  return true;
+  if (planTime && sessionTime) return planTime > sessionTime;
+  return false;
 }
 function htmlEscape(value) {
   return String(value !== null && value !== void 0 ? value : "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -6660,7 +6736,7 @@ function LogView() {
         var target = "".concat((_ex$sets = ex.sets) !== null && _ex$sets !== void 0 ? _ex$sets : "", " \xD7 ").concat((_ex$reps = ex.reps) !== null && _ex$reps !== void 0 ? _ex$reps : "").concat(ex.unit ? " \xB7 ".concat(ex.unit) : "");
         var skipLabel = (_model$skipKeys = model.skipKeys) !== null && _model$skipKeys !== void 0 && _model$skipKeys.has(ex._key) ? " · skip next" : "";
         setRows.forEach(function (set, i) {
-          var _lastEntry$sets2, _set$duration5, _set$weight3, _set$reps5, _set$reps6, _set$rpe2, _set$note4, _set$rpe3, _set$note5;
+          var _lastEntry$sets2, _set$duration5, _set$weight4, _set$reps5, _set$reps6, _set$rpe2, _set$note4, _set$rpe3, _set$note5;
           var first = i === 0;
           var edited = !!set._edited;
           var prefilled = !!set._prefilled && !edited;
@@ -6686,7 +6762,7 @@ function LogView() {
             color: c.muted
           });
           var lastValue = formatLastSetValue((lastEntry === null || lastEntry === void 0 || (_lastEntry$sets2 = lastEntry.sets) === null || _lastEntry$sets2 === void 0 ? void 0 : _lastEntry$sets2[i]) || null, durationMode);
-          var weightValue = durationMode ? (_set$duration5 = set.duration) !== null && _set$duration5 !== void 0 ? _set$duration5 : "" : (_set$weight3 = set.weight) !== null && _set$weight3 !== void 0 ? _set$weight3 : "";
+          var weightValue = durationMode ? (_set$duration5 = set.duration) !== null && _set$duration5 !== void 0 ? _set$duration5 : "" : (_set$weight4 = set.weight) !== null && _set$weight4 !== void 0 ? _set$weight4 : "";
           var unitValue = durationMode ? "min" : set.unit || "kg";
           var repsValue = durationMode ? (_set$reps5 = set.reps) !== null && _set$reps5 !== void 0 ? _set$reps5 : "" : (_set$reps6 = set.reps) !== null && _set$reps6 !== void 0 ? _set$reps6 : "";
           var exerciseHtml = first ? ["<div style=\"".concat(attrEscape(inlineStyle({
@@ -6819,16 +6895,18 @@ function LogView() {
         targetReps: ex.reps,
         ignoreForProgression: skipProgressionKeys.has(ex._key),
         sets: sets.map(function (s, i) {
+          var _parseLoggedNumber;
           var isBW = !durationMode && s.unit === "bw";
-          var additionalWeight = durationMode || s.weight === "" ? null : Number(s.weight);
+          var parsedWeight = durationMode ? null : parseLoggedNumber(s.weight);
+          var parsedReps = durationMode ? 0 : parseLoggedNumber(s.reps);
           return {
             set: i + 1,
-            weight: isBW ? additionalWeight : durationMode || s.weight === "" ? null : Number(s.weight),
+            weight: parsedWeight,
             unit: s.unit,
             bwBase: isBW && avgBW != null ? avgBW : undefined,
-            reps: durationMode ? 0 : s.reps === "" ? null : Number(s.reps),
-            repsNumber: durationMode ? 0 : s.reps === "" ? null : Number(s.reps),
-            durationMinutes: durationMode ? Number(s.duration || durationFromTarget(ex)) || null : null,
+            reps: parsedReps,
+            repsNumber: parsedReps,
+            durationMinutes: durationMode ? (_parseLoggedNumber = parseLoggedNumber(s.duration)) !== null && _parseLoggedNumber !== void 0 ? _parseLoggedNumber : parseLoggedNumber(durationFromTarget(ex)) : null,
             rpe: s.rpe || null,
             note: s.note || null
           };
@@ -6938,9 +7016,34 @@ function LogView() {
     });
   };
   var handleRemoveExercise = function handleRemoveExercise(key) {
-    setRemovedKeys(function (set) {
-      return new Set([].concat(_toConsumableArray(set), [key]));
-    });
+    if (String(key).startsWith("e-")) {
+      setExtraExercises(function (arr) {
+        return arr.filter(function (e, i) {
+          return (e._key || "e-".concat(i)) !== key;
+        });
+      });
+      setSetsByExercise(function (prev) {
+        if (!(key in prev)) return prev;
+        var next = _objectSpread({}, prev);
+        delete next[key];
+        return next;
+      });
+      setExerciseOrder(function (arr) {
+        return arr.filter(function (k) {
+          return k !== key;
+        });
+      });
+      setRemovedKeys(function (set) {
+        if (!set.has(key)) return set;
+        var next = new Set(set);
+        next.delete(key);
+        return next;
+      });
+    } else {
+      setRemovedKeys(function (set) {
+        return new Set([].concat(_toConsumableArray(set), [key]));
+      });
+    }
     setSkipProgressionKeys(function (set) {
       var next = new Set(set);
       next.delete(key);
@@ -12804,7 +12907,7 @@ function SessionsView(_ref) {
   var totalVolume = filtered.reduce(function (sum, sess) {
     return sum + (sess.entries || []).reduce(function (s, e) {
       return s + (e.sets || []).reduce(function (acc, x) {
-        return acc + (x.weight || 0) * (x.repsNumber || x.reps || 0);
+        return acc + (RepsData.setVolumeKg ? RepsData.setVolumeKg(x) : (x.weight || 0) * (x.repsNumber || x.reps || 0));
       }, 0);
     }, 0);
   }, 0);
@@ -12894,7 +12997,7 @@ function SessionsView(_ref) {
     var topSetText = topSet !== null && topSet !== void 0 && topSet.durationMinutes || topSet !== null && topSet !== void 0 && topSet.duration ? "".concat(topSet.durationMinutes || topSet.duration, " min") : topSet ? "".concat(topSet.weight).concat(topSet.unit, " \xD7 ").concat(topSet.repsNumber || topSet.reps) : "";
     var volume = (s.entries || []).reduce(function (sum, e) {
       return sum + (e.sets || []).reduce(function (a, x) {
-        return a + (x.weight || 0) * (x.repsNumber || x.reps || 0);
+        return a + (RepsData.setVolumeKg ? RepsData.setVolumeKg(x) : (x.weight || 0) * (x.repsNumber || x.reps || 0));
       }, 0);
     }, 0);
     var routineDay = ((_RepsData$normalizeDa = (_RepsData = RepsData).normalizeDayKey) === null || _RepsData$normalizeDa === void 0 ? void 0 : _RepsData$normalizeDa.call(_RepsData, s.routineDay || s.nominalDay)) || RepsData.dayName(s.plannedDate || s.date);

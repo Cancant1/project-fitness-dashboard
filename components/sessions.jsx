@@ -70,7 +70,7 @@ function SessionsView({ setView }) {
   const totalSets = filtered.reduce((s, x) => s + RepsData.sessionSetCount(x), 0);
   const totalVolume = filtered.reduce((sum, sess) => {
     return sum + (sess.entries || []).reduce((s, e) => {
-      return s + (e.sets || []).reduce((acc, x) => acc + ((x.weight || 0) * (x.repsNumber || x.reps || 0)), 0);
+      return s + (e.sets || []).reduce((acc, x) => acc + (RepsData.setVolumeKg ? RepsData.setVolumeKg(x) : (x.weight || 0) * (x.repsNumber || x.reps || 0)), 0);
     }, 0);
   }, 0);
 
@@ -130,7 +130,7 @@ function SessionsView({ setView }) {
                   const topSetText = topSet?.durationMinutes || topSet?.duration
                     ? `${topSet.durationMinutes || topSet.duration} min`
                     : topSet ? `${topSet.weight}${topSet.unit} × ${topSet.repsNumber || topSet.reps}` : "";
-                  const volume = (s.entries || []).reduce((sum, e) => sum + (e.sets || []).reduce((a,x) => a + ((x.weight||0)*(x.repsNumber||x.reps||0)), 0), 0);
+                  const volume = (s.entries || []).reduce((sum, e) => sum + (e.sets || []).reduce((a,x) => a + (RepsData.setVolumeKg ? RepsData.setVolumeKg(x) : (x.weight||0)*(x.repsNumber||x.reps||0)), 0), 0);
                   const routineDay = RepsData.normalizeDayKey?.(s.routineDay || s.nominalDay) || RepsData.dayName(s.plannedDate || s.date);
                   const plannedDate = s.plannedDate || (routineDay
                     ? RepsData.addDays(s.plannedWeekStart || s.weekStart || RepsData.mondayOf(s.date), RepsData.weekdays.indexOf(routineDay))

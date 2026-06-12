@@ -409,8 +409,22 @@ function draftSetHasResult(set = {}, durationMode = false) {
     return String(set.duration ?? "").trim() !== "" ||
       String(set.note ?? "").trim() !== "";
   }
+  // Weight counts as a result for persistence: a weight-only set (user bailed
+  // before logging reps) must survive Finish instead of being silently dropped.
+  // Counting/score logic elsewhere still ignores weight-only sets.
   return String(set.reps ?? "").trim() !== "" ||
+    String(set.weight ?? "").trim() !== "" ||
     String(set.note ?? "").trim() !== "";
+}
+
+// Tolerant numeric parser for logged values: "8-12" -> 8, "12+" -> 12,
+// "60kg" -> 60, "8,5" -> 8.5. Returns null when no number is present
+// (the old Number() coercion turned these into NaN and then null in JSON).
+function parseLoggedNumber(value) {
+  const text = String(value ?? "").trim();
+  if (text === "") return null;
+  const match = text.replace(/,/g, ".").match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
 }
 
 function dateMs(value) {
@@ -443,9 +457,13 @@ function shouldHydrateSavedPlan(savedPlan, existingLogged, options = {}) {
 
   const planTime = dateMs(savedPlan.updatedAt || savedPlan.savedAt);
   const sessionTime = dateMs(existingLogged.updatedAt || existingLogged.savedAt || existingLogged.createdAt);
-  if (planTime && sessionTime) return planTime >= sessionTime;
+  // Strict ">": Finish stamps the session and clears the plan in the same
+  // instant, so a timestamp tie must go to the finished session, not the draft.
+  if (planTime && sessionTime) return planTime > sessionTime;
 
-  return true;
+  // No usable timestamps on one side: the finished session is the safer source
+  // of truth than an undated draft (this fallthrough used to resurrect drafts).
+  return false;
 }
 
 function htmlEscape(value) {
@@ -1526,15 +1544,16 @@ function LogView() {
         ignoreForProgression: skipProgressionKeys.has(ex._key),
         sets: sets.map((s, i) => {
           const isBW = !durationMode && s.unit === "bw";
-          const additionalWeight = durationMode || s.weight === "" ? null : Number(s.weight);
+          const parsedWeight = durationMode ? null : parseLoggedNumber(s.weight);
+          const parsedReps = durationMode ? 0 : parseLoggedNumber(s.reps);
           return {
             set: i + 1,
-            weight: isBW ? additionalWeight : (durationMode || s.weight === "" ? null : Number(s.weight)),
+            weight: parsedWeight,
             unit: s.unit,
             bwBase: isBW && avgBW != null ? avgBW : undefined,
-            reps: durationMode ? 0 : (s.reps === "" ? null : Number(s.reps)),
-            repsNumber: durationMode ? 0 : (s.reps === "" ? null : Number(s.reps)),
-            durationMinutes: durationMode ? Number(s.duration || durationFromTarget(ex)) || null : null,
+            reps: parsedReps,
+            repsNumber: parsedReps,
+            durationMinutes: durationMode ? (parseLoggedNumber(s.duration) ?? parseLoggedNumber(durationFromTarget(ex))) : null,
             rpe: s.rpe || null,
             note: s.note || null
           };
@@ -1628,7 +1647,27 @@ function LogView() {
   };
 
   const handleRemoveExercise = (key) => {
-    setRemovedKeys(set => new Set([...set, key]));
+    if (String(key).startsWith("e-")) {
+      // Ad-hoc exercise: actually drop it and its sets. The old behavior only
+      // hid it via removedKeys while it stayed in extraExercises, where its
+      // phantom sets kept inflating the draft's completeness during hydration.
+      setExtraExercises(arr => arr.filter((e, i) => (e._key || `e-${i}`) !== key));
+      setSetsByExercise(prev => {
+        if (!(key in prev)) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setExerciseOrder(arr => arr.filter(k => k !== key));
+      setRemovedKeys(set => {
+        if (!set.has(key)) return set;
+        const next = new Set(set);
+        next.delete(key);
+        return next;
+      });
+    } else {
+      setRemovedKeys(set => new Set([...set, key]));
+    }
     setSkipProgressionKeys(set => {
       const next = new Set(set);
       next.delete(key);

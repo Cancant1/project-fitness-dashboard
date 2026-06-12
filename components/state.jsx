@@ -1033,6 +1033,8 @@ function migrateProfile(p) {
     hiddenBlockSheets: p.hiddenBlockSheets || [],
     customBlocks: p.customBlocks || [],
     deletedSessionIds: p.deletedSessionIds || [],
+    deletedRoutineIds: p.deletedRoutineIds || [],
+    deletedBlockIds: p.deletedBlockIds || [],
     sessionEdits: p.sessionEdits || {},
     loggedSessions: p.loggedSessions || [],
     bodyLedgerFoodsOpen: p.bodyLedgerFoodsOpen !== undefined ? !!p.bodyLedgerFoodsOpen : true,
@@ -1573,6 +1575,35 @@ function newerByUpdatedAt(remoteItem = {}, localItem = {}) {
   return localTime >= remoteTime ? localItem : remoteItem;
 }
 
+// Key-wise dictionary merge: union of keys, local wins per key. Strictly better
+// than the old wholesale local-wins which dropped every remote-only key.
+function mergeKeyedRecords(remote = {}, local = {}) {
+  return { ...(remote || {}), ...(local || {}) };
+}
+
+// exerciseAnnotations is nested (exercise -> date -> annotation); merge both levels.
+function mergeExerciseAnnotations(remote = {}, local = {}) {
+  const names = new Set([...Object.keys(remote || {}), ...Object.keys(local || {})]);
+  const out = {};
+  names.forEach(name => {
+    const mergedDates = { ...(remote?.[name] || {}), ...(local?.[name] || {}) };
+    if (Object.keys(mergedDates).length) out[name] = mergedDates;
+  });
+  return out;
+}
+
+// sessionEdits entries carry updatedAt stamps (see editSession); newest edit wins per id.
+function mergeSessionEdits(remote = {}, local = {}) {
+  const ids = new Set([...Object.keys(remote || {}), ...Object.keys(local || {})]);
+  return Object.fromEntries(Array.from(ids).map(id => {
+    const remoteEdit = remote?.[id];
+    const localEdit = local?.[id];
+    if (!remoteEdit) return [id, localEdit];
+    if (!localEdit) return [id, remoteEdit];
+    return [id, newerByUpdatedAt(remoteEdit, localEdit)];
+  }));
+}
+
 function mergeRecipes(remote = [], local = [], deletedRecipes = {}) {
   const deleted = new Set(Object.keys(normalizeDeletedRecipes(deletedRecipes)));
   return mergeByKey(
@@ -1596,13 +1627,19 @@ function mergeFoodByDate(remote = {}, local = {}, deletedFoodEntries = {}) {
 }
 
 function mergeLoggedSessions(remote = [], local = []) {
-  return [...(remote || []), ...(local || [])].reduce((list, session) => {
+  const merged = [...(remote || []), ...(local || [])].reduce((list, session) => {
     const index = list.findIndex(existing => sameLoggedSessionSlot(existing, session));
     if (index < 0) return [session, ...list];
     const next = [...list];
     next[index] = betterLoggedSession(next[index], session);
     return next;
   }, []);
+  // Deterministic newest-first order (the app prepends new sessions); the old
+  // reduce left a scrambled reverse-remote-then-reverse-local order.
+  return merged.sort((a, b) =>
+    String(b.date || b.plannedDate || "").localeCompare(String(a.date || a.plannedDate || "")) ||
+    (recordUpdatedMs(b) - recordUpdatedMs(a))
+  );
 }
 
 function mergeProfiles(remoteProfile = {}, localProfile = {}) {
@@ -1644,6 +1681,46 @@ function mergeProfiles(remoteProfile = {}, localProfile = {}) {
   );
   merged.hiddenExercises = [...new Set([...(remoteProfile.hiddenExercises || []), ...(localProfile.hiddenExercises || [])])];
   merged.hiddenFoodItems = [...new Set([...(remoteProfile.hiddenFoodItems || []), ...(localProfile.hiddenFoodItems || [])])];
+  // Fields below previously fell through to wholesale local-wins via the object
+  // spread above, which silently dropped remote-only edits (deleted sessions
+  // resurrecting, routine edits overwritten by a stale device, lost annotations).
+  merged.deletedSessionIds = [...new Set([
+    ...(remoteProfile.deletedSessionIds || []),
+    ...(localProfile.deletedSessionIds || [])
+  ])];
+  merged.sessionEdits = mergeSessionEdits(remoteProfile.sessionEdits || {}, localProfile.sessionEdits || {});
+  merged.deletedRoutineIds = [...new Set([
+    ...(remoteProfile.deletedRoutineIds || []),
+    ...(localProfile.deletedRoutineIds || [])
+  ])];
+  merged.deletedBlockIds = [...new Set([
+    ...(remoteProfile.deletedBlockIds || []),
+    ...(localProfile.deletedBlockIds || [])
+  ])];
+  const deletedRoutines = new Set(merged.deletedRoutineIds);
+  const deletedBlocks = new Set(merged.deletedBlockIds);
+  merged.routines = mergeByKey(
+    remoteProfile.routines || [],
+    localProfile.routines || [],
+    routine => String(routine.id || routine.name),
+    newerByUpdatedAt
+  ).filter(routine => !deletedRoutines.has(String(routine.id)));
+  merged.customBlocks = mergeByKey(
+    remoteProfile.customBlocks || [],
+    localProfile.customBlocks || [],
+    block => String(block.id || block.name),
+    newerByUpdatedAt
+  ).filter(block => !deletedBlocks.has(String(block.id)));
+  if (merged.activeRoutineId && deletedRoutines.has(String(merged.activeRoutineId))) {
+    merged.activeRoutineId = merged.routines[0]?.id || null;
+  }
+  merged.exerciseAnnotations = mergeExerciseAnnotations(remoteProfile.exerciseAnnotations, localProfile.exerciseAnnotations);
+  merged.exerciseRenames = mergeKeyedRecords(remoteProfile.exerciseRenames, localProfile.exerciseRenames);
+  merged.blockGoals = mergeKeyedRecords(remoteProfile.blockGoals, localProfile.blockGoals);
+  merged.blockNames = mergeKeyedRecords(remoteProfile.blockNames, localProfile.blockNames);
+  merged.blockStartOverrides = mergeKeyedRecords(remoteProfile.blockStartOverrides, localProfile.blockStartOverrides);
+  merged.blockWeeksOverride = mergeKeyedRecords(remoteProfile.blockWeeksOverride, localProfile.blockWeeksOverride);
+  merged.macros = mergeKeyedRecords(remoteProfile.macros, localProfile.macros);
   return sanitizeProfileForPush(merged);
 }
 
@@ -2363,7 +2440,7 @@ function AppStateProvider({ children }) {
   // Routines
   const addRoutine = (routine) => {
     const id = "routine-" + Date.now().toString(36);
-    const newRoutine = { ...routine, id };
+    const newRoutine = { ...routine, id, updatedAt: new Date().toISOString() };
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
@@ -2376,11 +2453,12 @@ function AppStateProvider({ children }) {
   };
 
   const updateRoutine = (id, patch) => {
+    const stamped = { ...patch, updatedAt: new Date().toISOString() };
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
         ...p,
-        routines: (p.routines || []).map(r => r.id === id ? { ...r, ...patch } : r)
+        routines: (p.routines || []).map(r => r.id === id ? { ...r, ...stamped } : r)
       } : p)
     }));
   };
@@ -2391,6 +2469,7 @@ function AppStateProvider({ children }) {
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
         ...p,
         routines: (p.routines || []).filter(r => r.id !== id),
+        deletedRoutineIds: [...new Set([...(p.deletedRoutineIds || []), id])],
         activeRoutineId: p.activeRoutineId === id
           ? ((p.routines || []).filter(r => r.id !== id)[0]?.id || null)
           : p.activeRoutineId
@@ -2411,17 +2490,18 @@ function AppStateProvider({ children }) {
       ...s,
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
         ...p,
-        customBlocks: [...(p.customBlocks || []), { ...block, id: "block-" + Date.now().toString(36) }]
+        customBlocks: [...(p.customBlocks || []), { ...block, id: "block-" + Date.now().toString(36), updatedAt: new Date().toISOString() }]
       } : p)
     }));
   };
 
   const updateCustomBlock = (id, patch) => {
+    const stamped = { ...patch, updatedAt: new Date().toISOString() };
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
         ...p,
-        customBlocks: (p.customBlocks || []).map(b => b.id === id ? { ...b, ...patch } : b)
+        customBlocks: (p.customBlocks || []).map(b => b.id === id ? { ...b, ...stamped } : b)
       } : p)
     }));
   };
@@ -2431,7 +2511,8 @@ function AppStateProvider({ children }) {
       ...s,
       profiles: s.profiles.map(p => p.id === s.activeProfileId ? {
         ...p,
-        customBlocks: (p.customBlocks || []).filter(b => b.id !== id)
+        customBlocks: (p.customBlocks || []).filter(b => b.id !== id),
+        deletedBlockIds: [...new Set([...(p.deletedBlockIds || []), id])]
       } : p)
     }));
   };

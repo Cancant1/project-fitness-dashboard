@@ -816,6 +816,18 @@
     };
   }
 
+  // Unit-aware weight in kg. lb sets used to be summed as if they were kg,
+  // inflating volume ~2.2x; "bw" sets keep their additional-weight semantics.
+  const KG_PER_LB = 0.45359237;
+  function setWeightKg(set = {}) {
+    const weight = Number(set.weight) || 0;
+    const unit = String(set.unit || "kg").toLowerCase();
+    return unit === "lb" || unit === "lbs" ? weight * KG_PER_LB : weight;
+  }
+  function setVolumeKg(set = {}) {
+    return setWeightKg(set) * (Number(set.repsNumber || set.reps) || 0);
+  }
+
   // Full progression history for a single exercise
   function exerciseHistory(name) {
     const sessions = allSessions();
@@ -828,12 +840,12 @@
       if (!entry) continue;
       const sets = (entry.sets || []).filter(x => x.repsNumber || x.reps);
       if (!sets.length) continue;
-      const maxW = Math.max(...sets.map(x => x.weight || 0));
+      const maxW = Math.max(...sets.map(setWeightKg));
       const totalReps = sets.reduce((sum, x) => sum + (x.repsNumber || x.reps || 0), 0);
-      const volume = sets.reduce((sum, x) => sum + ((x.weight || 0) * (x.repsNumber || x.reps || 0)), 0);
+      const volume = sets.reduce((sum, x) => sum + setVolumeKg(x), 0);
       // Best estimated 1RM via Epley: w * (1 + reps/30)
-      const est1rm = Math.max(...sets.map(x => (x.weight || 0) * (1 + (x.repsNumber || x.reps || 0) / 30)));
-      const topSet = sets.find(x => x.weight === maxW) || sets[0];
+      const est1rm = Math.max(...sets.map(x => setWeightKg(x) * (1 + (x.repsNumber || x.reps || 0) / 30)));
+      const topSet = sets.find(x => setWeightKg(x) === maxW) || sets[0];
       perSession.push({
         date: s.date, weekStart: s.weekStart, split: s.split,
         unit: topSet.unit || "kg",
@@ -1257,6 +1269,7 @@
     plannedFor, sessionForDate, sessionForRoutineSlot, sessionStatusForDay,
     sparklineFor, weightSparkline,
     streakDays, thisWeekStart,
+    setWeightKg, setVolumeKg,
     avgBodyweight, adaptiveTdeeEstimate, macroTargetsForAdaptiveTdee, tdeeEstimate, roundToIncrement,
     PLANNED_WEEK,
     notableNotes: (D.workouts?.notableNotes || []).slice(0, 16),
