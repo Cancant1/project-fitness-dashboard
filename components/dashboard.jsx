@@ -434,7 +434,7 @@ function Dashboard({ setView }) {
               </thead>
               <tbody>
                 {recentPerformedSessions.map((s, i) => {
-                  const top = (s.entries || []).find(entry => loggedSetCount(entry.sets || []) > 0) || s.entries[0];
+                  const top = (s.entries || []).find(entry => loggedSetCount(entry.sets || []) > 0) || (s.entries || [])[0];
                   const topSet = (top?.sets || []).find(set => loggedSetCount([set]) > 0);
                   const topSetText = topSet?.durationMinutes || topSet?.duration
                     ? `${topSet.durationMinutes || topSet.duration} min`

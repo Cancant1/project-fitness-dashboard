@@ -640,17 +640,17 @@ function Exercises() {
    BODY + FOOD
    ========================================================= */
 function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updateProfile, targetDate }) {
-  const [mode, setMode] = useS("catalog");
-  const [q, setQ] = useS("");
-  const [picked, setPicked] = useS(null);
-  const [amount, setAmount] = useS(1);
-  const [showHidden, setShowHidden] = useS(false);
-  const [qName, setQName] = useS("");
-  const [qKcal, setQKcal] = useS("");
-  const [qProtein, setQProtein] = useS("");
-  const [qCarbs, setQCarbs] = useS("");
-  const [qFat, setQFat] = useS("");
-  const [qSaveToLog, setQSaveToLog] = useS(false); // save as custom food item
+  const [mode, setMode] = useState("catalog");
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState(null);
+  const [amount, setAmount] = useState(1);
+  const [showHidden, setShowHidden] = useState(false);
+  const [qName, setQName] = useState("");
+  const [qKcal, setQKcal] = useState("");
+  const [qProtein, setQProtein] = useState("");
+  const [qCarbs, setQCarbs] = useState("");
+  const [qFat, setQFat] = useState("");
+  const [qSaveToLog, setQSaveToLog] = useState(false); // save as custom food item
 
   const hidden = activeProfile?.hiddenFoodItems || [];
   const items = allFoodCatalogItems(activeProfile, RepsData.foodItems, { includeHidden: true });
@@ -855,12 +855,12 @@ function AddFoodModal({ onClose, onAdd, onSaveToCatalog, activeProfile, updatePr
 }
 
 function NewCatalogEntryForm({ onSave, onCancel }) {
-  const [name, setName] = useS("");
-  const [kcal, setKcal] = useS("");
-  const [protein, setProtein] = useS("");
-  const [carbs, setCarbs] = useS("");
-  const [fat, setFat] = useS("");
-  const [category, setCategory] = useS("Custom");
+  const [name, setName] = useState("");
+  const [kcal, setKcal] = useState("");
+  const [protein, setProtein] = useState("");
+  const [carbs, setCarbs] = useState("");
+  const [fat, setFat] = useState("");
+  const [category, setCategory] = useState("Custom");
 
   const submit = () => {
     if (!name.trim() || !kcal) return;
@@ -910,14 +910,14 @@ function FoodLibraryModal({ activeProfile, updateProfile, catalogItems, onClose 
     _rowId: item._catalogKey || `food-row-${index}`,
     visible: !item._hidden
   }));
-  const [rows, setRows] = useS(makeRows);
-  const [query, setQuery] = useS("");
-  const [category, setCategory] = useS("all");
-  const [showHidden, setShowHidden] = useS(true);
-  const [dragKey, setDragKey] = useS(null);
-  const [error, setError] = useS("");
+  const [rows, setRows] = useState(makeRows);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState("all");
+  const [showHidden, setShowHidden] = useState(true);
+  const [dragKey, setDragKey] = useState(null);
+  const [error, setError] = useState("");
 
-  useE(() => {
+  _ue(() => {
     const onKey = (event) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
     const oldOverflow = document.body.style.overflow;
@@ -1188,10 +1188,10 @@ function FoodLibraryModal({ activeProfile, updateProfile, catalogItems, onClose 
 }
 
 function WeightEntryModal({ onClose, onSave, lookupExisting }) {
-  const [date, setDate] = useS(window.RepsData.TODAY);
+  const [date, setDate] = useState(window.RepsData.TODAY);
   const initial = lookupExisting ? lookupExisting(window.RepsData.TODAY) : null;
-  const [weight, setWeight] = useS(initial && initial.value != null ? String(initial.value) : "");
-  const [note, setNote] = useS(initial && initial.note ? initial.note : "");
+  const [weight, setWeight] = useState(initial && initial.value != null ? String(initial.value) : "");
+  const [note, setNote] = useState(initial && initial.note ? initial.note : "");
 
   // When the user picks a different date, reflect any existing entry for that date.
   React.useEffect(() => {
@@ -1245,8 +1245,8 @@ function WeightEntryModal({ onClose, onSave, lookupExisting }) {
 
 // Editable cell for the Daily log table — click value to turn it into an inline input.
 function EditableNumberCell({ value, placeholder, suffix, onSave, onClear, color, allowDecimals, alignRight = true }) {
-  const [editing, setEditing] = useS(false);
-  const [draft, setDraft] = useS("");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
 
   const start = () => {
     setDraft(value != null && value !== "" ? String(value) : "");
@@ -1300,8 +1300,8 @@ function EditableNumberCell({ value, placeholder, suffix, onSave, onClear, color
 }
 
 function EditableTextCell({ value, placeholder, onSave }) {
-  const [editing, setEditing] = useS(false);
-  const [draft, setDraft] = useS("");
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
   const start = () => { setDraft(value || ""); setEditing(true); };
   const commit = () => { setEditing(false); onSave(draft.trim()); };
   if (editing) {
@@ -1391,7 +1391,7 @@ function LedgerFoodDetails({ date, foods, onAddFood, onRemoveFood }) {
 }
 
 function DailyLogTable({ bodyD, kcal, protein, activeProfile, updateProfile, updateDailyOverride, clearDailyOverride, selectedDate, onSelectDate, onAddFoodForDate, onRemoveFoodForDate, foodsOpen = true, onFoodsOpenChange, className = "" }) {
-  const [rangeDays, setRangeDays] = useS("14");
+  const [rangeDays, setRangeDays] = useState("14");
   const today = window.RepsData.TODAY;
   const overrides = activeProfile.dailyOverrides || {};
   const foodByDate = activeProfile.foodByDate || {};
@@ -2158,11 +2158,11 @@ function Body() {
   const { activeProfile, addFoodEntry, removeFoodEntry, updateProfile, addCustomFoodItem,
           updateDailyOverride, clearDailyOverride } = window.RepsState.useApp();
   const todayIso = window.RepsData.TODAY;
-  const [selectedDate, setSelectedDate] = useS(todayIso);
-  const [showWeightModal, setShowWeightModal] = useS(false);
-  const [showFoodLibrary, setShowFoodLibrary] = useS(false);
-  const [tdeeWindowDays, setTdeeWindowDays] = useS(28);
-  const [foodModalDate, setFoodModalDate] = useS(null);
+  const [selectedDate, setSelectedDate] = useState(todayIso);
+  const [showWeightModal, setShowWeightModal] = useState(false);
+  const [showFoodLibrary, setShowFoodLibrary] = useState(false);
+  const [tdeeWindowDays, setTdeeWindowDays] = useState(28);
+  const [foodModalDate, setFoodModalDate] = useState(null);
   const selectedDayKey = window.RepsData.dayName(selectedDate);
   const targets = activeProfile.macros[selectedDayKey] || { kcal: 2000, protein: 160, carbs: 200, fat: 60 };
 
@@ -2196,7 +2196,7 @@ function Body() {
   const foodItems = RepsData.foodItems;
   // Manual override for the currently selected date's macros — used by the day's macro panel
   const selectedOverride = dailyOverrides[selectedDate] || {};
-  const [showAddFood, setShowAddFood] = useS(false);
+  const [showAddFood, setShowAddFood] = useState(false);
   const ledgerFoodsOpen = activeProfile.bodyLedgerFoodsOpen !== false;
 
   const entries = (activeProfile.foodByDate || {})[selectedDate] || [];
@@ -2362,10 +2362,10 @@ function MacroCell({ value, onChange, suffix }) {
 
 function AddBlockModal({ initialBlock, onClose, onSave, onDelete }) {
   const isEdit = !!initialBlock;
-  const [name, setName] = useS(initialBlock?.name || "Block " + new Date().getFullYear());
-  const [startDate, setStartDate] = useS(initialBlock?.startDate || window.RepsData.TODAY);
-  const [weeks, setWeeks] = useS(initialBlock?.weeks || 8);
-  const [goal, setGoal] = useS(initialBlock?.goal || "");
+  const [name, setName] = useState(initialBlock?.name || "Block " + new Date().getFullYear());
+  const [startDate, setStartDate] = useState(initialBlock?.startDate || window.RepsData.TODAY);
+  const [weeks, setWeeks] = useState(initialBlock?.weeks || 8);
+  const [goal, setGoal] = useState(initialBlock?.goal || "");
 
   const submit = () => {
     if (!name.trim()) return;
@@ -2657,7 +2657,8 @@ function Plan() {
             </thead>
             <tbody>
               {DAY_KEYS.map(day => {
-                const m = activeProfile.macros[day];
+                // Sync-restored profiles can miss a day key; never crash the table.
+                const m = { kcal: 0, protein: 0, carbs: 0, fat: 0, ...(activeProfile.macros?.[day] || {}) };
                 const isToday = day === todayKey;
                 return (
                   <tr key={day} style={isToday ? { background: "var(--accent-soft)" } : {}}>
@@ -2691,10 +2692,10 @@ function Plan() {
               })}
               <tr>
                 <td className="muted" style={{fontWeight:500}}>Avg / day</td>
-                <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + activeProfile.macros[d].kcal, 0) / 7)}</td>
-                <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + activeProfile.macros[d].protein, 0) / 7)}</td>
-                {trackCarbs && <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + activeProfile.macros[d].carbs, 0) / 7)}</td>}
-                {trackFat && <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + activeProfile.macros[d].fat, 0) / 7)}</td>}
+                <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + (Number(activeProfile.macros?.[d]?.kcal) || 0), 0) / 7)}</td>
+                <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + (Number(activeProfile.macros?.[d]?.protein) || 0), 0) / 7)}</td>
+                {trackCarbs && <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + (Number(activeProfile.macros?.[d]?.carbs) || 0), 0) / 7)}</td>}
+                {trackFat && <td className="num mono">{Math.round(DAY_KEYS.reduce((s,d) => s + (Number(activeProfile.macros?.[d]?.fat) || 0), 0) / 7)}</td>}
                 <td></td>
               </tr>
             </tbody>
