@@ -2,6 +2,54 @@
 const { useState, useEffect, useRef } = React;
 const I = RepsIcons;
 
+// Promise-based replacement for window.confirm. The native dialog is blocking,
+// unstylable and unreliable on iOS Safari; this one matches the app's look and
+// resolves false on Escape/scrim tap.
+function repsConfirm(message, options = {}) {
+  return new Promise(resolve => {
+    document.querySelectorAll(".ui-confirm-scrim").forEach(el => el.remove());
+    const scrim = document.createElement("div");
+    scrim.className = "ui-confirm-scrim";
+    const box = document.createElement("div");
+    box.className = "ui-confirm";
+    box.setAttribute("role", "alertdialog");
+    box.setAttribute("aria-modal", "true");
+    const text = document.createElement("div");
+    text.className = "ui-confirm-message";
+    text.textContent = message;
+    const actions = document.createElement("div");
+    actions.className = "ui-confirm-actions";
+    const done = (value) => {
+      document.removeEventListener("keydown", onKey, true);
+      scrim.remove();
+      resolve(value);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); done(false); }
+      if (e.key === "Enter") { e.preventDefault(); done(true); }
+    };
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn ghost sm";
+    cancelBtn.textContent = options.cancelLabel || "Cancel";
+    cancelBtn.addEventListener("click", () => done(false));
+    const okBtn = document.createElement("button");
+    okBtn.type = "button";
+    okBtn.className = "btn primary sm";
+    if (options.danger !== false) okBtn.classList.add("ui-confirm-danger");
+    okBtn.textContent = options.confirmLabel || "Confirm";
+    okBtn.addEventListener("click", () => done(true));
+    actions.append(cancelBtn, okBtn);
+    box.append(text, actions);
+    scrim.append(box);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) done(false); });
+    document.addEventListener("keydown", onKey, true);
+    document.body.append(scrim);
+    okBtn.focus();
+  });
+}
+window.RepsUI = { confirm: repsConfirm };
+
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: I.Dashboard, kbd: "1" },
   { id: "log",       label: "Log",       icon: I.Log,       kbd: "2" },
@@ -219,6 +267,8 @@ function ProfileSwitcher({ app, profile, setView }) {
 // Mobile-only top app bar + slide-in navigation drawer (shown <= 980px via CSS).
 function MobileNav({ view, setView }) {
   const [open, setOpen] = useState(false);
+  const drawerRef = useRef(null);
+  const touchRef = useRef(null);
   const app = window.RepsState?.useApp?.();
   const profile = app?.activeProfile;
   const labels = {
@@ -229,15 +279,45 @@ function MobileNav({ view, setView }) {
 
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+      // Focus trap: keep Tab cycling inside the open drawer.
+      if (e.key === "Tab" && drawerRef.current) {
+        const focusables = drawerRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (!focusables.length) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    const prevFocus = document.activeElement;
+    drawerRef.current?.querySelector("button")?.focus();
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
+      if (prevFocus?.focus) prevFocus.focus();
     };
   }, [open]);
+
+  // Swipe-left anywhere on the drawer closes it (matches iOS expectations).
+  const onTouchStart = (e) => {
+    touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const onTouchMove = (e) => {
+    if (!touchRef.current) return;
+    const dx = e.touches[0].clientX - touchRef.current.x;
+    const dy = Math.abs(e.touches[0].clientY - touchRef.current.y);
+    if (dx < -48 && dy < 40) {
+      touchRef.current = null;
+      setOpen(false);
+    }
+  };
 
   const go = (id) => { setView(id); setOpen(false); };
 
@@ -261,7 +341,14 @@ function MobileNav({ view, setView }) {
         onClick={() => setOpen(false)}
         aria-hidden="true"></div>
 
-      <aside className={`m-drawer ${open ? "is-open" : ""}`} role="dialog" aria-modal="true" aria-label="Main navigation">
+      <aside
+        className={`m-drawer ${open ? "is-open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Main navigation"
+        ref={drawerRef}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}>
         <div className="m-drawer-head">
           <div className="brand m-drawer-brand">
             <span className="brand-mark">R</span>

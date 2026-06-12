@@ -720,6 +720,7 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
       <div className="sheet-actual-group">
         <input
           className="sheet-weight-input"
+          inputMode="decimal"
           value={durationMode ? (set.duration ?? "") : set.weight}
           placeholder={durationMode ? "min" : isBW ? "+kg" : "kg"}
           aria-label={`${exercise.name} set ${idx} ${durationMode ? "minutes" : "weight"}`}
@@ -736,6 +737,7 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
         )}
         <input
           className="sheet-reps-input"
+          inputMode="numeric"
           value={set.reps}
           placeholder="reps"
           aria-label={`${exercise.name} set ${idx} reps`}
@@ -749,6 +751,7 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
       </div>
       <div className="sheet-rpe-cell">
         <input
+          inputMode="decimal"
           value={set.rpe}
           placeholder="rpe"
           aria-label={`${exercise.name} set ${idx} RPE`}
@@ -774,10 +777,10 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
         <button
           className="btn ghost icon-only"
           type="button"
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
             if (first) {
-              if (confirm(`Remove ${exercise.name} from this session?`)) onRemoveExercise?.();
+              if (await window.RepsUI.confirm(`Remove ${exercise.name} from this session?`, { confirmLabel: "Remove" })) onRemoveExercise?.();
               return;
             }
             onRemove?.();
@@ -1424,7 +1427,7 @@ function LogView() {
         });
 
         if (progressionNote) {
-          const noteColor = suggestion?.tone === "good" ? c.good : suggestion?.tone === "warn" ? c.bad : c.ink2;
+          const noteColor = suggestion?.tone === "good" ? c.good : suggestion?.tone === "warn" ? c.warn : c.ink2;
           rows.push(`<tr>${
             clipboardCell("Plan", { base: baseCell, style: { ...mutedSmall, background: c.surface2, "text-transform": "uppercase", "letter-spacing": "0.05em" } }) +
             clipboardCell(progressionNote, { colspan: LOG_CLIPBOARD_COL_COUNT - 1, base: baseCell, style: { color: noteColor, background: c.surface2 } })
@@ -1663,8 +1666,8 @@ function LogView() {
     persistExerciseOrder(keys);
   };
 
-  const handleResetDay = () => {
-    if (!confirm("Reset this day back to the routine? This clears your overrides for this date.")) return;
+  const handleResetDay = async () => {
+    if (!(await window.RepsUI.confirm("Reset this day back to the routine? This clears your overrides for this date.", { confirmLabel: "Reset day" }))) return;
     app.clearSessionPlan?.(sessionDate);
     const existingLogged = loggedSessionForDate(sessionDate, selectedDay);
     if (existingLogged) {
