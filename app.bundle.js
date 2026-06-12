@@ -1787,57 +1787,113 @@ function githubContentUrl(config) {
   var branch = encodeURIComponent(String(config.branch || "main").trim());
   return "https://api.github.com/repos/".concat(owner, "/").concat(repo, "/contents/").concat(path, "?ref=").concat(branch);
 }
-function fetchGithubState(_x) {
-  return _fetchGithubState.apply(this, arguments);
+function fetchGithubBlobContent(_x, _x2) {
+  return _fetchGithubBlobContent.apply(this, arguments);
 }
-function _fetchGithubState() {
-  _fetchGithubState = _asyncToGenerator(_regenerator().m(function _callee5(config) {
-    var res, text, file, payload;
+function _fetchGithubBlobContent() {
+  _fetchGithubBlobContent = _asyncToGenerator(_regenerator().m(function _callee5(config, file) {
+    var owner, repo, url, res, text, blob;
     return _regenerator().w(function (_context5) {
       while (1) switch (_context5.n) {
         case 0:
+          owner = encodeURIComponent(String(config.owner || "").trim());
+          repo = encodeURIComponent(String(config.repo || "").trim());
+          url = file.git_url || "https://api.github.com/repos/".concat(owner, "/").concat(repo, "/git/blobs/").concat(file.sha);
           _context5.n = 1;
-          return fetch(githubContentUrl(config), {
+          return fetch(url, {
             headers: githubApiHeaders(config)
           });
         case 1:
           res = _context5.v;
-          if (!(res.status === 404)) {
-            _context5.n = 2;
+          if (res.ok) {
+            _context5.n = 3;
             break;
           }
-          return _context5.a(2, null);
+          _context5.n = 2;
+          return res.text();
+        case 2:
+          text = _context5.v;
+          throw new Error("GitHub pull failed while reading large state file (".concat(res.status, "): ").concat(text.slice(0, 180)));
+        case 3:
+          _context5.n = 4;
+          return res.json();
+        case 4:
+          blob = _context5.v;
+          return _context5.a(2, blob.content || "");
+      }
+    }, _callee5);
+  }));
+  return _fetchGithubBlobContent.apply(this, arguments);
+}
+function fetchGithubState(_x3) {
+  return _fetchGithubState.apply(this, arguments);
+}
+function _fetchGithubState() {
+  _fetchGithubState = _asyncToGenerator(_regenerator().m(function _callee6(config) {
+    var res, text, file, rawContent, payload, _t4;
+    return _regenerator().w(function (_context6) {
+      while (1) switch (_context6.p = _context6.n) {
+        case 0:
+          _context6.n = 1;
+          return fetch(githubContentUrl(config), {
+            headers: githubApiHeaders(config)
+          });
+        case 1:
+          res = _context6.v;
+          if (!(res.status === 404)) {
+            _context6.n = 2;
+            break;
+          }
+          return _context6.a(2, null);
         case 2:
           if (res.ok) {
-            _context5.n = 4;
+            _context6.n = 4;
             break;
           }
-          _context5.n = 3;
+          _context6.n = 3;
           return res.text();
         case 3:
-          text = _context5.v;
+          text = _context6.v;
           throw new Error("GitHub pull failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
         case 4:
-          _context5.n = 5;
+          _context6.n = 5;
           return res.json();
         case 5:
-          file = _context5.v;
-          payload = JSON.parse(base64DecodeUtf8(file.content || ""));
-          return _context5.a(2, {
+          file = _context6.v;
+          rawContent = String(file.content || "");
+          if (!((!rawContent.trim() || file.encoding === "none") && file.sha)) {
+            _context6.n = 7;
+            break;
+          }
+          _context6.n = 6;
+          return fetchGithubBlobContent(config, file);
+        case 6:
+          rawContent = _context6.v;
+        case 7:
+          _context6.p = 7;
+          payload = JSON.parse(base64DecodeUtf8(rawContent));
+          _context6.n = 9;
+          break;
+        case 8:
+          _context6.p = 8;
+          _t4 = _context6.v;
+          throw new Error("GitHub state file could not be parsed (".concat(_t4.message, "). The file on GitHub may be corrupt; check ").concat(config.path || "the state file", " in the repo."));
+        case 9:
+          return _context6.a(2, {
             sha: file.sha,
             envelope: payload,
             state: migrateState(unwrapRemoteState(payload))
           });
       }
-    }, _callee5);
+    }, _callee6, null, [[7, 8]]);
   }));
   return _fetchGithubState.apply(this, arguments);
 }
-function putGithubState(_x2, _x3) {
+function putGithubState(_x4, _x5) {
   return _putGithubState.apply(this, arguments);
 }
 function _putGithubState() {
-  _putGithubState = _asyncToGenerator(_regenerator().m(function _callee6(config, state) {
+  _putGithubState = _asyncToGenerator(_regenerator().m(function _callee7(config, state) {
     var _result$content;
     var sha,
       cleanPath,
@@ -1846,20 +1902,20 @@ function _putGithubState() {
       res,
       text,
       result,
-      _args6 = arguments;
-    return _regenerator().w(function (_context6) {
-      while (1) switch (_context6.n) {
+      _args7 = arguments;
+    return _regenerator().w(function (_context7) {
+      while (1) switch (_context7.n) {
         case 0:
-          sha = _args6.length > 2 && _args6[2] !== undefined ? _args6[2] : null;
+          sha = _args7.length > 2 && _args7[2] !== undefined ? _args7[2] : null;
           cleanPath = String(config.path || "state/reps-app-state.json").trim();
           body = {
             message: "Sync Reps dashboard state ".concat(new Date().toISOString()),
-            content: base64EncodeUtf8(JSON.stringify(stateEnvelope(state, config.clientId), null, 2)),
+            content: base64EncodeUtf8(JSON.stringify(stateEnvelope(state, config.clientId))),
             branch: config.branch || "main"
           };
           if (sha) body.sha = sha;
           url = "https://api.github.com/repos/".concat(encodeURIComponent(config.owner), "/").concat(encodeURIComponent(config.repo), "/contents/").concat(cleanPath.split("/").map(encodeURIComponent).join("/"));
-          _context6.n = 1;
+          _context7.n = 1;
           return fetch(url, {
             method: "PUT",
             headers: _objectSpread(_objectSpread({}, githubApiHeaders(config)), {}, {
@@ -1868,24 +1924,24 @@ function _putGithubState() {
             body: JSON.stringify(body)
           });
         case 1:
-          res = _context6.v;
+          res = _context7.v;
           if (res.ok) {
-            _context6.n = 3;
+            _context7.n = 3;
             break;
           }
-          _context6.n = 2;
+          _context7.n = 2;
           return res.text();
         case 2:
-          text = _context6.v;
+          text = _context7.v;
           throw new Error("GitHub push failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
         case 3:
-          _context6.n = 4;
+          _context7.n = 4;
           return res.json();
         case 4:
-          result = _context6.v;
-          return _context6.a(2, ((_result$content = result.content) === null || _result$content === void 0 ? void 0 : _result$content.sha) || null);
+          result = _context7.v;
+          return _context7.a(2, ((_result$content = result.content) === null || _result$content === void 0 ? void 0 : _result$content.sha) || null);
       }
-    }, _callee6);
+    }, _callee7);
   }));
   return _putGithubState.apply(this, arguments);
 }
@@ -2818,7 +2874,7 @@ function AppStateProvider(_ref11) {
         }
       }, _callee4);
     }));
-    return function resolveSyncConflict(_x4) {
+    return function resolveSyncConflict(_x6) {
       return _ref15.apply(this, arguments);
     };
   }();

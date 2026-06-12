@@ -27,7 +27,8 @@ window.__syncMergeTests = {
   mergeSessionPlanTombstones,
   mergeSessionPlans,
   mergeRemoteAndLocalState,
-  sanitizeProfileForPush
+  sanitizeProfileForPush,
+  fetchGithubState
 };`;
 const compiled = babelSandbox.Babel.transform(`${stateSource}\n${testExports}`, {
   filename: "components/state.jsx",
@@ -191,5 +192,40 @@ const sanitized = sanitizeProfileForPush({
 });
 assert.deepEqual(Object.keys(sanitized.sessionPlansByDate), []);
 assert.ok(sanitized.sessionPlanTombstones[date]);
+
+// --- GitHub pull: files over 1MB come back with empty content from the
+// contents API and must be re-fetched through the git blobs API. ---
+const { fetchGithubState } = runtime.__syncMergeTests;
+const syncConfig = { owner: "m", repo: "r", branch: "main", path: "state/reps-app-state.json", token: "tok", clientId: "c1" };
+const remoteEnvelope = {
+  app: "reps-dashboard",
+  schemaVersion: 1,
+  state: { profiles: [{ id: "p1", name: "Mario", loggedSessions: [withReps] }], activeProfileId: "p1" }
+};
+const remoteB64 = Buffer.from(JSON.stringify(remoteEnvelope), "utf8").toString("base64");
+const chunkedB64 = remoteB64.match(/.{1,60}/g).join("\n"); // blobs API wraps base64 lines
+
+const fetchCalls = [];
+runtime.fetch = async (url, opts = {}) => {
+  fetchCalls.push(url);
+  if (url.includes("/contents/")) {
+    return { ok: true, status: 200, json: async () => ({ sha: "bigsha", size: 1500000, content: "", encoding: "none", git_url: "https://api.github.com/repos/m/r/git/blobs/bigsha" }) };
+  }
+  if (url.includes("/git/blobs/bigsha")) {
+    return { ok: true, status: 200, json: async () => ({ sha: "bigsha", content: chunkedB64, encoding: "base64" }) };
+  }
+  return { ok: false, status: 500, text: async () => "unexpected url: " + url };
+};
+const largePull = await fetchGithubState(syncConfig);
+assert.equal(largePull.sha, "bigsha");
+assert.equal(largePull.state.profiles[0].loggedSessions[0].entries[0].sets[0].repsNumber, 8);
+assert.equal(fetchCalls.length, 2, "large file pull must fall back to the blobs API");
+
+runtime.fetch = async () => ({ ok: true, status: 200, json: async () => ({ sha: "small", size: 10, content: remoteB64, encoding: "base64" }) });
+const smallPull = await fetchGithubState(syncConfig);
+assert.equal(smallPull.sha, "small", "small file pull must keep working without a second request");
+
+runtime.fetch = async () => ({ ok: true, status: 200, json: async () => ({ sha: "bad", size: 5, content: Buffer.from("{oops", "utf8").toString("base64"), encoding: "base64" }) });
+await assert.rejects(() => fetchGithubState(syncConfig), /could not be parsed/, "corrupt remote file must raise a readable error");
 
 console.log("sync merge regression tests passed");
