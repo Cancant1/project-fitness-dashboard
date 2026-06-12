@@ -1483,9 +1483,12 @@ function defaultSyncConfig() {
     branch: "main",
     path: "state/reps-app-state.json",
     token: "",
+    autoSync: true,
     clientId: syncClientId()
   };
 }
+var AUTO_PUSH_DELAY_MS = 20000;
+var AUTO_PULL_MIN_INTERVAL_MS = 45000;
 function defaultSyncMeta() {
   return {
     lastRemoteSha: null,
@@ -1827,17 +1830,19 @@ function _fetchGithubBlobContent() {
   }));
   return _fetchGithubBlobContent.apply(this, arguments);
 }
-function fetchGithubState(_x3) {
-  return _fetchGithubState.apply(this, arguments);
+function assertGithubRepoReachable(_x3) {
+  return _assertGithubRepoReachable.apply(this, arguments);
 }
-function _fetchGithubState() {
-  _fetchGithubState = _asyncToGenerator(_regenerator().m(function _callee6(config) {
-    var res, text, file, rawContent, payload, _t4;
+function _assertGithubRepoReachable() {
+  _assertGithubRepoReachable = _asyncToGenerator(_regenerator().m(function _callee6(config) {
+    var owner, repo, res, text;
     return _regenerator().w(function (_context6) {
-      while (1) switch (_context6.p = _context6.n) {
+      while (1) switch (_context6.n) {
         case 0:
+          owner = encodeURIComponent(String(config.owner || "").trim());
+          repo = encodeURIComponent(String(config.repo || "").trim());
           _context6.n = 1;
-          return fetch(githubContentUrl(config), {
+          return fetch("https://api.github.com/repos/".concat(owner, "/").concat(repo), {
             headers: githubApiHeaders(config)
           });
         case 1:
@@ -1846,7 +1851,7 @@ function _fetchGithubState() {
             _context6.n = 2;
             break;
           }
-          return _context6.a(2, null);
+          throw new Error("GitHub repo ".concat(config.owner, "/").concat(config.repo, " not found. Check owner/repo spelling and that the token can access it."));
         case 2:
           if (res.ok) {
             _context6.n = 4;
@@ -1856,46 +1861,86 @@ function _fetchGithubState() {
           return res.text();
         case 3:
           text = _context6.v;
-          throw new Error("GitHub pull failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
+          throw new Error("GitHub repo check failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
         case 4:
-          _context6.n = 5;
-          return res.json();
-        case 5:
-          file = _context6.v;
-          rawContent = String(file.content || "");
-          if (!((!rawContent.trim() || file.encoding === "none") && file.sha)) {
-            _context6.n = 7;
+          return _context6.a(2);
+      }
+    }, _callee6);
+  }));
+  return _assertGithubRepoReachable.apply(this, arguments);
+}
+function fetchGithubState(_x4) {
+  return _fetchGithubState.apply(this, arguments);
+}
+function _fetchGithubState() {
+  _fetchGithubState = _asyncToGenerator(_regenerator().m(function _callee7(config) {
+    var res, text, file, rawContent, payload, _t4;
+    return _regenerator().w(function (_context7) {
+      while (1) switch (_context7.p = _context7.n) {
+        case 0:
+          _context7.n = 1;
+          return fetch(githubContentUrl(config), {
+            headers: githubApiHeaders(config)
+          });
+        case 1:
+          res = _context7.v;
+          if (!(res.status === 404)) {
+            _context7.n = 3;
             break;
           }
-          _context6.n = 6;
-          return fetchGithubBlobContent(config, file);
+          _context7.n = 2;
+          return assertGithubRepoReachable(config);
+        case 2:
+          return _context7.a(2, null);
+        case 3:
+          if (res.ok) {
+            _context7.n = 5;
+            break;
+          }
+          _context7.n = 4;
+          return res.text();
+        case 4:
+          text = _context7.v;
+          throw new Error("GitHub pull failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
+        case 5:
+          _context7.n = 6;
+          return res.json();
         case 6:
-          rawContent = _context6.v;
+          file = _context7.v;
+          rawContent = String(file.content || "");
+          if (!((!rawContent.trim() || file.encoding === "none") && file.sha)) {
+            _context7.n = 8;
+            break;
+          }
+          _context7.n = 7;
+          return fetchGithubBlobContent(config, file);
         case 7:
-          _context6.p = 7;
-          payload = JSON.parse(base64DecodeUtf8(rawContent));
-          _context6.n = 9;
-          break;
+          rawContent = _context7.v;
         case 8:
-          _context6.p = 8;
-          _t4 = _context6.v;
-          throw new Error("GitHub state file could not be parsed (".concat(_t4.message, "). The file on GitHub may be corrupt; check ").concat(config.path || "the state file", " in the repo."));
+          _context7.p = 8;
+          payload = JSON.parse(base64DecodeUtf8(rawContent));
+          _context7.n = 10;
+          break;
         case 9:
-          return _context6.a(2, {
+          _context7.p = 9;
+          _t4 = _context7.v;
+          throw new Error("GitHub state file could not be parsed (".concat(_t4.message, "). The file on GitHub may be corrupt; check ").concat(config.path || "the state file", " in the repo."));
+        case 10:
+          return _context7.a(2, {
             sha: file.sha,
             envelope: payload,
             state: migrateState(unwrapRemoteState(payload))
           });
       }
-    }, _callee6, null, [[7, 8]]);
+    }, _callee7, null, [[8, 9]]);
   }));
   return _fetchGithubState.apply(this, arguments);
 }
-function putGithubState(_x4, _x5) {
+function putGithubState(_x5, _x6) {
   return _putGithubState.apply(this, arguments);
 }
 function _putGithubState() {
-  _putGithubState = _asyncToGenerator(_regenerator().m(function _callee7(config, state) {
+  _putGithubState = _asyncToGenerator(_regenerator().m(function _callee8(config, state) {
     var _result$content;
     var sha,
       cleanPath,
@@ -1904,11 +1949,11 @@ function _putGithubState() {
       res,
       text,
       result,
-      _args7 = arguments;
-    return _regenerator().w(function (_context7) {
-      while (1) switch (_context7.n) {
+      _args8 = arguments;
+    return _regenerator().w(function (_context8) {
+      while (1) switch (_context8.n) {
         case 0:
-          sha = _args7.length > 2 && _args7[2] !== undefined ? _args7[2] : null;
+          sha = _args8.length > 2 && _args8[2] !== undefined ? _args8[2] : null;
           cleanPath = String(config.path || "state/reps-app-state.json").trim();
           body = {
             message: "Sync Reps dashboard state ".concat(new Date().toISOString()),
@@ -1917,7 +1962,7 @@ function _putGithubState() {
           };
           if (sha) body.sha = sha;
           url = "https://api.github.com/repos/".concat(encodeURIComponent(config.owner), "/").concat(encodeURIComponent(config.repo), "/contents/").concat(cleanPath.split("/").map(encodeURIComponent).join("/"));
-          _context7.n = 1;
+          _context8.n = 1;
           return fetch(url, {
             method: "PUT",
             headers: _objectSpread(_objectSpread({}, githubApiHeaders(config)), {}, {
@@ -1926,24 +1971,24 @@ function _putGithubState() {
             body: JSON.stringify(body)
           });
         case 1:
-          res = _context7.v;
+          res = _context8.v;
           if (res.ok) {
-            _context7.n = 3;
+            _context8.n = 3;
             break;
           }
-          _context7.n = 2;
+          _context8.n = 2;
           return res.text();
         case 2:
-          text = _context7.v;
+          text = _context8.v;
           throw new Error("GitHub push failed (".concat(res.status, "): ").concat(text.slice(0, 180)));
         case 3:
-          _context7.n = 4;
+          _context8.n = 4;
           return res.json();
         case 4:
-          result = _context7.v;
-          return _context7.a(2, ((_result$content = result.content) === null || _result$content === void 0 ? void 0 : _result$content.sha) || null);
+          result = _context8.v;
+          return _context8.a(2, ((_result$content = result.content) === null || _result$content === void 0 ? void 0 : _result$content.sha) || null);
       }
-    }, _callee7);
+    }, _callee8);
   }));
   return _putGithubState.apply(this, arguments);
 }
@@ -2558,6 +2603,11 @@ function AppStateProvider(_ref11) {
   var stateRef = useRef(state);
   var syncMetaRef = useRef(syncMeta);
   var pushInFlightRef = useRef(null);
+  var pullInFlightRef = useRef(false);
+  var syncConfigRef = useRef(syncConfig);
+  var lastAutoPullRef = useRef(0);
+  var pushRemoteStateRef = useRef(null);
+  var pullRemoteStateRef = useRef(null);
   var setState = function setState(updater) {
     var base = stateRef.current || state;
     var nextRaw = typeof updater === "function" ? updater(base) : updater;
@@ -2599,14 +2649,32 @@ function AppStateProvider(_ref11) {
         conflict: false
       });
     });
-    if (syncConfig.enabled && syncConfig.token) {
-      setSyncStatus({
-        state: "idle",
-        message: "Local changes saved. Push when done."
-      });
+    var config = syncConfigRef.current;
+    if (config.enabled && config.token) {
+      if (config.autoSync !== false) {
+        if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+        pushTimerRef.current = setTimeout(function () {
+          var _pushRemoteStateRef$c;
+          pushTimerRef.current = null;
+          (_pushRemoteStateRef$c = pushRemoteStateRef.current) === null || _pushRemoteStateRef$c === void 0 || _pushRemoteStateRef$c.call(pushRemoteStateRef, {
+            silent: true,
+            auto: true
+          });
+        }, AUTO_PUSH_DELAY_MS);
+        setSyncStatus({
+          state: "idle",
+          message: "Local changes saved · auto-sync shortly"
+        });
+      } else {
+        setSyncStatus({
+          state: "idle",
+          message: "Local changes saved. Push when done."
+        });
+      }
     }
   }, [state]);
   useEffect(function () {
+    syncConfigRef.current = syncConfig;
     writeJsonStorage(SYNC_CONFIG_KEY, syncConfig);
   }, [syncConfig]);
   useEffect(function () {
@@ -2709,28 +2777,35 @@ function AppStateProvider(_ref11) {
         while (1) switch (_context.p = _context.n) {
           case 0:
             options = _args.length > 0 && _args[0] !== undefined ? _args[0] : {};
-            config = options.config || syncConfig;
+            config = options.config || syncConfigRef.current;
             if (config.token) {
               _context.n = 1;
               break;
             }
-            setSyncStatus({
+            if (!options.silent) setSyncStatus({
               state: "error",
               message: "Add a GitHub token before pulling."
             });
             return _context.a(2, null);
           case 1:
-            _context.p = 1;
-            setSyncStatus({
+            if (!(pullInFlightRef.current || pushInFlightRef.current)) {
+              _context.n = 2;
+              break;
+            }
+            return _context.a(2, null);
+          case 2:
+            pullInFlightRef.current = true;
+            _context.p = 3;
+            if (!options.silent) setSyncStatus({
               state: "syncing",
               message: "Pulling GitHub state..."
             });
-            _context.n = 2;
+            _context.n = 4;
             return fetchGithubState(config);
-          case 2:
+          case 4:
             remote = _context.v;
             if (remote) {
-              _context.n = 3;
+              _context.n = 5;
               break;
             }
             setSyncStatus({
@@ -2738,25 +2813,37 @@ function AppStateProvider(_ref11) {
               message: "No remote state file yet. Push once to create it."
             });
             return _context.a(2, null);
-          case 3:
+          case 5:
             remoteState = sanitizeStateForPush(remote.state);
             if ((_syncMetaRef$current = syncMetaRef.current) !== null && _syncMetaRef$current !== void 0 && _syncMetaRef$current.dirty && !options.preferRemote) {
               mergedState = mergeRemoteAndLocalState(remoteState, stateRef.current);
-              setRemoteMergedDirtyState(mergedState, remote.sha, "Pull complete. Local changes kept; push to update GitHub.");
+              setRemoteMergedDirtyState(mergedState, remote.sha, options.silent ? "Synced from GitHub \xB7 local edits kept (".concat(new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit"
+              }), ")") : "Pull complete. Local changes kept; push to update GitHub.");
             } else {
-              setRemoteCleanState(remoteState, remote.sha, "Pull complete. GitHub applied.");
+              setRemoteCleanState(remoteState, remote.sha, options.silent ? "Synced from GitHub (".concat(new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit"
+              }), ")") : "Pull complete. GitHub applied.");
             }
             return _context.a(2, remote);
-          case 4:
-            _context.p = 4;
+          case 6:
+            _context.p = 6;
             _t = _context.v;
             setSyncStatus({
               state: "error",
               message: _t.message || "GitHub pull failed."
             });
             return _context.a(2, null);
+          case 7:
+            _context.p = 7;
+            pullInFlightRef.current = false;
+            return _context.f(7);
+          case 8:
+            return _context.a(2);
         }
-      }, _callee, null, [[1, 4]]);
+      }, _callee, null, [[3, 6, 7, 8]]);
     }));
     return function pullRemoteState() {
       return _ref12.apply(this, arguments);
@@ -2764,6 +2851,7 @@ function AppStateProvider(_ref11) {
   }();
   var pushRemoteState = function () {
     var _ref13 = _asyncToGenerator(_regenerator().m(function _callee3() {
+      var _syncMetaRef$current2;
       var options,
         config,
         runPush,
@@ -2787,7 +2875,7 @@ function AppStateProvider(_ref11) {
               return null;
             });
           case 1:
-            config = options.config || syncConfig;
+            config = options.config || syncConfigRef.current;
             if (config.token) {
               _context3.n = 2;
               break;
@@ -2798,6 +2886,12 @@ function AppStateProvider(_ref11) {
             });
             return _context3.a(2, null);
           case 2:
+            if (!(options.auto && !((_syncMetaRef$current2 = syncMetaRef.current) !== null && _syncMetaRef$current2 !== void 0 && _syncMetaRef$current2.dirty))) {
+              _context3.n = 3;
+              break;
+            }
+            return _context3.a(2, null);
+          case 3:
             runPush = function () {
               var _ref14 = _asyncToGenerator(_regenerator().m(function _callee2() {
                 var remote, remoteSha, pushState, nextSha, attempt, isShaConflict, latestRemote, _t2;
@@ -2871,7 +2965,10 @@ function AppStateProvider(_ref11) {
                       setSyncConflict(null);
                       setSyncStatus({
                         state: "ok",
-                        message: "Push complete. Local changes merged with GitHub."
+                        message: options.auto ? "Auto-synced to GitHub (".concat(new Date().toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit"
+                        }), ")") : "Push complete. Local changes merged with GitHub."
                       });
                       return _context2.a(2, nextSha);
                   }
@@ -2883,27 +2980,27 @@ function AppStateProvider(_ref11) {
             }();
             promise = runPush();
             pushInFlightRef.current = promise;
-            _context3.p = 3;
-            _context3.n = 4;
+            _context3.p = 4;
+            _context3.n = 5;
             return promise;
-          case 4:
-            return _context3.a(2, _context3.v);
           case 5:
-            _context3.p = 5;
+            return _context3.a(2, _context3.v);
+          case 6:
+            _context3.p = 6;
             _t3 = _context3.v;
             setSyncStatus({
               state: "error",
               message: _t3.message || "GitHub push failed."
             });
             return _context3.a(2, null);
-          case 6:
-            _context3.p = 6;
-            if (pushInFlightRef.current === promise) pushInFlightRef.current = null;
-            return _context3.f(6);
           case 7:
+            _context3.p = 7;
+            if (pushInFlightRef.current === promise) pushInFlightRef.current = null;
+            return _context3.f(7);
+          case 8:
             return _context3.a(2);
         }
-      }, _callee3, null, [[3, 5, 6, 7]]);
+      }, _callee3, null, [[4, 6, 7, 8]]);
     }));
     return function pushRemoteState() {
       return _ref13.apply(this, arguments);
@@ -2940,10 +3037,50 @@ function AppStateProvider(_ref11) {
         }
       }, _callee4);
     }));
-    return function resolveSyncConflict(_x6) {
+    return function resolveSyncConflict(_x7) {
       return _ref15.apply(this, arguments);
     };
   }();
+  pushRemoteStateRef.current = pushRemoteState;
+  pullRemoteStateRef.current = pullRemoteState;
+  useEffect(function () {
+    if (!syncConfig.enabled || !syncConfig.token || syncConfig.autoSync === false) return undefined;
+    var autoPull = function autoPull() {
+      var _pullRemoteStateRef$c;
+      var now = Date.now();
+      if (now - lastAutoPullRef.current < AUTO_PULL_MIN_INTERVAL_MS) return;
+      lastAutoPullRef.current = now;
+      (_pullRemoteStateRef$c = pullRemoteStateRef.current) === null || _pullRemoteStateRef$c === void 0 || _pullRemoteStateRef$c.call(pullRemoteStateRef, {
+        silent: true
+      });
+    };
+    autoPull();
+    var onVisibility = function onVisibility() {
+      var _syncMetaRef$current3;
+      if (document.visibilityState === "visible") {
+        autoPull();
+      } else if ((_syncMetaRef$current3 = syncMetaRef.current) !== null && _syncMetaRef$current3 !== void 0 && _syncMetaRef$current3.dirty) {
+        var _pushRemoteStateRef$c2;
+        if (pushTimerRef.current) {
+          clearTimeout(pushTimerRef.current);
+          pushTimerRef.current = null;
+        }
+        (_pushRemoteStateRef$c2 = pushRemoteStateRef.current) === null || _pushRemoteStateRef$c2 === void 0 || _pushRemoteStateRef$c2.call(pushRemoteStateRef, {
+          silent: true,
+          auto: true
+        });
+      }
+    };
+    var onFocus = function onFocus() {
+      return autoPull();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return function () {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [syncConfig.enabled, syncConfig.token, syncConfig.autoSync]);
   var updateProfile = function updateProfile(id, patch) {
     setState(function (s) {
       return _objectSpread(_objectSpread({}, s), {}, {
@@ -3718,16 +3855,16 @@ window.RepsState = {
 };
 
 /* ---- components/layout.jsx ---- */
+function _regenerator() { var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
+function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
+function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
+function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
 function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
 function _arrayLikeToArray(r, a) { (null == a || a > r.length) && (a = r.length); for (var e = 0, n = Array(a); e < a; e++) n[e] = r[e]; return n; }
 function _iterableToArrayLimit(r, l) { var t = null == r ? null : "undefined" != typeof Symbol && r[Symbol.iterator] || r["@@iterator"]; if (null != t) { var e, n, i, u, a = [], f = !0, o = !1; try { if (i = (t = t.call(r)).next, 0 === l) { if (Object(t) !== t) return; f = !1; } else for (; !(f = (e = i.call(t)).done) && (a.push(e.value), a.length !== l); f = !0); } catch (r) { o = !0, n = r; } finally { try { if (!f && null != t.return && (u = t.return(), Object(u) !== u)) return; } finally { if (o) throw n; } } return a; } }
 function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
-function _regenerator() { var e, t, r = "function" == typeof Symbol ? Symbol : {}, n = r.iterator || "@@iterator", o = r.toStringTag || "@@toStringTag"; function i(r, n, o, i) { var c = n && n.prototype instanceof Generator ? n : Generator, u = Object.create(c.prototype); return _regeneratorDefine2(u, "_invoke", function (r, n, o) { var i, c, u, f = 0, p = o || [], y = !1, G = { p: 0, n: 0, v: e, a: d, f: d.bind(e, 4), d: function d(t, r) { return i = t, c = 0, u = e, G.n = r, a; } }; function d(r, n) { for (c = r, u = n, t = 0; !y && f && !o && t < p.length; t++) { var o, i = p[t], d = G.p, l = i[2]; r > 3 ? (o = l === n) && (u = i[(c = i[4]) ? 5 : (c = 3, 3)], i[4] = i[5] = e) : i[0] <= d && ((o = r < 2 && d < i[1]) ? (c = 0, G.v = n, G.n = i[1]) : d < l && (o = r < 3 || i[0] > n || n > l) && (i[4] = r, i[5] = n, G.n = l, c = 0)); } if (o || r > 1) return a; throw y = !0, n; } return function (o, p, l) { if (f > 1) throw TypeError("Generator is already running"); for (y && 1 === p && d(p, l), c = p, u = l; (t = c < 2 ? e : u) || !y;) { i || (c ? c < 3 ? (c > 1 && (G.n = -1), d(c, u)) : G.n = u : G.v = u); try { if (f = 2, i) { if (c || (o = "next"), t = i[o]) { if (!(t = t.call(i, u))) throw TypeError("iterator result is not an object"); if (!t.done) return t; u = t.value, c < 2 && (c = 0); } else 1 === c && (t = i.return) && t.call(i), c < 2 && (u = TypeError("The iterator does not provide a '" + o + "' method"), c = 1); i = e; } else if ((t = (y = G.n < 0) ? u : r.call(n, G)) !== a) break; } catch (t) { i = e, c = 1, u = t; } finally { f = 1; } } return { value: t, done: y }; }; }(r, o, i), !0), u; } var a = {}; function Generator() {} function GeneratorFunction() {} function GeneratorFunctionPrototype() {} t = Object.getPrototypeOf; var c = [][n] ? t(t([][n]())) : (_regeneratorDefine2(t = {}, n, function () { return this; }), t), u = GeneratorFunctionPrototype.prototype = Generator.prototype = Object.create(c); function f(e) { return Object.setPrototypeOf ? Object.setPrototypeOf(e, GeneratorFunctionPrototype) : (e.__proto__ = GeneratorFunctionPrototype, _regeneratorDefine2(e, o, "GeneratorFunction")), e.prototype = Object.create(u), e; } return GeneratorFunction.prototype = GeneratorFunctionPrototype, _regeneratorDefine2(u, "constructor", GeneratorFunctionPrototype), _regeneratorDefine2(GeneratorFunctionPrototype, "constructor", GeneratorFunction), GeneratorFunction.displayName = "GeneratorFunction", _regeneratorDefine2(GeneratorFunctionPrototype, o, "GeneratorFunction"), _regeneratorDefine2(u), _regeneratorDefine2(u, o, "Generator"), _regeneratorDefine2(u, n, function () { return this; }), _regeneratorDefine2(u, "toString", function () { return "[object Generator]"; }), (_regenerator = function _regenerator() { return { w: i, m: f }; })(); }
-function _regeneratorDefine2(e, r, n, t) { var i = Object.defineProperty; try { i({}, "", {}); } catch (e) { i = 0; } _regeneratorDefine2 = function _regeneratorDefine(e, r, n, t) { function o(r, n) { _regeneratorDefine2(e, r, function (e) { return this._invoke(r, n, e); }); } r ? i ? i(e, r, { value: n, enumerable: !t, configurable: !t, writable: !t }) : e[r] = n : (o("next", 0), o("throw", 1), o("return", 2)); }, _regeneratorDefine2(e, r, n, t); }
-function asyncGeneratorStep(n, t, e, r, o, a, c) { try { var i = n[a](c), u = i.value; } catch (n) { return void e(n); } i.done ? t(u) : Promise.resolve(u).then(r, o); }
-function _asyncToGenerator(n) { return function () { var t = this, e = arguments; return new Promise(function (r, o) { var a = n.apply(t, e); function _next(n) { asyncGeneratorStep(a, r, o, _next, _throw, "next", n); } function _throw(n) { asyncGeneratorStep(a, r, o, _next, _throw, "throw", n); } _next(void 0); }); }; }
 var _React = React,
   useState = _React.useState,
   useEffect = _React.useEffect,
@@ -3780,13 +3917,40 @@ var NAV_ITEMS = [{
   kbd: "9"
 }];
 var BUILD_LABEL = "08 Jun 2026";
+function relativeSyncTime(iso) {
+  var ms = Date.parse(iso || "");
+  if (!ms) return "";
+  var mins = Math.floor((Date.now() - ms) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return "".concat(mins, " min ago");
+  var hours = Math.floor(mins / 60);
+  if (hours < 24) return "".concat(hours, " h ago");
+  return new Date(ms).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short"
+  });
+}
 function SyncQuickActions(_ref) {
-  var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4;
+  var _window$RepsState, _window$RepsState$use, _app$syncConfig, _app$syncConfig2, _app$syncConfig3, _app$syncConfig4, _app$syncStatus, _app$syncConfig5, _app$syncStatus2, _app$syncStatus3, _app$syncMeta, _app$syncMeta2, _app$syncStatus4, _app$syncStatus5, _app$syncStatus6, _app$syncMeta3, _app$syncStatus7;
   var onAfterAction = _ref.onAfterAction;
   var app = (_window$RepsState = window.RepsState) === null || _window$RepsState === void 0 || (_window$RepsState$use = _window$RepsState.useApp) === null || _window$RepsState$use === void 0 ? void 0 : _window$RepsState$use.call(_window$RepsState);
+  var _useState = useState(0),
+    _useState2 = _slicedToArray(_useState, 2),
+    setTick = _useState2[1];
+  useEffect(function () {
+    var timer = setInterval(function () {
+      return setTick(function (x) {
+        return x + 1;
+      });
+    }, 30000);
+    return function () {
+      return clearInterval(timer);
+    };
+  }, []);
   if (!app) return null;
   var configured = !!((_app$syncConfig = app.syncConfig) !== null && _app$syncConfig !== void 0 && _app$syncConfig.enabled && (_app$syncConfig2 = app.syncConfig) !== null && _app$syncConfig2 !== void 0 && _app$syncConfig2.token && (_app$syncConfig3 = app.syncConfig) !== null && _app$syncConfig3 !== void 0 && _app$syncConfig3.owner && (_app$syncConfig4 = app.syncConfig) !== null && _app$syncConfig4 !== void 0 && _app$syncConfig4.repo);
   var busy = ((_app$syncStatus = app.syncStatus) === null || _app$syncStatus === void 0 ? void 0 : _app$syncStatus.state) === "syncing";
+  var autoSync = configured && ((_app$syncConfig5 = app.syncConfig) === null || _app$syncConfig5 === void 0 ? void 0 : _app$syncConfig5.autoSync) !== false;
   var statusClass = ((_app$syncStatus2 = app.syncStatus) === null || _app$syncStatus2 === void 0 ? void 0 : _app$syncStatus2.state) === "error" ? "warn" : ((_app$syncStatus3 = app.syncStatus) === null || _app$syncStatus3 === void 0 ? void 0 : _app$syncStatus3.state) === "ok" ? "good" : (_app$syncMeta = app.syncMeta) !== null && _app$syncMeta !== void 0 && _app$syncMeta.dirty ? "warn" : "";
   var run = function () {
     var _ref2 = _asyncToGenerator(_regenerator().m(function _callee(action) {
@@ -3823,7 +3987,8 @@ function SyncQuickActions(_ref) {
       return _ref2.apply(this, arguments);
     };
   }();
-  var status = !configured ? "Sync not configured" : (_app$syncMeta2 = app.syncMeta) !== null && _app$syncMeta2 !== void 0 && _app$syncMeta2.dirty ? "Local changes not pushed" : ((_app$syncStatus4 = app.syncStatus) === null || _app$syncStatus4 === void 0 ? void 0 : _app$syncStatus4.message) || "Manual sync ready";
+  var lastSync = relativeSyncTime((_app$syncMeta2 = app.syncMeta) === null || _app$syncMeta2 === void 0 ? void 0 : _app$syncMeta2.lastSyncAt);
+  var status = !configured ? "Sync not configured" : busy ? ((_app$syncStatus4 = app.syncStatus) === null || _app$syncStatus4 === void 0 ? void 0 : _app$syncStatus4.message) || "Syncing…" : ((_app$syncStatus5 = app.syncStatus) === null || _app$syncStatus5 === void 0 ? void 0 : _app$syncStatus5.state) === "error" ? ((_app$syncStatus6 = app.syncStatus) === null || _app$syncStatus6 === void 0 ? void 0 : _app$syncStatus6.message) || "Sync error" : (_app$syncMeta3 = app.syncMeta) !== null && _app$syncMeta3 !== void 0 && _app$syncMeta3.dirty ? autoSync ? "Unsynced edits · auto-push soon" : "Local changes not pushed" : lastSync ? "Synced ".concat(lastSync) : ((_app$syncStatus7 = app.syncStatus) === null || _app$syncStatus7 === void 0 ? void 0 : _app$syncStatus7.message) || "Sync ready";
   return React.createElement("div", {
     className: "sync-quick"
   }, React.createElement("button", {
@@ -3968,10 +4133,10 @@ function ProfileSwitcher(_ref5) {
   var app = _ref5.app,
     profile = _ref5.profile,
     setView = _ref5.setView;
-  var _useState = useState(false),
-    _useState2 = _slicedToArray(_useState, 2),
-    open = _useState2[0],
-    setOpen = _useState2[1];
+  var _useState3 = useState(false),
+    _useState4 = _slicedToArray(_useState3, 2),
+    open = _useState4[0],
+    setOpen = _useState4[1];
   var ref = useRef(null);
   var profiles = (app === null || app === void 0 || (_app$state = app.state) === null || _app$state === void 0 ? void 0 : _app$state.profiles) || [];
   useEffect(function () {
@@ -4053,10 +4218,10 @@ function MobileNav(_ref6) {
   var _window$RepsState3, _window$RepsState3$us;
   var view = _ref6.view,
     setView = _ref6.setView;
-  var _useState3 = useState(false),
-    _useState4 = _slicedToArray(_useState3, 2),
-    open = _useState4[0],
-    setOpen = _useState4[1];
+  var _useState5 = useState(false),
+    _useState6 = _slicedToArray(_useState5, 2),
+    open = _useState6[0],
+    setOpen = _useState6[1];
   var app = (_window$RepsState3 = window.RepsState) === null || _window$RepsState3 === void 0 || (_window$RepsState3$us = _window$RepsState3.useApp) === null || _window$RepsState3$us === void 0 ? void 0 : _window$RepsState3$us.call(_window$RepsState3);
   var profile = app === null || app === void 0 ? void 0 : app.activeProfile;
   var labels = {
@@ -15767,27 +15932,33 @@ function GitHubSyncPanel() {
     _useS10 = _slicedToArray(_useS1, 2),
     tokenCopied = _useS10[0],
     setTokenCopied = _useS10[1];
+  var _useS11 = useS(false),
+    _useS12 = _slicedToArray(_useS11, 2),
+    tokenVisible = _useS12[0],
+    setTokenVisible = _useS12[1];
   useE(function () {
     setForm(app.syncConfig);
     setTokenDraft(app.syncConfig.token || "");
-  }, [app.syncConfig.owner, app.syncConfig.repo, app.syncConfig.branch, app.syncConfig.path, app.syncConfig.enabled]);
+  }, [app.syncConfig.owner, app.syncConfig.repo, app.syncConfig.branch, app.syncConfig.path, app.syncConfig.enabled, app.syncConfig.token, app.syncConfig.autoSync]);
   var patchForm = function patchForm(patch) {
     return setForm(function (prev) {
       return _objectSpread(_objectSpread({}, prev), patch);
     });
   };
   var saveConfig = function saveConfig() {
-    var enabled = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
+    var enabled = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : app.syncConfig.enabled;
     var next = _objectSpread(_objectSpread({}, app.syncConfig), {}, {
       owner: form.owner.trim(),
       repo: form.repo.trim(),
       branch: form.branch.trim() || "main",
       path: form.path.trim() || "state/reps-app-state.json",
       token: tokenDraft.trim(),
+      autoSync: form.autoSync !== false,
       enabled: enabled
     });
-    var changed = ["owner", "repo", "branch", "path", "token", "enabled"].some(function (key) {
-      return (app.syncConfig[key] || "") !== (next[key] || "");
+    var changed = ["owner", "repo", "branch", "path", "token", "enabled", "autoSync"].some(function (key) {
+      var _app$syncConfig$key, _next$key;
+      return ((_app$syncConfig$key = app.syncConfig[key]) !== null && _app$syncConfig$key !== void 0 ? _app$syncConfig$key : "") !== ((_next$key = next[key]) !== null && _next$key !== void 0 ? _next$key : "");
     });
     if (changed) app.updateSyncConfig(next);
     return next;
@@ -15847,7 +16018,7 @@ function GitHubSyncPanel() {
     style: {
       lineHeight: 1.6
     }
-  }, "Sync uses one private repo file and one token per device. Use a fine-grained GitHub token with Contents read/write for your private data repository. Push first merges this browser with GitHub and retries SHA conflicts. Pull applies GitHub; if this browser has unsynced edits, it keeps them and leaves the app marked unsynced until you push."), React.createElement("div", {
+  }, "Sync uses one private repo file and one token per device. Use a fine-grained GitHub token with Contents read/write for your private data repository. With auto-sync on, the app pulls the latest state when opened or focused and pushes about 20 seconds after your last change \u2014 no buttons needed. Push merges this browser with GitHub and retries SHA conflicts; Pull keeps unsynced local edits and marks the app unsynced until the next push."), React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
@@ -15929,13 +16100,14 @@ function GitHubSyncPanel() {
       gap: 6
     }
   }, React.createElement("input", {
-    type: "text",
+    type: tokenVisible ? "text" : "password",
     value: tokenDraft,
     onChange: function onChange(e) {
       return setTokenDraft(e.target.value);
     },
     placeholder: "github_pat_...",
     spellCheck: "false",
+    autoComplete: "off",
     style: {
       flex: 1,
       minWidth: 0,
@@ -15949,9 +16121,38 @@ function GitHubSyncPanel() {
   }), React.createElement("button", {
     className: "btn sm",
     type: "button",
+    onClick: function onClick() {
+      return setTokenVisible(function (v) {
+        return !v;
+      });
+    },
+    disabled: !tokenDraft
+  }, tokenVisible ? "Hide" : "Show"), React.createElement("button", {
+    className: "btn sm",
+    type: "button",
     onClick: copyToken,
     disabled: !tokenDraft
-  }, React.createElement(SI.Download, null), " ", tokenCopied ? "Copied" : "Copy token"))), React.createElement("div", {
+  }, tokenCopied ? "Copied" : "Copy"))), React.createElement("label", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer"
+    }
+  }, React.createElement("input", {
+    type: "checkbox",
+    checked: form.autoSync !== false,
+    onChange: function onChange(e) {
+      return patchForm({
+        autoSync: e.target.checked
+      });
+    }
+  }), React.createElement("span", {
+    className: "kpi-label",
+    style: {
+      margin: 0
+    }
+  }, "Sync automatically \u2014 pull on open/focus, push ~20s after changes")), React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -15967,14 +16168,14 @@ function GitHubSyncPanel() {
     className: "btn sm",
     onClick: function onClick() {
       return app.pullRemoteState({
-        config: saveConfig(true)
+        config: saveConfig()
       });
     }
   }, "Pull"), React.createElement("button", {
     className: "btn sm",
     onClick: function onClick() {
       return app.pushRemoteState({
-        config: saveConfig(true)
+        config: saveConfig()
       });
     }
   }, "Push"), React.createElement("button", {

@@ -15,11 +15,28 @@ const NAV_ITEMS = [
 ];
 const BUILD_LABEL = "08 Jun 2026";
 
+function relativeSyncTime(iso) {
+  const ms = Date.parse(iso || "");
+  if (!ms) return "";
+  const mins = Math.floor((Date.now() - ms) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 function SyncQuickActions({ onAfterAction }) {
   const app = window.RepsState?.useApp?.();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(x => x + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
   if (!app) return null;
   const configured = !!(app.syncConfig?.enabled && app.syncConfig?.token && app.syncConfig?.owner && app.syncConfig?.repo);
   const busy = app.syncStatus?.state === "syncing";
+  const autoSync = configured && app.syncConfig?.autoSync !== false;
   const statusClass =
     app.syncStatus?.state === "error" ? "warn" :
     app.syncStatus?.state === "ok" ? "good" :
@@ -30,11 +47,18 @@ function SyncQuickActions({ onAfterAction }) {
     if (action === "push") await app.pushRemoteState();
     onAfterAction?.();
   };
+  const lastSync = relativeSyncTime(app.syncMeta?.lastSyncAt);
   const status = !configured
     ? "Sync not configured"
-    : app.syncMeta?.dirty
-      ? "Local changes not pushed"
-      : (app.syncStatus?.message || "Manual sync ready");
+    : busy
+      ? (app.syncStatus?.message || "Syncing…")
+      : app.syncStatus?.state === "error"
+        ? (app.syncStatus?.message || "Sync error")
+        : app.syncMeta?.dirty
+          ? (autoSync ? "Unsynced edits · auto-push soon" : "Local changes not pushed")
+          : lastSync
+            ? `Synced ${lastSync}`
+            : (app.syncStatus?.message || "Sync ready");
   return (
     <div className="sync-quick">
       <button className="sync-quick-btn" type="button" disabled={!configured || busy} onClick={() => run("pull")}>

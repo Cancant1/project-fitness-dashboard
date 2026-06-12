@@ -786,9 +786,13 @@ function defaultSyncConfig() {
     branch: "main",
     path: "state/reps-app-state.json",
     token: "",
+    autoSync: true,
     clientId: syncClientId()
   };
 }
+
+const AUTO_PUSH_DELAY_MS = 20000;
+const AUTO_PULL_MIN_INTERVAL_MS = 45000;
 
 function defaultSyncMeta() {
   return {
@@ -1115,9 +1119,28 @@ async function fetchGithubBlobContent(config, file) {
   return blob.content || "";
 }
 
+// A 404 on the contents URL can mean "file not created yet" (fine) or a
+// misconfigured owner/repo/token (push would then create a file in the wrong
+// place). Disambiguate by checking whether the repo itself is reachable.
+async function assertGithubRepoReachable(config) {
+  const owner = encodeURIComponent(String(config.owner || "").trim());
+  const repo = encodeURIComponent(String(config.repo || "").trim());
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: githubApiHeaders(config) });
+  if (res.status === 404) {
+    throw new Error(`GitHub repo ${config.owner}/${config.repo} not found. Check owner/repo spelling and that the token can access it.`);
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`GitHub repo check failed (${res.status}): ${text.slice(0, 180)}`);
+  }
+}
+
 async function fetchGithubState(config) {
   const res = await fetch(githubContentUrl(config), { headers: githubApiHeaders(config) });
-  if (res.status === 404) return null;
+  if (res.status === 404) {
+    await assertGithubRepoReachable(config);
+    return null;
+  }
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`GitHub pull failed (${res.status}): ${text.slice(0, 180)}`);
@@ -1763,6 +1786,11 @@ function AppStateProvider({ children }) {
   const stateRef = useRef(state);
   const syncMetaRef = useRef(syncMeta);
   const pushInFlightRef = useRef(null);
+  const pullInFlightRef = useRef(false);
+  const syncConfigRef = useRef(syncConfig);
+  const lastAutoPullRef = useRef(0);
+  const pushRemoteStateRef = useRef(null);
+  const pullRemoteStateRef = useRef(null);
 
   const setState = (updater) => {
     const base = stateRef.current || state;
@@ -1800,12 +1828,25 @@ function AppStateProvider({ children }) {
       return;
     }
     updateSyncMeta(prev => ({ ...prev, dirty: true, conflict: false }));
-    if (syncConfig.enabled && syncConfig.token) {
-      setSyncStatus({ state: "idle", message: "Local changes saved. Push when done." });
+    const config = syncConfigRef.current;
+    if (config.enabled && config.token) {
+      if (config.autoSync !== false) {
+        // Debounced auto-push: each edit resets the timer; one push lands
+        // shortly after the user stops making changes.
+        if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+        pushTimerRef.current = setTimeout(() => {
+          pushTimerRef.current = null;
+          pushRemoteStateRef.current?.({ silent: true, auto: true });
+        }, AUTO_PUSH_DELAY_MS);
+        setSyncStatus({ state: "idle", message: "Local changes saved · auto-sync shortly" });
+      } else {
+        setSyncStatus({ state: "idle", message: "Local changes saved. Push when done." });
+      }
     }
   }, [state]);
 
   useEffect(() => {
+    syncConfigRef.current = syncConfig;
     writeJsonStorage(SYNC_CONFIG_KEY, syncConfig);
   }, [syncConfig]);
 
@@ -1876,13 +1917,15 @@ function AppStateProvider({ children }) {
   };
 
   const pullRemoteState = async (options = {}) => {
-    const config = options.config || syncConfig;
+    const config = options.config || syncConfigRef.current;
     if (!config.token) {
-      setSyncStatus({ state: "error", message: "Add a GitHub token before pulling." });
+      if (!options.silent) setSyncStatus({ state: "error", message: "Add a GitHub token before pulling." });
       return null;
     }
+    if (pullInFlightRef.current || pushInFlightRef.current) return null;
+    pullInFlightRef.current = true;
     try {
-      setSyncStatus({ state: "syncing", message: "Pulling GitHub state..." });
+      if (!options.silent) setSyncStatus({ state: "syncing", message: "Pulling GitHub state..." });
       const remote = await fetchGithubState(config);
       if (!remote) {
         setSyncStatus({ state: "ok", message: "No remote state file yet. Push once to create it." });
@@ -1891,14 +1934,20 @@ function AppStateProvider({ children }) {
       const remoteState = sanitizeStateForPush(remote.state);
       if (syncMetaRef.current?.dirty && !options.preferRemote) {
         const mergedState = mergeRemoteAndLocalState(remoteState, stateRef.current);
-        setRemoteMergedDirtyState(mergedState, remote.sha, "Pull complete. Local changes kept; push to update GitHub.");
+        setRemoteMergedDirtyState(mergedState, remote.sha, options.silent
+          ? `Synced from GitHub · local edits kept (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`
+          : "Pull complete. Local changes kept; push to update GitHub.");
       } else {
-        setRemoteCleanState(remoteState, remote.sha, "Pull complete. GitHub applied.");
+        setRemoteCleanState(remoteState, remote.sha, options.silent
+          ? `Synced from GitHub (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`
+          : "Pull complete. GitHub applied.");
       }
       return remote;
     } catch (e) {
       setSyncStatus({ state: "error", message: e.message || "GitHub pull failed." });
       return null;
+    } finally {
+      pullInFlightRef.current = false;
     }
   };
 
@@ -1910,11 +1959,12 @@ function AppStateProvider({ children }) {
     if (pushInFlightRef.current) {
       await pushInFlightRef.current.catch(() => null);
     }
-    const config = options.config || syncConfig;
+    const config = options.config || syncConfigRef.current;
     if (!config.token) {
       if (!options.silent) setSyncStatus({ state: "error", message: "Add a GitHub token before pushing." });
       return null;
     }
+    if (options.auto && !syncMetaRef.current?.dirty) return null;
     const runPush = async () => {
       if (!options.silent) setSyncStatus({ state: "syncing", message: "Checking GitHub state..." });
       const remote = await fetchGithubState(config);
@@ -1952,7 +2002,12 @@ function AppStateProvider({ children }) {
         conflict: false
       }));
       setSyncConflict(null);
-      setSyncStatus({ state: "ok", message: "Push complete. Local changes merged with GitHub." });
+      setSyncStatus({
+        state: "ok",
+        message: options.auto
+          ? `Auto-synced to GitHub (${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})`
+          : "Push complete. Local changes merged with GitHub."
+      });
       return nextSha;
     };
 
@@ -1973,6 +2028,43 @@ function AppStateProvider({ children }) {
     if (choice === "remote") await pullRemoteState({ preferRemote: true });
     if (choice === "local") await pushRemoteState();
   };
+
+  // Keep stable handles for timers/listeners so they always call the latest closures.
+  pushRemoteStateRef.current = pushRemoteState;
+  pullRemoteStateRef.current = pullRemoteState;
+
+  // Automatic sync: pull on app open and whenever the tab comes back into
+  // focus (throttled), so every device starts from the latest pushed state.
+  // When the tab hides with unsynced changes, flush the pending auto-push
+  // immediately instead of waiting out the debounce timer.
+  useEffect(() => {
+    if (!syncConfig.enabled || !syncConfig.token || syncConfig.autoSync === false) return undefined;
+    const autoPull = () => {
+      const now = Date.now();
+      if (now - lastAutoPullRef.current < AUTO_PULL_MIN_INTERVAL_MS) return;
+      lastAutoPullRef.current = now;
+      pullRemoteStateRef.current?.({ silent: true });
+    };
+    autoPull();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        autoPull();
+      } else if (syncMetaRef.current?.dirty) {
+        if (pushTimerRef.current) {
+          clearTimeout(pushTimerRef.current);
+          pushTimerRef.current = null;
+        }
+        pushRemoteStateRef.current?.({ silent: true, auto: true });
+      }
+    };
+    const onFocus = () => autoPull();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [syncConfig.enabled, syncConfig.token, syncConfig.autoSync]);
   const updateProfile = (id, patch) => {
     setState(s => ({
       ...s,
