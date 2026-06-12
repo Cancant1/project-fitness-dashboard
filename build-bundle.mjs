@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import vm from "node:vm";
@@ -15,10 +16,8 @@ const sourceFiles = [
   "components/views.jsx",
   "components/sessions.jsx",
   "components/exercise-modal.jsx",
-  "components/phase-progress.jsx",
   "components/settings.jsx",
   "components/strength.jsx",
-  "tweaks-panel.jsx",
   "app.jsx"
 ];
 
@@ -35,9 +34,15 @@ if (!sandbox.Babel) {
   throw new Error("Babel standalone did not initialize");
 }
 
+// Stamp the in-app build label with today's date (layout.jsx shows it in the sidebar).
+const buildDate = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
 const chunks = [];
 for (const file of sourceFiles) {
-  const input = await fs.readFile(path.join(root, file), "utf8");
+  let input = await fs.readFile(path.join(root, file), "utf8");
+  if (file === "components/layout.jsx") {
+    input = input.replace(/const BUILD_LABEL = "[^"]*";/, `const BUILD_LABEL = "${buildDate}";`);
+  }
   const result = sandbox.Babel.transform(input, {
     filename: file,
     sourceType: "script",
@@ -46,7 +51,8 @@ for (const file of sourceFiles) {
       ["react", { runtime: "classic" }]
     ],
     comments: false,
-    compact: false
+    compact: true,
+    minified: true
   });
 
   chunks.push(`/* ---- ${file} ---- */\n${result.code}\n`);
@@ -58,4 +64,25 @@ const output = [
 ].join("\n");
 
 await fs.writeFile(path.join(root, "app.bundle.js"), output);
-console.log(`Built app.bundle.js from ${sourceFiles.length} source files.`);
+
+// Auto cache-busting: stamp every local script/stylesheet URL in Reps.html with
+// a short content hash so deploys invalidate stale caches without hand-editing.
+const hash = (buf) => crypto.createHash("sha256").update(buf).digest("hex").slice(0, 10);
+const stampFor = async (file) => hash(await fs.readFile(path.join(root, file)));
+const stamps = {
+  "app.bundle.js": hash(output),
+  "styles.css": await stampFor("styles.css"),
+  "data/food-catalog.js": await stampFor("data/food-catalog.js"),
+  "data/helpers.js": await stampFor("data/helpers.js"),
+  "data/routine.js": await stampFor("data/routine.js"),
+  "data/strength-analytics.js": await stampFor("data/strength-analytics.js")
+};
+let html = await fs.readFile(path.join(root, "Reps.html"), "utf8");
+for (const [file, stamp] of Object.entries(stamps)) {
+  const re = new RegExp(`(["'])${file.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\?v=[^"']*)?(["'])`, "g");
+  html = html.replace(re, `$1${file}?v=${stamp}$3`);
+}
+await fs.writeFile(path.join(root, "Reps.html"), html);
+
+console.log(`Built app.bundle.js from ${sourceFiles.length} source files (minified, build ${buildDate}).`);
+console.log(`Cache stamps: ${Object.entries(stamps).map(([f, s]) => `${path.basename(f)}=${s}`).join(" ")}`);

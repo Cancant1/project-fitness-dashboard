@@ -447,34 +447,40 @@ function Exercises() {
       : { field, dir: field === "sets" ? "desc" : "asc" });
   };
 
-  const enrich = (e) => {
-    const custom = customs.find(c => c.name === e.name);
-    return { ...e, isCompound: !!(custom?.compound ?? RepsData.isCompoundName(e.name)) };
-  };
-  const enriched = allEx.map(enrich);
+  // Memoized: this pipeline used to re-run over the full catalog on every
+  // render (every keystroke anywhere in the view).
+  const enriched = _um(() => {
+    const customByName = new Map(customs.map(c => [c.name, c]));
+    return allEx.map(e => {
+      const custom = customByName.get(e.name);
+      return { ...e, isCompound: !!(custom?.compound ?? RepsData.isCompoundName(e.name)) };
+    });
+  }, [allEx, customs]);
 
-  const filtered = enriched.filter(e => {
-    if (filter === "Compound") { if (!e.isCompound) return false; }
-    else if (filter !== "All" && e.group !== filter) return false;
-    if (q && !e.name.toLowerCase().includes(q.toLowerCase())) return false;
-    return true;
-  });
-
-  const sorted = [...filtered].sort((a, b) => {
-    let va, vb;
-    switch (sort.field) {
-      case "name":    va = a.name; vb = b.name; break;
-      case "group":   va = a.group||""; vb = b.group||""; break;
-      case "lastDate": va = a.lastDate||""; vb = b.lastDate||""; break;
-      case "lastWeight": va = a.lastWeight||0; vb = b.lastWeight||0; break;
-      case "sets":    va = a.sets||0; vb = b.sets||0; break;
-      default:        va = a.sets||0; vb = b.sets||0;
-    }
-    if (typeof va === "string") {
-      return sort.dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
-    }
-    return sort.dir === "asc" ? va - vb : vb - va;
-  });
+  const sorted = _um(() => {
+    const needle = q.toLowerCase();
+    const filtered = enriched.filter(e => {
+      if (filter === "Compound") { if (!e.isCompound) return false; }
+      else if (filter !== "All" && e.group !== filter) return false;
+      if (needle && !e.name.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+    return filtered.sort((a, b) => {
+      let va, vb;
+      switch (sort.field) {
+        case "name":    va = a.name; vb = b.name; break;
+        case "group":   va = a.group||""; vb = b.group||""; break;
+        case "lastDate": va = a.lastDate||""; vb = b.lastDate||""; break;
+        case "lastWeight": va = a.lastWeight||0; vb = b.lastWeight||0; break;
+        case "sets":    va = a.sets||0; vb = b.sets||0; break;
+        default:        va = a.sets||0; vb = b.sets||0;
+      }
+      if (typeof va === "string") {
+        return sort.dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      return sort.dir === "asc" ? va - vb : vb - va;
+    });
+  }, [enriched, filter, q, sort.field, sort.dir]);
 
   const handleAdd = () => {
     if (!newName.trim()) return;
@@ -569,7 +575,6 @@ function Exercises() {
             <table className="tab">
               <thead>
                 <tr>
-                  <th style={{width:24}}></th>
                   <SortHeader label="Exercise" field="name" sort={sort} onSort={handleSort} />
                   <SortHeader label="Group" field="group" sort={sort} onSort={handleSort} />
                   <SortHeader label="Last seen" field="lastDate" sort={sort} onSort={handleSort} />
@@ -584,7 +589,6 @@ function Exercises() {
                   <tr key={i}
                     style={{cursor: e.sets > 0 ? "pointer" : "default"}}
                     onClick={() => e.sets > 0 && setOpenModal(e.name)}>
-                    <td className="shrink"><span className={`fav-star ${i % 5 === 0 ? "on" : ""}`}>★</span></td>
                     <td style={{fontWeight:500}} onClick={ev => renaming === e.name && ev.stopPropagation()}>
                       {renaming === e.name ? (
                         <div style={{display:"flex", gap:6, alignItems:"center"}}>
@@ -2708,7 +2712,7 @@ function Plan() {
         <div className="panel-head">
           <h3>Training blocks</h3>
           <div style={{display:"flex", gap:6}}>
-            <span className="label">2026 · click a block to edit dates and duration</span>
+            <span className="label">{new Date().getFullYear()} · click a block to edit dates and duration</span>
             <button className="btn primary sm" onClick={() => setBlockModal({ type: "new" })}><VI.Plus /> New block</button>
           </div>
         </div>

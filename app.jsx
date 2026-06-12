@@ -1,5 +1,17 @@
-/* global React, ReactDOM, RepsLayout, RepsDashboard, RepsLog, RepsViews, TweaksPanel, TweakSection, TweakColor, TweakRadio, TweakToggle, useTweaks */
+/* global React, ReactDOM, RepsLayout, RepsDashboard, RepsLog, RepsViews */
 const { useState, useEffect } = React;
+
+// Minimal theming state hook (replaces the old prototype tweaks-panel host
+// integration; persistence is handled by setTweak in App via localStorage).
+function useTweaks(defaults) {
+  const [values, setValues] = useState(defaults);
+  const setTweak = (keyOrEdits, val) => {
+    const edits = typeof keyOrEdits === "object" && keyOrEdits !== null
+      ? keyOrEdits : { [keyOrEdits]: val };
+    setValues(prev => ({ ...prev, ...edits }));
+  };
+  return [values, setTweak];
+}
 
 // Capture the static shell routine so imported private state can override it cleanly.
 window.__DEFAULT_PLANNED_ROUTINE = window.__DEFAULT_PLANNED_ROUTINE || JSON.parse(JSON.stringify(window.PLANNED_ROUTINE || []));
@@ -147,23 +159,6 @@ function App() {
           {view === "settings"  && <Settings theme={t.theme} setTheme={chooseTheme} themes={THEME_OPTIONS} />}
         </div>
       </div>
-
-      <TweaksPanel title="Tweaks">
-        <TweakSection label="Theme" />
-        <TweakRadio
-          label="Mode" value={t.theme}
-          options={THEME_OPTIONS.map(theme => ({ value: theme.id, label: theme.label }))}
-          onChange={(v) => setTweak("theme", v)} />
-        <TweakColor
-          label="Accent" value={t.accent}
-          options={Object.keys(ACCENT_PRESETS)}
-          onChange={(v) => setTweak("accent", v)} />
-        <TweakSection label="Density" />
-        <TweakRadio
-          label="Spacing" value={t.density}
-          options={["compact", "cozy"]}
-          onChange={(v) => setTweak("density", v)} />
-      </TweaksPanel>
     </>
   );
 }
