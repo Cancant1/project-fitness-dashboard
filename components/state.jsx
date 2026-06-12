@@ -1098,6 +1098,21 @@ function githubContentUrl(config) {
   return `https://api.github.com/repos/${owner}/${repo}/contents/${path}?ref=${branch}`;
 }
 
+async function fetchGithubBlobContent(config, file) {
+  // The contents API leaves `content` empty (encoding "none") for files larger
+  // than 1MB. The git blobs API serves the same file up to 100MB.
+  const owner = encodeURIComponent(String(config.owner || "").trim());
+  const repo = encodeURIComponent(String(config.repo || "").trim());
+  const url = file.git_url || `https://api.github.com/repos/${owner}/${repo}/git/blobs/${file.sha}`;
+  const res = await fetch(url, { headers: githubApiHeaders(config) });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`GitHub pull failed while reading large state file (${res.status}): ${text.slice(0, 180)}`);
+  }
+  const blob = await res.json();
+  return blob.content || "";
+}
+
 async function fetchGithubState(config) {
   const res = await fetch(githubContentUrl(config), { headers: githubApiHeaders(config) });
   if (res.status === 404) return null;
@@ -1106,7 +1121,16 @@ async function fetchGithubState(config) {
     throw new Error(`GitHub pull failed (${res.status}): ${text.slice(0, 180)}`);
   }
   const file = await res.json();
-  const payload = JSON.parse(base64DecodeUtf8(file.content || ""));
+  let rawContent = String(file.content || "");
+  if ((!rawContent.trim() || file.encoding === "none") && file.sha) {
+    rawContent = await fetchGithubBlobContent(config, file);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(base64DecodeUtf8(rawContent));
+  } catch (e) {
+    throw new Error(`GitHub state file could not be parsed (${e.message}). The file on GitHub may be corrupt; check ${config.path || "the state file"} in the repo.`);
+  }
   return {
     sha: file.sha,
     envelope: payload,
@@ -1118,7 +1142,9 @@ async function putGithubState(config, state, sha = null) {
   const cleanPath = String(config.path || "state/reps-app-state.json").trim();
   const body = {
     message: `Sync Reps dashboard state ${new Date().toISOString()}`,
-    content: base64EncodeUtf8(JSON.stringify(stateEnvelope(state, config.clientId), null, 2)),
+    // Compact JSON: pretty-printing roughly doubled the file size, pushing it
+    // over the 1MB threshold where the GitHub contents API stops inlining content.
+    content: base64EncodeUtf8(JSON.stringify(stateEnvelope(state, config.clientId))),
     branch: config.branch || "main"
   };
   if (sha) body.sha = sha;
