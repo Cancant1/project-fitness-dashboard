@@ -134,10 +134,12 @@ function LineArea({ data, width = 600, height = 200, accent = true, target = nul
     path += (path ? " L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1);
   });
   const lastIdx = pts.length - 1;
-  const gridLines = Array.from({ length: max - min + 1 }, (_, index) => {
-    const value = min + index;
-    return { y: yScale(value), label: value.toFixed(0) };
-  });
+  // Cap grid density: one line per kg was unreadable (and slow) on wide ranges.
+  const gridStep = Math.max(1, Math.ceil(range / 6));
+  const gridLines = [];
+  for (let value = min; value <= max; value += gridStep) {
+    gridLines.push({ y: yScale(value), label: value.toFixed(0) });
+  }
   const monthTicks = monthlyChartTicks(startMs, endMs);
   const targetY = Number.isFinite(targetValue) ? yScale(targetValue) : null;
   const currentY = Number.isFinite(currentValue) ? yScale(currentValue) : null;
@@ -190,33 +192,4 @@ function LineArea({ data, width = 600, height = 200, accent = true, target = nul
   );
 }
 
-function Heatmap({ data, weeks = 12 }) {
-  // data: [{date, value}] — render as 7×N grid
-  const cells = [];
-  const today = new Date();
-  for (let w = weeks - 1; w >= 0; w--) {
-    for (let d = 0; d < 7; d++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - (w * 7 + (6 - d)));
-      const iso = date.toISOString().slice(0, 10);
-      const entry = data.find(x => x.date === iso);
-      cells.push({ date: iso, value: entry?.value || 0, d, w });
-    }
-  }
-  const max = Math.max(...cells.map(c => c.value), 1);
-  return (
-    <svg viewBox={`0 0 ${weeks * 14} ${7 * 14}`} style={{width:"100%", height:"auto"}}>
-      {cells.map((c, i) => {
-        const intensity = c.value ? Math.max(0.18, c.value / max) : 0;
-        return (
-          <rect key={i}
-            x={c.w * 14} y={c.d * 14}
-            width={12} height={12} rx={2}
-            fill={c.value ? `color-mix(in oklab, var(--accent) ${intensity * 100}%, var(--surface-2))` : "var(--surface-2)"} />
-        );
-      })}
-    </svg>
-  );
-}
-
-window.RepsCharts = { Sparkline, StackedBars, LineArea, Heatmap };
+window.RepsCharts = { Sparkline, StackedBars, LineArea };

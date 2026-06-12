@@ -26,58 +26,9 @@ function targetFromCatalogItem(item) {
 // Reads from RepsData.exerciseLastWeek so it considers only entries strictly
 // before the current session's week, matching the visible weekly table.
 // to the left of "this week".
-function LastWeekCell({ exerciseName, beforeDate }) {
-  const last = window.RepsData.exerciseLastWeek?.(exerciseName, beforeDate);
-  if (!last) {
-    return (
-      <div className="ex-lastweek empty">
-        <div className="ex-lw-head">LAST</div>
-        <div className="ex-lw-body">no history</div>
-      </div>
-    );
-  }
-  const parts = last.sets.map(s => {
-    if (s.durationMinutes) return `${s.durationMinutes}m`;
-    if (s.weight == null && s.reps == null) return "—";
-    const w = s.weight == null ? "?" : s.weight;
-    const r = s.reps == null ? "?" : s.reps;
-    return `${w}×${r}`;
-  });
-  return (
-    <div className="ex-lastweek">
-      <div className="ex-lw-head">
-        LAST · <span className="ex-lw-date">{window.RepsData.shortDate(last.date)}</span>
-      </div>
-      <div className="ex-lw-body mono" title={parts.join(", ")}>
-        {parts.join("  ·  ")}
-      </div>
-    </div>
-  );
-}
 
 // Coached suggestion for this week, derived from the progression rule
 // (compound / hypertrophy / safety) and last week's actual sets.
-function ThisWeekCell({ exercise, lastEntry }) {
-  const sg = window.RepsData.progressionSuggestion?.(exercise, lastEntry);
-  if (!sg) {
-    return (
-      <div className="ex-suggest">
-        <div className="ex-sg-head">THIS WEEK</div>
-        <div className="ex-sg-body mono">{exercise.sets} × {exercise.reps}</div>
-      </div>
-    );
-  }
-  const arrow = sg.tone === "good" ? "↑" : sg.tone === "warn" ? "↓" : "→";
-  return (
-    <div className={`ex-suggest tone-${sg.tone || "neutral"}`}>
-      <div className="ex-sg-head">
-        THIS WEEK{sg.deltaLabel ? <> · <span className="ex-sg-delta">{arrow} {sg.deltaLabel}</span></> : null}
-      </div>
-      <div className="ex-sg-body mono">{sg.headline}</div>
-      <div className="ex-sg-sub">{sg.sub}</div>
-    </div>
-  );
-}
 
 const LOG_RULE_KEYS = ["compound", "hypertrophy", "safety"];
 
@@ -277,18 +228,6 @@ function formatLastEntrySets(lastEntry, durationMode) {
   return sets.map(s => formatLastSetValue(s, durationMode)).join(" / ");
 }
 
-function formatTopSetValue(lastEntry, durationMode) {
-  const sets = lastEntry?.sets || [];
-  if (!sets.length) return "—";
-  if (durationMode) return formatLastSetValue(sets[sets.length - 1], true);
-  const top = sets.reduce((best, set) => {
-    const bestWeight = Number(best?.weight) || 0;
-    const setWeight = Number(set?.weight) || 0;
-    if (setWeight !== bestWeight) return setWeight > bestWeight ? set : best;
-    return (Number(set?.reps) || 0) > (Number(best?.reps) || 0) ? set : best;
-  }, sets[0]);
-  return formatLastSetValue(top, false);
-}
 
 function progressionNoteLine(exercise, lastEntry, suggestion) {
   if (!suggestion) return "";
@@ -881,7 +820,7 @@ function ExerciseRow({ exercise, sets, index, totalExercises, onUpdateSets, onRe
     onUpdateSets([...sets, {
       id: nextSetId(),
       weight: "",
-      reps: durationMode ? "" : "",
+      reps: "",
       unit: durationMode ? "min" : (last?.unit || "kg"),
       duration: "",
       rpe: "",

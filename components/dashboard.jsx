@@ -225,6 +225,10 @@ function Dashboard({ setView }) {
   const kcalTarget = averageKcalTarget(profile, kcalD.map(d => d.date));
   const kcalFoot = `${kcalD.length}d ${kcalSummary.source}`;
   const recentPerformedSessions = useMemo(() => performedSessions.slice(-6).reverse(), [performedSessions]);
+  const sessionCountSpark = useMemo(
+    () => weeklyVol.map(w => performedSessions.filter(s => RepsData.mondayOf(s.date) === w.week).length),
+    [weeklyVol, performedSessions]
+  );
   const tdee = useMemo(() => RepsData.adaptiveTdeeEstimate ? RepsData.adaptiveTdeeEstimate(profile, { windowDays: 28 }) : null, [profile]);
   const summary = {
     performedSessionCount: performedSessions.length
@@ -320,7 +324,7 @@ function Dashboard({ setView }) {
           label="Sessions / 6 wk"
           value={recent6wkCount}
           foot={<><Delta value={sessionDelta} suffix=" vs prior" /> <span style={{marginLeft:"auto"}}>{summary.performedSessionCount} all-time</span></>}
-          spark={weeklyVol.map(w => performedSessions.filter(s => RepsData.mondayOf(s.date) === w.week).length)}
+          spark={sessionCountSpark}
         />
         <Kpi
           label="Weekly volume"

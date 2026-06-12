@@ -3645,8 +3645,6 @@ table { border-collapse: collapse; }
   color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em;
 }
 .ex-tag.is-on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.fav-star { font-family: var(--font-mono); color: var(--faint); }
-.fav-star.on { color: var(--warn); }
 
 /* ---------- ai export ---------- */
 .export-pre {
@@ -3786,7 +3784,6 @@ table { border-collapse: collapse; }
 }
 
 /* ---------- tweaks defaults ---------- */
-.tw-edit, .tw-edit input, .tw-edit select { font-family: var(--font-sans); }
 
 /* ---------- responsive ---------- */
 @media (max-width: 1180px) {
