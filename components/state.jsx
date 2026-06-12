@@ -1784,7 +1784,13 @@ function AppStateProvider({ children }) {
 
   useEffect(() => {
     stateRef.current = state;
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    } catch (e) {
+      // Quota-full or private-mode writes used to fail silently = quiet data loss.
+      console.error("Reps: failed to persist state to localStorage", e);
+      setSyncStatus({ state: "error", message: "Could not save locally (storage full?). Push to GitHub to avoid losing changes." });
+    }
     if (!didMountRef.current) {
       didMountRef.current = true;
       return;

@@ -2578,7 +2578,13 @@ function AppStateProvider(_ref11) {
     stateRef.current = state;
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    } catch (e) {}
+    } catch (e) {
+      console.error("Reps: failed to persist state to localStorage", e);
+      setSyncStatus({
+        state: "error",
+        message: "Could not save locally (storage full?). Push to GitHub to avoid losing changes."
+      });
+    }
     if (!didMountRef.current) {
       didMountRef.current = true;
       return;
@@ -4895,7 +4901,7 @@ function Dashboard(_ref4) {
   }, "Status"))), React.createElement("tbody", null, recentPerformedSessions.map(function (s, i) {
     var top = (s.entries || []).find(function (entry) {
       return loggedSetCount(entry.sets || []) > 0;
-    }) || s.entries[0];
+    }) || (s.entries || [])[0];
     var topSet = ((top === null || top === void 0 ? void 0 : top.sets) || []).find(function (set) {
       return loggedSetCount([set]) > 0;
     });
@@ -8674,50 +8680,50 @@ function AddFoodModal(_ref5) {
     activeProfile = _ref5.activeProfile,
     updateProfile = _ref5.updateProfile,
     targetDate = _ref5.targetDate;
-  var _useS = useS("catalog"),
-    _useS2 = _slicedToArray(_useS, 2),
-    mode = _useS2[0],
-    setMode = _useS2[1];
-  var _useS3 = useS(""),
-    _useS4 = _slicedToArray(_useS3, 2),
-    q = _useS4[0],
-    setQ = _useS4[1];
-  var _useS5 = useS(null),
-    _useS6 = _slicedToArray(_useS5, 2),
-    picked = _useS6[0],
-    setPicked = _useS6[1];
-  var _useS7 = useS(1),
-    _useS8 = _slicedToArray(_useS7, 2),
-    amount = _useS8[0],
-    setAmount = _useS8[1];
-  var _useS9 = useS(false),
-    _useS0 = _slicedToArray(_useS9, 2),
-    showHidden = _useS0[0],
-    setShowHidden = _useS0[1];
-  var _useS1 = useS(""),
-    _useS10 = _slicedToArray(_useS1, 2),
-    qName = _useS10[0],
-    setQName = _useS10[1];
-  var _useS11 = useS(""),
-    _useS12 = _slicedToArray(_useS11, 2),
-    qKcal = _useS12[0],
-    setQKcal = _useS12[1];
-  var _useS13 = useS(""),
-    _useS14 = _slicedToArray(_useS13, 2),
-    qProtein = _useS14[0],
-    setQProtein = _useS14[1];
-  var _useS15 = useS(""),
-    _useS16 = _slicedToArray(_useS15, 2),
-    qCarbs = _useS16[0],
-    setQCarbs = _useS16[1];
-  var _useS17 = useS(""),
-    _useS18 = _slicedToArray(_useS17, 2),
-    qFat = _useS18[0],
-    setQFat = _useS18[1];
-  var _useS19 = useS(false),
-    _useS20 = _slicedToArray(_useS19, 2),
-    qSaveToLog = _useS20[0],
-    setQSaveToLog = _useS20[1];
+  var _useState37 = useState("catalog"),
+    _useState38 = _slicedToArray(_useState37, 2),
+    mode = _useState38[0],
+    setMode = _useState38[1];
+  var _useState39 = useState(""),
+    _useState40 = _slicedToArray(_useState39, 2),
+    q = _useState40[0],
+    setQ = _useState40[1];
+  var _useState41 = useState(null),
+    _useState42 = _slicedToArray(_useState41, 2),
+    picked = _useState42[0],
+    setPicked = _useState42[1];
+  var _useState43 = useState(1),
+    _useState44 = _slicedToArray(_useState43, 2),
+    amount = _useState44[0],
+    setAmount = _useState44[1];
+  var _useState45 = useState(false),
+    _useState46 = _slicedToArray(_useState45, 2),
+    showHidden = _useState46[0],
+    setShowHidden = _useState46[1];
+  var _useState47 = useState(""),
+    _useState48 = _slicedToArray(_useState47, 2),
+    qName = _useState48[0],
+    setQName = _useState48[1];
+  var _useState49 = useState(""),
+    _useState50 = _slicedToArray(_useState49, 2),
+    qKcal = _useState50[0],
+    setQKcal = _useState50[1];
+  var _useState51 = useState(""),
+    _useState52 = _slicedToArray(_useState51, 2),
+    qProtein = _useState52[0],
+    setQProtein = _useState52[1];
+  var _useState53 = useState(""),
+    _useState54 = _slicedToArray(_useState53, 2),
+    qCarbs = _useState54[0],
+    setQCarbs = _useState54[1];
+  var _useState55 = useState(""),
+    _useState56 = _slicedToArray(_useState55, 2),
+    qFat = _useState56[0],
+    setQFat = _useState56[1];
+  var _useState57 = useState(false),
+    _useState58 = _slicedToArray(_useState57, 2),
+    qSaveToLog = _useState58[0],
+    setQSaveToLog = _useState58[1];
   var hidden = (activeProfile === null || activeProfile === void 0 ? void 0 : activeProfile.hiddenFoodItems) || [];
   var items = allFoodCatalogItems(activeProfile, RepsData.foodItems, {
     includeHidden: true
@@ -9169,30 +9175,30 @@ function AddFoodModal(_ref5) {
 function NewCatalogEntryForm(_ref0) {
   var onSave = _ref0.onSave,
     onCancel = _ref0.onCancel;
-  var _useS21 = useS(""),
-    _useS22 = _slicedToArray(_useS21, 2),
-    name = _useS22[0],
-    setName = _useS22[1];
-  var _useS23 = useS(""),
-    _useS24 = _slicedToArray(_useS23, 2),
-    kcal = _useS24[0],
-    setKcal = _useS24[1];
-  var _useS25 = useS(""),
-    _useS26 = _slicedToArray(_useS25, 2),
-    protein = _useS26[0],
-    setProtein = _useS26[1];
-  var _useS27 = useS(""),
-    _useS28 = _slicedToArray(_useS27, 2),
-    carbs = _useS28[0],
-    setCarbs = _useS28[1];
-  var _useS29 = useS(""),
-    _useS30 = _slicedToArray(_useS29, 2),
-    fat = _useS30[0],
-    setFat = _useS30[1];
-  var _useS31 = useS("Custom"),
-    _useS32 = _slicedToArray(_useS31, 2),
-    category = _useS32[0],
-    setCategory = _useS32[1];
+  var _useState59 = useState(""),
+    _useState60 = _slicedToArray(_useState59, 2),
+    name = _useState60[0],
+    setName = _useState60[1];
+  var _useState61 = useState(""),
+    _useState62 = _slicedToArray(_useState61, 2),
+    kcal = _useState62[0],
+    setKcal = _useState62[1];
+  var _useState63 = useState(""),
+    _useState64 = _slicedToArray(_useState63, 2),
+    protein = _useState64[0],
+    setProtein = _useState64[1];
+  var _useState65 = useState(""),
+    _useState66 = _slicedToArray(_useState65, 2),
+    carbs = _useState66[0],
+    setCarbs = _useState66[1];
+  var _useState67 = useState(""),
+    _useState68 = _slicedToArray(_useState67, 2),
+    fat = _useState68[0],
+    setFat = _useState68[1];
+  var _useState69 = useState("Custom"),
+    _useState70 = _slicedToArray(_useState69, 2),
+    category = _useState70[0],
+    setCategory = _useState70[1];
   var submit = function submit() {
     if (!name.trim() || !kcal) return;
     onSave({
@@ -9324,31 +9330,31 @@ function FoodLibraryModal(_ref11) {
       });
     });
   };
-  var _useS33 = useS(makeRows),
-    _useS34 = _slicedToArray(_useS33, 2),
-    rows = _useS34[0],
-    setRows = _useS34[1];
-  var _useS35 = useS(""),
-    _useS36 = _slicedToArray(_useS35, 2),
-    query = _useS36[0],
-    setQuery = _useS36[1];
-  var _useS37 = useS("all"),
-    _useS38 = _slicedToArray(_useS37, 2),
-    category = _useS38[0],
-    setCategory = _useS38[1];
-  var _useS39 = useS(true),
-    _useS40 = _slicedToArray(_useS39, 2),
-    showHidden = _useS40[0],
-    setShowHidden = _useS40[1];
-  var _useS41 = useS(null),
-    _useS42 = _slicedToArray(_useS41, 2),
-    dragKey = _useS42[0],
-    setDragKey = _useS42[1];
-  var _useS43 = useS(""),
-    _useS44 = _slicedToArray(_useS43, 2),
-    error = _useS44[0],
-    setError = _useS44[1];
-  useE(function () {
+  var _useState71 = useState(makeRows),
+    _useState72 = _slicedToArray(_useState71, 2),
+    rows = _useState72[0],
+    setRows = _useState72[1];
+  var _useState73 = useState(""),
+    _useState74 = _slicedToArray(_useState73, 2),
+    query = _useState74[0],
+    setQuery = _useState74[1];
+  var _useState75 = useState("all"),
+    _useState76 = _slicedToArray(_useState75, 2),
+    category = _useState76[0],
+    setCategory = _useState76[1];
+  var _useState77 = useState(true),
+    _useState78 = _slicedToArray(_useState77, 2),
+    showHidden = _useState78[0],
+    setShowHidden = _useState78[1];
+  var _useState79 = useState(null),
+    _useState80 = _slicedToArray(_useState79, 2),
+    dragKey = _useState80[0],
+    setDragKey = _useState80[1];
+  var _useState81 = useState(""),
+    _useState82 = _slicedToArray(_useState81, 2),
+    error = _useState82[0],
+    setError = _useState82[1];
+  _ue(function () {
     var onKey = function onKey(event) {
       if (event.key === "Escape") onClose();
     };
@@ -9718,19 +9724,19 @@ function WeightEntryModal(_ref16) {
   var onClose = _ref16.onClose,
     onSave = _ref16.onSave,
     lookupExisting = _ref16.lookupExisting;
-  var _useS45 = useS(window.RepsData.TODAY),
-    _useS46 = _slicedToArray(_useS45, 2),
-    date = _useS46[0],
-    setDate = _useS46[1];
+  var _useState83 = useState(window.RepsData.TODAY),
+    _useState84 = _slicedToArray(_useState83, 2),
+    date = _useState84[0],
+    setDate = _useState84[1];
   var initial = lookupExisting ? lookupExisting(window.RepsData.TODAY) : null;
-  var _useS47 = useS(initial && initial.value != null ? String(initial.value) : ""),
-    _useS48 = _slicedToArray(_useS47, 2),
-    weight = _useS48[0],
-    setWeight = _useS48[1];
-  var _useS49 = useS(initial && initial.note ? initial.note : ""),
-    _useS50 = _slicedToArray(_useS49, 2),
-    note = _useS50[0],
-    setNote = _useS50[1];
+  var _useState85 = useState(initial && initial.value != null ? String(initial.value) : ""),
+    _useState86 = _slicedToArray(_useState85, 2),
+    weight = _useState86[0],
+    setWeight = _useState86[1];
+  var _useState87 = useState(initial && initial.note ? initial.note : ""),
+    _useState88 = _slicedToArray(_useState87, 2),
+    note = _useState88[0],
+    setNote = _useState88[1];
   React.useEffect(function () {
     if (!lookupExisting) return;
     var existing = lookupExisting(date);
@@ -9876,14 +9882,14 @@ function EditableNumberCell(_ref17) {
     allowDecimals = _ref17.allowDecimals,
     _ref17$alignRight = _ref17.alignRight,
     alignRight = _ref17$alignRight === void 0 ? true : _ref17$alignRight;
-  var _useS51 = useS(false),
-    _useS52 = _slicedToArray(_useS51, 2),
-    editing = _useS52[0],
-    setEditing = _useS52[1];
-  var _useS53 = useS(""),
-    _useS54 = _slicedToArray(_useS53, 2),
-    draft = _useS54[0],
-    setDraft = _useS54[1];
+  var _useState89 = useState(false),
+    _useState90 = _slicedToArray(_useState89, 2),
+    editing = _useState90[0],
+    setEditing = _useState90[1];
+  var _useState91 = useState(""),
+    _useState92 = _slicedToArray(_useState91, 2),
+    draft = _useState92[0],
+    setDraft = _useState92[1];
   var start = function start() {
     setDraft(value != null && value !== "" ? String(value) : "");
     setEditing(true);
@@ -9961,14 +9967,14 @@ function EditableTextCell(_ref18) {
   var value = _ref18.value,
     placeholder = _ref18.placeholder,
     onSave = _ref18.onSave;
-  var _useS55 = useS(false),
-    _useS56 = _slicedToArray(_useS55, 2),
-    editing = _useS56[0],
-    setEditing = _useS56[1];
-  var _useS57 = useS(""),
-    _useS58 = _slicedToArray(_useS57, 2),
-    draft = _useS58[0],
-    setDraft = _useS58[1];
+  var _useState93 = useState(false),
+    _useState94 = _slicedToArray(_useState93, 2),
+    editing = _useState94[0],
+    setEditing = _useState94[1];
+  var _useState95 = useState(""),
+    _useState96 = _slicedToArray(_useState95, 2),
+    draft = _useState96[0],
+    setDraft = _useState96[1];
   var start = function start() {
     setDraft(value || "");
     setEditing(true);
@@ -10116,10 +10122,10 @@ function DailyLogTable(_ref20) {
     onFoodsOpenChange = _ref20.onFoodsOpenChange,
     _ref20$className = _ref20.className,
     className = _ref20$className === void 0 ? "" : _ref20$className;
-  var _useS59 = useS("14"),
-    _useS60 = _slicedToArray(_useS59, 2),
-    rangeDays = _useS60[0],
-    setRangeDays = _useS60[1];
+  var _useState97 = useState("14"),
+    _useState98 = _slicedToArray(_useState97, 2),
+    rangeDays = _useState98[0],
+    setRangeDays = _useState98[1];
   var today = window.RepsData.TODAY;
   var overrides = activeProfile.dailyOverrides || {};
   var foodByDate = activeProfile.foodByDate || {};
@@ -11143,26 +11149,26 @@ function Body() {
     updateDailyOverride = _window$RepsState$use.updateDailyOverride,
     clearDailyOverride = _window$RepsState$use.clearDailyOverride;
   var todayIso = window.RepsData.TODAY;
-  var _useS61 = useS(todayIso),
-    _useS62 = _slicedToArray(_useS61, 2),
-    selectedDate = _useS62[0],
-    setSelectedDate = _useS62[1];
-  var _useS63 = useS(false),
-    _useS64 = _slicedToArray(_useS63, 2),
-    showWeightModal = _useS64[0],
-    setShowWeightModal = _useS64[1];
-  var _useS65 = useS(false),
-    _useS66 = _slicedToArray(_useS65, 2),
-    showFoodLibrary = _useS66[0],
-    setShowFoodLibrary = _useS66[1];
-  var _useS67 = useS(28),
-    _useS68 = _slicedToArray(_useS67, 2),
-    tdeeWindowDays = _useS68[0],
-    setTdeeWindowDays = _useS68[1];
-  var _useS69 = useS(null),
-    _useS70 = _slicedToArray(_useS69, 2),
-    foodModalDate = _useS70[0],
-    setFoodModalDate = _useS70[1];
+  var _useState99 = useState(todayIso),
+    _useState100 = _slicedToArray(_useState99, 2),
+    selectedDate = _useState100[0],
+    setSelectedDate = _useState100[1];
+  var _useState101 = useState(false),
+    _useState102 = _slicedToArray(_useState101, 2),
+    showWeightModal = _useState102[0],
+    setShowWeightModal = _useState102[1];
+  var _useState103 = useState(false),
+    _useState104 = _slicedToArray(_useState103, 2),
+    showFoodLibrary = _useState104[0],
+    setShowFoodLibrary = _useState104[1];
+  var _useState105 = useState(28),
+    _useState106 = _slicedToArray(_useState105, 2),
+    tdeeWindowDays = _useState106[0],
+    setTdeeWindowDays = _useState106[1];
+  var _useState107 = useState(null),
+    _useState108 = _slicedToArray(_useState107, 2),
+    foodModalDate = _useState108[0],
+    setFoodModalDate = _useState108[1];
   var selectedDayKey = window.RepsData.dayName(selectedDate);
   var targets = activeProfile.macros[selectedDayKey] || {
     kcal: 2000,
@@ -11232,10 +11238,10 @@ function Body() {
   }, [activeProfile]);
   var foodItems = RepsData.foodItems;
   var selectedOverride = dailyOverrides[selectedDate] || {};
-  var _useS71 = useS(false),
-    _useS72 = _slicedToArray(_useS71, 2),
-    showAddFood = _useS72[0],
-    setShowAddFood = _useS72[1];
+  var _useState109 = useState(false),
+    _useState110 = _slicedToArray(_useState109, 2),
+    showAddFood = _useState110[0],
+    setShowAddFood = _useState110[1];
   var ledgerFoodsOpen = activeProfile.bodyLedgerFoodsOpen !== false;
   var entries = (activeProfile.foodByDate || {})[selectedDate] || [];
   var foodKcal = entries.reduce(function (s, f) {
@@ -11480,22 +11486,22 @@ function AddBlockModal(_ref32) {
     onSave = _ref32.onSave,
     onDelete = _ref32.onDelete;
   var isEdit = !!initialBlock;
-  var _useS73 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.name) || "Block " + new Date().getFullYear()),
-    _useS74 = _slicedToArray(_useS73, 2),
-    name = _useS74[0],
-    setName = _useS74[1];
-  var _useS75 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.startDate) || window.RepsData.TODAY),
-    _useS76 = _slicedToArray(_useS75, 2),
-    startDate = _useS76[0],
-    setStartDate = _useS76[1];
-  var _useS77 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.weeks) || 8),
-    _useS78 = _slicedToArray(_useS77, 2),
-    weeks = _useS78[0],
-    setWeeks = _useS78[1];
-  var _useS79 = useS((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.goal) || ""),
-    _useS80 = _slicedToArray(_useS79, 2),
-    goal = _useS80[0],
-    setGoal = _useS80[1];
+  var _useState111 = useState((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.name) || "Block " + new Date().getFullYear()),
+    _useState112 = _slicedToArray(_useState111, 2),
+    name = _useState112[0],
+    setName = _useState112[1];
+  var _useState113 = useState((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.startDate) || window.RepsData.TODAY),
+    _useState114 = _slicedToArray(_useState113, 2),
+    startDate = _useState114[0],
+    setStartDate = _useState114[1];
+  var _useState115 = useState((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.weeks) || 8),
+    _useState116 = _slicedToArray(_useState115, 2),
+    weeks = _useState116[0],
+    setWeeks = _useState116[1];
+  var _useState117 = useState((initialBlock === null || initialBlock === void 0 ? void 0 : initialBlock.goal) || ""),
+    _useState118 = _slicedToArray(_useState117, 2),
+    goal = _useState118[0],
+    setGoal = _useState118[1];
   var submit = function submit() {
     if (!name.trim()) return;
     var parsedWeeks = Math.max(1, Math.min(52, Number(weeks) || 8));
@@ -11692,14 +11698,14 @@ function Plan() {
   var allSessions = _um(function () {
     return RepsData.allSessions();
   }, [activeProfile]);
-  var _useState37 = useState(null),
-    _useState38 = _slicedToArray(_useState37, 2),
-    blockModal = _useState38[0],
-    setBlockModal = _useState38[1];
-  var _useState39 = useState(""),
-    _useState40 = _slicedToArray(_useState39, 2),
-    newProfileName = _useState40[0],
-    setNewProfileName = _useState40[1];
+  var _useState119 = useState(null),
+    _useState120 = _slicedToArray(_useState119, 2),
+    blockModal = _useState120[0],
+    setBlockModal = _useState120[1];
+  var _useState121 = useState(""),
+    _useState122 = _slicedToArray(_useState121, 2),
+    newProfileName = _useState122[0],
+    setNewProfileName = _useState122[1];
   var trackCarbs = activeProfile.trackCarbs !== false;
   var trackFat = activeProfile.trackFat !== false;
   var todayKey = window.RepsState.todayDayKey();
@@ -12026,7 +12032,13 @@ function Plan() {
   }, "carbs"), trackFat && React.createElement("th", {
     className: "num"
   }, "fat"), React.createElement("th", null))), React.createElement("tbody", null, DAY_KEYS.map(function (day) {
-    var m = activeProfile.macros[day];
+    var _activeProfile$macros;
+    var m = _objectSpread({
+      kcal: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0
+    }, ((_activeProfile$macros = activeProfile.macros) === null || _activeProfile$macros === void 0 ? void 0 : _activeProfile$macros[day]) || {});
     var isToday = day === todayKey;
     return React.createElement("tr", {
       key: day,
@@ -12109,19 +12121,23 @@ function Plan() {
   }, "Avg / day"), React.createElement("td", {
     className: "num mono"
   }, Math.round(DAY_KEYS.reduce(function (s, d) {
-    return s + activeProfile.macros[d].kcal;
+    var _activeProfile$macros2;
+    return s + (Number((_activeProfile$macros2 = activeProfile.macros) === null || _activeProfile$macros2 === void 0 || (_activeProfile$macros2 = _activeProfile$macros2[d]) === null || _activeProfile$macros2 === void 0 ? void 0 : _activeProfile$macros2.kcal) || 0);
   }, 0) / 7)), React.createElement("td", {
     className: "num mono"
   }, Math.round(DAY_KEYS.reduce(function (s, d) {
-    return s + activeProfile.macros[d].protein;
+    var _activeProfile$macros3;
+    return s + (Number((_activeProfile$macros3 = activeProfile.macros) === null || _activeProfile$macros3 === void 0 || (_activeProfile$macros3 = _activeProfile$macros3[d]) === null || _activeProfile$macros3 === void 0 ? void 0 : _activeProfile$macros3.protein) || 0);
   }, 0) / 7)), trackCarbs && React.createElement("td", {
     className: "num mono"
   }, Math.round(DAY_KEYS.reduce(function (s, d) {
-    return s + activeProfile.macros[d].carbs;
+    var _activeProfile$macros4;
+    return s + (Number((_activeProfile$macros4 = activeProfile.macros) === null || _activeProfile$macros4 === void 0 || (_activeProfile$macros4 = _activeProfile$macros4[d]) === null || _activeProfile$macros4 === void 0 ? void 0 : _activeProfile$macros4.carbs) || 0);
   }, 0) / 7)), trackFat && React.createElement("td", {
     className: "num mono"
   }, Math.round(DAY_KEYS.reduce(function (s, d) {
-    return s + activeProfile.macros[d].fat;
+    var _activeProfile$macros5;
+    return s + (Number((_activeProfile$macros5 = activeProfile.macros) === null || _activeProfile$macros5 === void 0 || (_activeProfile$macros5 = _activeProfile$macros5[d]) === null || _activeProfile$macros5 === void 0 ? void 0 : _activeProfile$macros5.fat) || 0);
   }, 0) / 7)), React.createElement("td", null)))))), React.createElement("div", {
     className: "panel"
   }, React.createElement("div", {
@@ -12361,18 +12377,18 @@ function ToggleRow(_ref33) {
 function ExportView() {
   var app = window.RepsState.useApp();
   var hasHistory = !!app.activeProfile.hasHistory;
-  var _useState41 = useState("90"),
-    _useState42 = _slicedToArray(_useState41, 2),
-    range = _useState42[0],
-    setRange = _useState42[1];
-  var _useState43 = useState(false),
-    _useState44 = _slicedToArray(_useState43, 2),
-    copied = _useState44[0],
-    setCopied = _useState44[1];
-  var _useState45 = useState(loadExportPrefs),
-    _useState46 = _slicedToArray(_useState45, 2),
-    prefs = _useState46[0],
-    setPrefs = _useState46[1];
+  var _useState123 = useState("90"),
+    _useState124 = _slicedToArray(_useState123, 2),
+    range = _useState124[0],
+    setRange = _useState124[1];
+  var _useState125 = useState(false),
+    _useState126 = _slicedToArray(_useState125, 2),
+    copied = _useState126[0],
+    setCopied = _useState126[1];
+  var _useState127 = useState(loadExportPrefs),
+    _useState128 = _slicedToArray(_useState127, 2),
+    prefs = _useState128[0],
+    setPrefs = _useState128[1];
   var updatePref = function updatePref(key, value) {
     var next = _objectSpread(_objectSpread({}, prefs), {}, _defineProperty({}, key, value));
     setPrefs(next);
