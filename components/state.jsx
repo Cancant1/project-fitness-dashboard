@@ -1060,6 +1060,27 @@ function AppStateProvider({ children }) {
     });
   };
 
+  // Debounced auto-push: each call resets the timer; one push lands shortly
+  // after the activity stops. Returns false when auto-sync is not active.
+  const scheduleAutoPush = () => {
+    const config = syncConfigRef.current;
+    if (!config.enabled || !config.token || config.autoSync === false) return false;
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
+    pushTimerRef.current = setTimeout(() => {
+      pushTimerRef.current = null;
+      pushRemoteStateRef.current?.({ silent: true, auto: true });
+    }, AUTO_PUSH_DELAY_MS);
+    return true;
+  };
+
+  // Keep syncConfigRef in sync BEFORE the [state] effect below runs, so a
+  // config change and a state change landing in the same commit don't let the
+  // [state] effect read a stale config.
+  useEffect(() => {
+    syncConfigRef.current = syncConfig;
+    writeJsonStorage(SYNC_CONFIG_KEY, syncConfig);
+  }, [syncConfig]);
+
   useEffect(() => {
     stateRef.current = state;
     try {
@@ -1080,25 +1101,13 @@ function AppStateProvider({ children }) {
     updateSyncMeta(prev => ({ ...prev, dirty: true, conflict: false }));
     const config = syncConfigRef.current;
     if (config.enabled && config.token) {
-      if (config.autoSync !== false) {
-        // Debounced auto-push: each edit resets the timer; one push lands
-        // shortly after the user stops making changes.
-        if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
-        pushTimerRef.current = setTimeout(() => {
-          pushTimerRef.current = null;
-          pushRemoteStateRef.current?.({ silent: true, auto: true });
-        }, AUTO_PUSH_DELAY_MS);
+      if (scheduleAutoPush()) {
         setSyncStatus({ state: "idle", message: "Local changes saved · auto-sync shortly" });
       } else {
         setSyncStatus({ state: "idle", message: "Local changes saved. Push when done." });
       }
     }
   }, [state]);
-
-  useEffect(() => {
-    syncConfigRef.current = syncConfig;
-    writeJsonStorage(SYNC_CONFIG_KEY, syncConfig);
-  }, [syncConfig]);
 
   useEffect(() => {
     syncMetaRef.current = syncMeta;
@@ -1164,6 +1173,10 @@ function AppStateProvider({ children }) {
     }));
     setSyncConflict(null);
     setSyncStatus({ state: "ok", message });
+    // The merged result is dirty but the [state] effect skips remote applies,
+    // so queue the auto-push here — otherwise the merge would only reach
+    // GitHub after the user's next edit (or never, if they just close the tab).
+    scheduleAutoPush();
   };
 
   const pullRemoteState = async (options = {}) => {
@@ -1279,9 +1292,13 @@ function AppStateProvider({ children }) {
     if (choice === "local") await pushRemoteState();
   };
 
-  // Keep stable handles for timers/listeners so they always call the latest closures.
-  pushRemoteStateRef.current = pushRemoteState;
-  pullRemoteStateRef.current = pullRemoteState;
+  // Keep stable handles for timers/listeners so they always call the latest
+  // closures. Assigned in an effect (not during render) so an interrupted
+  // concurrent render can never leave the refs pointing at uncommitted closures.
+  useEffect(() => {
+    pushRemoteStateRef.current = pushRemoteState;
+    pullRemoteStateRef.current = pullRemoteState;
+  });
 
   // Automatic sync: pull on app open and whenever the tab comes back into
   // focus (throttled), so every device starts from the latest pushed state.
