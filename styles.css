@@ -3684,6 +3684,70 @@ table { border-collapse: collapse; }
 .chart-dot { fill: var(--accent); }
 .kpi-spark .chart-line { stroke: var(--accent); stroke-width: 1.75; }
 .kpi-spark .chart-dot { fill: var(--accent); }
+.split-chip { border-color: transparent; background: var(--surface-2); }
+
+/* ---------- records view ---------- */
+.records-heatmap-wrap { overflow-x: auto; }
+.records-heatmap { display: block; width: 100%; min-width: 640px; height: auto; }
+.hm-cell, .hm-swatch { transition: opacity var(--t-fast) var(--ease); }
+.hm-l0 { fill: var(--surface-2); }
+.hm-l1 { fill: color-mix(in oklab, var(--accent) 28%, var(--surface-2)); }
+.hm-l2 { fill: color-mix(in oklab, var(--accent) 55%, var(--surface-2)); }
+.hm-l3 { fill: color-mix(in oklab, var(--accent) 80%, var(--surface-2)); }
+.hm-l4 { fill: var(--accent); }
+.hm-cell:hover { opacity: 0.78; }
+.records-hm-legend { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-family: var(--font-mono); font-size: 10px; }
+.records-hm-legend .hm-swatch {
+  display: inline-block; width: 11px; height: 11px; border-radius: 2.5px;
+}
+.hm-swatch.hm-l0 { background: var(--surface-2); }
+.hm-swatch.hm-l1 { background: color-mix(in oklab, var(--accent) 28%, var(--surface-2)); }
+.hm-swatch.hm-l2 { background: color-mix(in oklab, var(--accent) 55%, var(--surface-2)); }
+.hm-swatch.hm-l3 { background: color-mix(in oklab, var(--accent) 80%, var(--surface-2)); }
+.hm-swatch.hm-l4 { background: var(--accent); }
+
+.panel-head-meta {
+  font-family: var(--font-mono); font-size: 10px;
+  color: var(--faint); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.records-sub { margin-top: 2px; font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.records-compound { color: var(--faint); letter-spacing: 0.04em; text-transform: uppercase; font-size: 9px; }
+.records-chip { margin-left: 6px; }
+.records-show-all { padding: var(--pad-2); display: flex; justify-content: center; border-top: var(--hair); }
+.records-empty { color: var(--muted); font-size: var(--t-sm); padding: var(--pad-3); }
+
+.records-side { display: flex; flex-direction: column; gap: var(--pad-4); min-width: 0; }
+.records-feed { display: flex; flex-direction: column; }
+.records-feed-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px var(--pad-3);
+  border-bottom: 1px solid color-mix(in oklab, var(--hairline) 65%, transparent);
+}
+.records-feed-row:last-child { border-bottom: 0; }
+.records-feed-main { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.records-feed-name { font-weight: 550; font-size: var(--t-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.records-feed-val { font-size: var(--t-xs); color: var(--muted); }
+.records-feed-meta { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; font-size: 10px; color: var(--faint); }
+.records-droughts { display: flex; flex-direction: column; gap: 6px; }
+.records-drought-row { display: flex; justify-content: space-between; gap: 10px; font-size: var(--t-sm); }
+.records-drought-row .mono { color: var(--warn); }
+
+/* dashboard latest-PR strip */
+.pr-strip {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: var(--pad-2) var(--pad-3);
+}
+.pr-strip-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pr-strip-icon {
+  display: grid; place-items: center;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent-ink);
+  flex: 0 0 auto;
+}
+.pr-strip-icon svg { width: 16px; height: 16px; }
+.pr-strip-title { font-size: var(--t-md); font-weight: 550; }
+.pr-strip-title .mono { color: var(--accent-ink); }
+.pr-strip-sub { margin-top: 1px; font-size: 10px; color: var(--muted); }
 
 /* ---------- notes list ---------- */
 .notes-list { display: flex; flex-wrap: wrap; gap: 4px; }

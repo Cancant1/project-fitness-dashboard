@@ -64,6 +64,7 @@ const NAV_ITEMS = [
   { id: "log",       label: "Log",       icon: I.Log,       kbd: "2" },
   { id: "sessions",  label: "Sessions",  icon: I.Log,       kbd: "3" },
   { id: "strength",  label: "Strength",  icon: I.Trend,     kbd: "4" },
+  { id: "records",   label: "Records",   icon: I.Trophy,    kbd: "R" },
   { id: "routines",  label: "Routines",  icon: I.Routine,   kbd: "5" },
   { id: "exercises", label: "Exercises", icon: I.Exercises, kbd: "6" },
   { id: "body",      label: "Body",      icon: I.Body,      kbd: "7" },

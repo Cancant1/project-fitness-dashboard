@@ -18,6 +18,7 @@ const sourceFiles = [
   "components/exercise-modal.jsx",
   "components/settings.jsx",
   "components/strength.jsx",
+  "components/records.jsx",
   "app.jsx"
 ];
 
