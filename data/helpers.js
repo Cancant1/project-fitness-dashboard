@@ -553,7 +553,8 @@
   }
 
   function entrySnapshot(session, entry, beforeDate, matchLevel = "exercise", allowProgression = true) {
-    const rawSets = (entry.sets || []).filter(loggedSetHasResult);
+    // Warm-up ramps don't inform next-week prefills or progression targets.
+    const rawSets = (entry.sets || []).filter(loggedSetHasResult).filter(x => x.type !== "warmup");
     if (!rawSets.length) return null;
     return {
       date: session.date,
@@ -840,7 +841,9 @@
     for (const s of sessions) {
       const entry = s.entries.find(e => e.exercise === name);
       if (!entry) continue;
-      const sets = (entry.sets || []).filter(x => x.repsNumber || x.reps);
+      // Warm-up sets stay visible in the session but are excluded from
+      // records, e1RM, volume and PR analytics.
+      const sets = (entry.sets || []).filter(x => (x.repsNumber || x.reps) && x.type !== "warmup");
       if (!sets.length) continue;
       const maxW = Math.max(...sets.map(setWeightKg));
       const totalReps = sets.reduce((sum, x) => sum + (x.repsNumber || x.reps || 0), 0);

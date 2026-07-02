@@ -598,6 +598,162 @@ function loggedSessionForDate(date, routineDay = null) {
   return matches.find(s => s.status === "performed") || matches[0] || null;
 }
 
+/* ---------- in-workout tools: set types, rest timer, plates, warm-ups ---------- */
+
+const SET_TYPE_ORDER = ["working", "warmup", "drop", "amrap"];
+const SET_TYPE_META = {
+  warmup: { abbr: "W", title: "Warm-up — excluded from records & progression" },
+  drop:   { abbr: "D", title: "Drop set" },
+  amrap:  { abbr: "A", title: "AMRAP — as many reps as possible" }
+};
+function nextSetType(type) {
+  const i = SET_TYPE_ORDER.indexOf(type || "working");
+  return SET_TYPE_ORDER[(i + 1) % SET_TYPE_ORDER.length];
+}
+
+function isBarbellExercise(name = "") {
+  const t = name.toLowerCase();
+  if (/\bdb\b|dumbbell|dumbell|cable|machine|smith|band|bodyweight|pull-?up|chin|dip|flye|raise|curl\b/.test(t)) return false;
+  return /barbell|deadlift|squat|bench|row|press|morning|romanian|rdl|pendlay|ohp|clean|snatch/.test(t);
+}
+
+const PLATE_INVENTORY = [25, 20, 15, 10, 5, 2.5, 1.25];
+function platesPerSide(target, bar = 20) {
+  let remaining = (Number(target) - bar) / 2;
+  if (!Number.isFinite(remaining) || remaining < 0) return null;
+  const plates = [];
+  for (const p of PLATE_INVENTORY) {
+    let count = 0;
+    while (remaining >= p - 1e-9) { remaining -= p; count += 1; }
+    if (count) plates.push({ plate: p, count });
+  }
+  return { plates, shortPerSide: remaining };
+}
+
+function warmupScheme(workingWeight, barbell) {
+  if (!(workingWeight > 0)) return [];
+  const inc = barbell ? 2.5 : 1;
+  const floor = barbell ? 20 : 0;
+  const round = (v) => Math.max(floor, Math.round(v / inc) * inc);
+  const ramp = barbell && workingWeight > 40
+    ? [{ w: 20, reps: 10 }, { w: round(workingWeight * 0.4), reps: 5 },
+       { w: round(workingWeight * 0.6), reps: 3 }, { w: round(workingWeight * 0.8), reps: 1 }]
+    : [{ w: round(workingWeight * 0.5), reps: 8 }, { w: round(workingWeight * 0.7), reps: 4 }];
+  const out = [];
+  for (const s of ramp) {
+    if (!(s.w > 0) || s.w >= workingWeight) continue;
+    if (out.length && s.w <= out[out.length - 1].w) continue;
+    out.push(s);
+  }
+  return out;
+}
+
+// Shared AudioContext primed inside the tap gesture so iOS lets the
+// end-of-rest beep play later.
+let __repsAudioCtx = null;
+function primeRestAudio() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    __repsAudioCtx = __repsAudioCtx || new Ctx();
+    if (__repsAudioCtx.state === "suspended") __repsAudioCtx.resume();
+  } catch (e) {}
+}
+function playRestBeep() {
+  try {
+    if (!__repsAudioCtx) return;
+    const ctx = __repsAudioCtx;
+    [0, 0.28].forEach(at => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.value = 880;
+      osc.connect(gain); gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + at);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.2);
+      osc.start(ctx.currentTime + at); osc.stop(ctx.currentTime + at + 0.22);
+    });
+  } catch (e) {}
+}
+
+function RestTimer({ timer, onExtend, onDismiss }) {
+  const [, setTick] = useState(0);
+  const firedRef = React.useRef(null);
+  React.useEffect(() => {
+    if (!timer) return undefined;
+    const t = setInterval(() => setTick(x => x + 1), 500);
+    return () => clearInterval(t);
+  }, [timer]);
+  React.useEffect(() => {
+    if (!timer) return;
+    if (timer.endsAt - Date.now() <= 0 && firedRef.current !== timer.id) {
+      firedRef.current = timer.id;
+      try { navigator.vibrate && navigator.vibrate([180, 90, 180]); } catch (e) {}
+      playRestBeep();
+    }
+  });
+  if (!timer) return null;
+  const remaining = Math.max(0, Math.ceil((timer.endsAt - Date.now()) / 1000));
+  const mm = Math.floor(remaining / 60);
+  const ss = String(remaining % 60).padStart(2, "0");
+  const frac = timer.seconds ? Math.max(0, Math.min(1, remaining / timer.seconds)) : 0;
+  return (
+    <div className={`rest-timer ${remaining === 0 ? "is-done" : ""}`} role="timer" aria-live="polite">
+      <div className="rest-timer-ring" style={{ "--frac": frac }}></div>
+      <div className="rest-timer-copy">
+        <span className="rest-timer-time mono">{remaining === 0 ? "Rest done" : `${mm}:${ss}`}</span>
+        <span className="rest-timer-ex">{timer.exercise}</span>
+      </div>
+      <button className="btn ghost sm" type="button" onClick={() => onExtend(30)}>+30s</button>
+      <button className="btn ghost sm icon-only" type="button" aria-label="Dismiss rest timer" onClick={onDismiss}><LIcons.X /></button>
+    </div>
+  );
+}
+
+function PlateCalcPopover({ exercise, initialWeight, onClose }) {
+  const [target, setTarget] = useState(initialWeight > 0 ? String(initialWeight) : "");
+  const [bar, setBar] = useState(20);
+  const w = parseFloat(String(target).replace(",", "."));
+  const result = w > 0 && w >= bar ? platesPerSide(w, bar) : null;
+  const loadable = result ? w - result.shortPerSide * 2 : null;
+  return (
+    <div className="plate-pop" role="dialog" aria-label={`Plate calculator — ${exercise.name}`}>
+      <div className="plate-pop-head">
+        <strong>Plates</strong>
+        <button className="btn ghost sm icon-only" type="button" onClick={onClose} aria-label="Close plate calculator"><LIcons.X /></button>
+      </div>
+      <div className="plate-pop-controls">
+        <input
+          inputMode="decimal"
+          value={target}
+          autoFocus
+          placeholder="target kg"
+          aria-label="Target weight in kg"
+          onChange={e => setTarget(e.target.value)} />
+        <select value={bar} aria-label="Bar weight" onChange={e => setBar(Number(e.target.value))}>
+          <option value={20}>20kg bar</option>
+          <option value={15}>15kg bar</option>
+          <option value={10}>10kg bar</option>
+        </select>
+      </div>
+      {result && result.plates.length > 0 && (
+        <div className="plate-pop-result">
+          <span className="plate-pop-side mono">per side</span>
+          <div className="chips">
+            {result.plates.map(p => (
+              <span key={p.plate} className="chip solid mono">{p.plate} × {p.count}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {w > 0 && w < bar && <div className="plate-pop-note">Target is below the bar weight.</div>}
+      {result && !result.plates.length && <div className="plate-pop-note">Empty bar — nothing to load.</div>}
+      {result && result.shortPerSide > 0.01 && (
+        <div className="plate-pop-note">Closest load {loadable.toFixed(1)}kg — {(result.shortPerSide * 2).toFixed(1)}kg short with standard plates.</div>
+      )}
+    </div>
+  );
+}
+
 function loggedEntryIndexFromKey(key, date, entries = []) {
   const explicitIndex = entries.findIndex((entry, index) => loggedEntryKey(entry, index, date) === key);
   if (explicitIndex >= 0) return explicitIndex;
@@ -640,7 +796,7 @@ function routineSessionMovedAwayFromDate(profile = {}, plannedDate, routineDay) 
   });
 }
 
-function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, targetLabel, finished, canRemoveSet, first, setsCount, suggestion, progressionRules, skipNextTargets, onToggleSkipNextTargets, onDragStart, onDragEnd, onRemoveExercise, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
+function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, targetLabel, finished, canRemoveSet, first, setsCount, suggestion, progressionRules, skipNextTargets, onToggleSkipNextTargets, onDragStart, onDragEnd, onRemoveExercise, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onSetCompleted, onAddWarmups, onOpenPlates, showWarmupTool, showPlateTool }) {
   const durationMode = isDurationExercise(exercise);
   const isBW = !durationMode && set.unit === "bw";
   const [noteOpen, setNoteOpen] = useState(!!set.note);
@@ -650,6 +806,13 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
   const patchEdited = (patch) => onChange({ ...patch, _edited: true });
   const markEdited = () => { if (!set._edited) onChange({ _edited: true }); };
   const hasNote = !!String(set.note || "").trim();
+  // Rest timer fires whenever this row transitions into "accepted" — whether
+  // via typing values (auto-accept) or tapping the check. No fire on mount.
+  const wasAcceptedRef = React.useRef(accepted);
+  React.useEffect(() => {
+    if (!wasAcceptedRef.current && accepted && !finished) onSetCompleted?.(set);
+    wasAcceptedRef.current = accepted;
+  }, [accepted]);
   const toggleDone = () => {
     const next = !accepted;
     if (next) {
@@ -661,7 +824,7 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
   };
 
   return (
-    <div className={`sheet-set-row ${first ? "is-first" : ""} ${durationMode ? "duration" : ""} ${prefilled ? "is-prefilled" : ""} ${edited ? "is-edited" : ""} ${accepted ? "is-done" : ""} ${finished && accepted ? "is-finished" : ""}`}>
+    <div className={`sheet-set-row ${first ? "is-first" : ""} ${durationMode ? "duration" : ""} ${prefilled ? "is-prefilled" : ""} ${edited ? "is-edited" : ""} ${accepted ? "is-done" : ""} ${finished && accepted ? "is-finished" : ""} ${set.type === "warmup" ? "is-warmup-row" : ""}`}>
       <div className="sheet-exercise-cell">
         {first && (
           <>
@@ -681,6 +844,16 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
                 <span>{ruleLabel(exercise, progressionRules)}</span>
                 <span>{setsCount} set{setsCount === 1 ? "" : "s"}</span>
               </div>
+              {!finished && (showWarmupTool || showPlateTool) && (
+                <div className="sheet-ex-tools">
+                  {showPlateTool && (
+                    <button type="button" className="sheet-tool" title="Plate calculator" onClick={onOpenPlates}>plates</button>
+                  )}
+                  {showWarmupTool && (
+                    <button type="button" className="sheet-tool" title="Insert a warm-up ramp before the working sets" onClick={onAddWarmups}>+ warm-up</button>
+                  )}
+                </div>
+              )}
             </div>
             <div className="sheet-mobile-move" aria-label={`Move ${exercise.name}`}>
               <button type="button" onClick={onMoveUp} disabled={!canMoveUp} title="Move up" aria-label={`Move ${exercise.name} up`}>
@@ -716,7 +889,18 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
         )}
       </div>
       <div className="sheet-last-cell mono">{formatLastSetValue(lastSet, durationMode)}</div>
-      <div className="sheet-set-index mono">{idx}</div>
+      {durationMode ? (
+        <div className="sheet-set-index mono">{idx}</div>
+      ) : (
+        <button
+          type="button"
+          className={`sheet-set-index mono sheet-set-type ${set.type && set.type !== "working" ? `is-${set.type}` : ""}`}
+          title={set.type && SET_TYPE_META[set.type] ? SET_TYPE_META[set.type].title : "Working set — tap to mark warm-up / drop / AMRAP"}
+          aria-label={`Set ${idx} type: ${set.type || "working"} — tap to change`}
+          onClick={() => onChange({ type: nextSetType(set.type), _edited: true })}>
+          {set.type && SET_TYPE_META[set.type] ? SET_TYPE_META[set.type].abbr : idx}
+        </button>
+      )}
       <div className="sheet-actual-group">
         <input
           className="sheet-weight-input"
@@ -805,18 +989,54 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
   );
 }
 
-function ExerciseRow({ exercise, sets, index, totalExercises, onUpdateSets, onRemove, avgBW, beforeDate, routineDay, finished, skipNextTargets, onToggleSkipNextTargets, dragging, onDragStart, onDragOver, onDrop, onDragEnd, onMoveUp, onMoveDown, progressionRules }) {
+function ExerciseRow({ exercise, sets, index, totalExercises, onUpdateSets, onRemove, avgBW, beforeDate, routineDay, finished, skipNextTargets, onToggleSkipNextTargets, dragging, onDragStart, onDragOver, onDrop, onDragEnd, onMoveUp, onMoveDown, progressionRules, onSetCompleted }) {
   const durationMode = isDurationExercise(exercise);
   const lastEntry = window.RepsData.exerciseLastWeek?.(exercise.name, beforeDate, { exercise, routineDay });
   const suggestion = window.RepsData.progressionSuggestion?.(exercise, lastEntry, { rules: progressionRules });
   const targetSummary = `${exercise.sets} × ${exercise.reps}${exercise.unit ? ` · ${exercise.unit}` : ""}`;
   const nextSummary = suggestion?.headline || targetSummary;
+  const [plateOpen, setPlateOpen] = useState(false);
 
   const updateSet = (id, patch) => {
     onUpdateSets(sets.map(s => s.id === id ? { ...s, ...patch } : s));
   };
   const removeSet = (id) => {
     onUpdateSets(sets.filter(s => s.id !== id));
+  };
+
+  // Best guess at today's working weight: first filled-in set, else the
+  // progression suggestion, else last week's top set. Used by both tools.
+  const workingWeightGuess = () => {
+    for (const s of sets) {
+      const w = parseFloat(String(s.weight).replace(",", "."));
+      if (w > 0 && s.type !== "warmup") return w;
+    }
+    const fromSuggestion = suggestion ? parseFloat(String(suggestion.headline).replace(",", ".")) : NaN;
+    if (fromSuggestion > 0) return fromSuggestion;
+    const lastWeights = (lastEntry?.sets || []).map(s => Number(s.weight)).filter(w => w > 0);
+    return lastWeights.length ? Math.max(...lastWeights) : null;
+  };
+
+  const barbell = !durationMode && (exercise.unit || "kg") === "kg" && isBarbellExercise(exercise.name);
+  const hasWarmups = sets.some(s => s.type === "warmup");
+
+  const addWarmups = () => {
+    const w = workingWeightGuess();
+    const scheme = warmupScheme(w, barbell);
+    if (!scheme.length) return;
+    const warmups = scheme.map(x => ({
+      id: nextSetId(),
+      weight: String(x.w),
+      reps: String(x.reps),
+      unit: exercise.unit || "kg",
+      duration: "",
+      rpe: "",
+      note: "",
+      type: "warmup",
+      _prefilled: false,
+      _edited: true
+    }));
+    onUpdateSets([...warmups, ...sets]);
   };
   const addSet = () => {
     const last = sets[sets.length - 1];
@@ -864,8 +1084,19 @@ function ExerciseRow({ exercise, sets, index, totalExercises, onUpdateSets, onRe
           onRemove={() => removeSet(set.id)}
           onRemoveExercise={onRemove}
           canRemoveSet={sets.length > 1}
+          onSetCompleted={(s) => onSetCompleted?.(exercise, s)}
+          onAddWarmups={addWarmups}
+          onOpenPlates={() => setPlateOpen(v => !v)}
+          showWarmupTool={!durationMode && !hasWarmups}
+          showPlateTool={barbell}
         />
       ))}
+      {plateOpen && (
+        <PlateCalcPopover
+          exercise={exercise}
+          initialWeight={workingWeightGuess()}
+          onClose={() => setPlateOpen(false)} />
+      )}
       <button className="sheet-add-set" onClick={addSet}>
         <LIcons.Plus /> Add set
       </button>
@@ -973,6 +1204,16 @@ function LogView() {
   const [exerciseOrder, setExerciseOrder] = useState([]);
   const [dragKey, setDragKey] = useState(null);
   const [setsByExercise, setSetsByExercise] = useState({});
+  // Rest timer — auto-starts when a set is checked off. Rule-based defaults:
+  // compounds get 3 min, hypertrophy 90s, conditioning/duration none.
+  const [restTimer, setRestTimer] = useState(null);
+  const handleSetCompleted = (exercise, set) => {
+    if (isDurationExercise(exercise) || exercise.rule === "safety") return;
+    if (set?.type === "warmup") return; // no long rests inside the ramp
+    const seconds = exercise.rule === "compound" ? 180 : 90;
+    primeRestAudio();
+    setRestTimer({ id: Date.now(), endsAt: Date.now() + seconds * 1000, seconds, exercise: exercise.name });
+  };
   const [newExName, setNewExName] = useState("");
   const [newExTarget, setNewExTarget] = useState("3 × 8-12");
   const [newExUnit, setNewExUnit] = useState("kg");
@@ -1508,7 +1749,8 @@ function LogView() {
             repsNumber: parsedReps,
             durationMinutes: durationMode ? (parseLoggedNumber(s.duration) ?? parseLoggedNumber(durationFromTarget(ex))) : null,
             rpe: s.rpe || null,
-            note: s.note || null
+            note: s.note || null,
+            type: s.type && s.type !== "working" ? s.type : undefined
           };
         }),
         status: "performed",
@@ -1824,10 +2066,15 @@ function LogView() {
                   onMoveUp={() => moveExerciseByOffset(ex._key, -1)}
                   onMoveDown={() => moveExerciseByOffset(ex._key, 1)}
                   progressionRules={progressionRules}
+                  onSetCompleted={handleSetCompleted}
                 />
               ))}
             </div>
           )}
+          <RestTimer
+            timer={restTimer}
+            onExtend={(secs) => setRestTimer(t => t ? { ...t, endsAt: Math.max(Date.now(), t.endsAt) + secs * 1000, seconds: t.seconds + secs } : t)}
+            onDismiss={() => setRestTimer(null)} />
 
           <div className="ex-add log-add-exercise">
             <select value={newExName} onChange={e => applyCatalogChoice(e.target.value)}>
