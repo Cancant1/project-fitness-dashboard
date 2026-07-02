@@ -1562,6 +1562,8 @@ function StrengthView() {
 
           {history && <SessionsTable history={history} />}
 
+          {window.RepsMuscleVolume && <window.RepsMuscleVolume.Panel />}
+
           <div className="panel" style={{padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center"}}>
             <div className="mono" style={{fontSize: 10, color: "var(--muted)"}}>
               <strong style={{color: "var(--ink)"}}>Keyboard:</strong> ← → flip exercises · [ ] step blocks · drag the brush to zoom

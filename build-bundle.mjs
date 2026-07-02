@@ -19,6 +19,7 @@ const sourceFiles = [
   "components/settings.jsx",
   "components/strength.jsx",
   "components/records.jsx",
+  "components/muscle-volume.jsx",
   "app.jsx"
 ];
 

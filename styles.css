@@ -3811,6 +3811,53 @@ table { border-collapse: collapse; }
 .plate-pop-side { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
 .plate-pop-note { margin-top: 8px; font-size: var(--t-xs); color: var(--muted); }
 
+/* ---------- muscle volume panel ---------- */
+.mv-week-nav { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mv-rows { display: flex; flex-direction: column; gap: 7px; }
+.mv-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 40px 96px;
+  align-items: center;
+  gap: 10px;
+}
+.mv-name { font-size: var(--t-sm); font-weight: 550; }
+.mv-bar {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.mv-zone { position: absolute; top: 0; bottom: 0; }
+.mv-zone-grow { background: color-mix(in oklab, var(--good) 12%, transparent); }
+.mv-zone-high { background: color-mix(in oklab, var(--warn) 10%, transparent); }
+.mv-fill {
+  position: absolute; top: 2px; bottom: 2px; left: 2px;
+  border-radius: 999px;
+  min-width: 4px;
+  transition: width var(--t-med) var(--ease);
+}
+.mv-fill.is-low { background: var(--faint); }
+.mv-fill.is-good { background: var(--good); }
+.mv-fill.is-high { background: var(--warn); }
+.mv-fill.is-over { background: var(--bad); }
+.mv-tick { position: absolute; top: 0; bottom: 0; width: 1px; background: color-mix(in oklab, var(--ink) 22%, transparent); }
+.mv-tick-mrv { background: color-mix(in oklab, var(--bad) 55%, transparent); }
+.mv-sets { text-align: right; font-size: var(--t-sm); }
+.mv-chip { justify-self: start; border-color: transparent; }
+.mv-chip.is-low { background: var(--surface-2); color: var(--muted); }
+.mv-chip.is-good { background: var(--good-soft); color: var(--good); }
+.mv-chip.is-high { background: var(--warn-soft); color: var(--warn); }
+.mv-chip.is-over { background: var(--bad-soft); color: var(--bad); }
+.mv-untrained, .mv-untagged {
+  margin-top: 12px;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+}
+@media (max-width: 980px) {
+  .mv-row { grid-template-columns: 84px minmax(0, 1fr) 34px; }
+  .mv-chip { display: none; }
+}
+
 /* dashboard latest-PR strip */
 .pr-strip {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
