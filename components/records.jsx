@@ -89,7 +89,7 @@
         if (kinds.includes("weight") || kinds.includes("e1rm")) lastPrDate = s.date;
         prEvents.push({
           date: s.date, exercise: ex.name, group: h.group, kinds,
-          maxWeight: s.maxWeight, topReps: s.topReps, est1rm: s.est1rm, volume: s.volume
+          maxWeight: s.maxWeight, unit: s.unit, topReps: s.topReps, est1rm: s.est1rm, volume: s.volume
         });
       });
       lifts.push({
@@ -184,9 +184,11 @@
 
   // ---- formatting ----
   const fmtKg = (v) => v == null || !Number.isFinite(v) ? "—" : (Math.round(v * 10) / 10).toLocaleString("en-GB");
-  const fmtSet = (w, reps) => {
+  // Native units: lbs-logged lifts (cable stack) display in lbs, ≤2 decimals.
+  const fmtSet = (w, reps, unit) => {
+    const shown = window.RepsStrength.displayWeight(w, unit);
     const r = Number(reps);
-    return Number.isFinite(r) && r > 0 ? `${fmtKg(w)}kg × ${r}` : `${fmtKg(w)}kg`;
+    return Number.isFinite(r) && r > 0 ? `${shown} × ${r}` : shown;
   };
   const fmtTonnes = (v) => `${(v / 1000).toLocaleString("en-GB", { maximumFractionDigits: 1 })}`;
   const kindLabel = { weight: "weight", e1rm: "e1RM", volume: "volume" };
@@ -286,7 +288,7 @@
           <div className="panel">
             <div className="panel-head">
               <h3>Lift records</h3>
-              <span className="panel-head-meta">best converted to kg · Epley e1RM</span>
+              <span className="panel-head-meta">native units · e1RM in kg</span>
             </div>
             <div className="panel-body tight">
               <table className="tab records-table">
@@ -311,7 +313,7 @@
                         </div>
                       </td>
                       <td>
-                        <span className="mono tnum">{fmtSet(l.best.maxWeight, l.best.topReps)}</span>
+                        <span className="mono tnum">{fmtSet(l.best.maxWeight, l.best.topReps, l.best.unit)}</span>
                         <div className="records-sub mono">{D.shortDate(l.best.date)}</div>
                       </td>
                       <td className="num">{Number.isFinite(l.e1rm) ? Math.round(l.e1rm) : "—"}</td>
@@ -353,7 +355,7 @@
                       <div key={i} className="records-feed-row">
                         <div className="records-feed-main">
                           <span className="records-feed-name">{p.exercise}</span>
-                          <span className="mono tnum records-feed-val">{fmtSet(p.maxWeight, p.topReps)}</span>
+                          <span className="mono tnum records-feed-val">{fmtSet(p.maxWeight, p.topReps, p.unit)}</span>
                         </div>
                         <div className="records-feed-meta">
                           <PrBadge kinds={p.kinds} />

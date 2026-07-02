@@ -5319,9 +5319,18 @@ table { border-collapse: collapse; }
     grid-column: 2;
     grid-row: 1;
     min-height: 40px;
-    grid-template-columns: minmax(42px, 1fr) 42px minmax(48px, 1fr);
+    /* 56px middle column: "lbs" was clipped at 42px on iOS */
+    grid-template-columns: minmax(42px, 1fr) 56px minmax(42px, 1fr);
     border-left: 1px solid var(--hairline);
     border-right: 1px solid var(--hairline);
+  }
+  .classic-log-sheet .sheet-actual-group select,
+  .log-sheet .sheet-actual-group select {
+    padding: 0 2px;
+    text-align: center;
+    text-align-last: center;
+    appearance: none;
+    -webkit-appearance: none;
   }
   .classic-log-sheet .sheet-set-row.is-first .sheet-actual-group,
   .log-sheet .sheet-set-row.is-first .sheet-actual-group {

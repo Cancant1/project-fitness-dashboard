@@ -3,6 +3,22 @@
 // Inputs come from window.RepsData.exerciseHistory(name) and RepsData.blockSummary().
 (function () {
   const R = () => window.RepsData;
+  const KG_PER_LB = 0.45359237;
+
+  // Session weights are stored kg-converted; lbs-native lifts (cable stack)
+  // must convert BACK for display and never show float tails
+  // ("13.60777111lbs" was a 30lbs flye). Max 2 decimals.
+  function displayWeightParts(kgValue, unit) {
+    if (kgValue == null || !Number.isFinite(kgValue)) return { value: "—", unit: "" };
+    const isLbs = String(unit || "").toLowerCase().startsWith("lb");
+    const raw = isLbs ? kgValue / KG_PER_LB : kgValue;
+    const rounded = Math.round(raw * 100) / 100;
+    return { value: String(rounded), unit: isLbs ? "lbs" : "kg" };
+  }
+  function displayWeight(kgValue, unit) {
+    const p = displayWeightParts(kgValue, unit);
+    return p.unit ? `${p.value}${p.unit}` : p.value;
+  }
 
   // ---- PR detection ---------------------------------------------------------
   // Walk per-session entries chronologically; tag the points where the user
@@ -66,7 +82,7 @@
       delta,
       spanLabel,
       deltaLabel: `${delta > 0 ? "+" : ""}${delta.toFixed(1)} kg over ${spanLabel}`,
-      prText: `${peak.maxWeight}${peak.unit} × ${peak.topReps}`,
+      prText: `${displayWeight(peak.maxWeight, peak.unit)} × ${peak.topReps}`,
       prDate: peak.date,
       e1rm: Math.round(history.peak1rm),
       lastVolume: last.volume || 0,
@@ -292,6 +308,8 @@
   }
 
   window.RepsStrength = {
+    displayWeight,
+    displayWeightParts,
     tagPRs,
     smartYBounds,
     avgSetWeight,

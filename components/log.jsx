@@ -617,7 +617,8 @@ function isBarbellExercise(name = "") {
   return /barbell|deadlift|squat|bench|row|press|morning|romanian|rdl|pendlay|ohp|clean|snatch/.test(t);
 }
 
-const PLATE_INVENTORY = [25, 20, 15, 10, 5, 2.5, 1.25];
+// Mario's rack: no 25s or 15s.
+const PLATE_INVENTORY = [20, 10, 5, 2.5, 1.25];
 function platesPerSide(target, bar = 20) {
   let remaining = (Number(target) - bar) / 2;
   if (!Number.isFinite(remaining) || remaining < 0) return null;
@@ -628,24 +629,6 @@ function platesPerSide(target, bar = 20) {
     if (count) plates.push({ plate: p, count });
   }
   return { plates, shortPerSide: remaining };
-}
-
-function warmupScheme(workingWeight, barbell) {
-  if (!(workingWeight > 0)) return [];
-  const inc = barbell ? 2.5 : 1;
-  const floor = barbell ? 20 : 0;
-  const round = (v) => Math.max(floor, Math.round(v / inc) * inc);
-  const ramp = barbell && workingWeight > 40
-    ? [{ w: 20, reps: 10 }, { w: round(workingWeight * 0.4), reps: 5 },
-       { w: round(workingWeight * 0.6), reps: 3 }, { w: round(workingWeight * 0.8), reps: 1 }]
-    : [{ w: round(workingWeight * 0.5), reps: 8 }, { w: round(workingWeight * 0.7), reps: 4 }];
-  const out = [];
-  for (const s of ramp) {
-    if (!(s.w > 0) || s.w >= workingWeight) continue;
-    if (out.length && s.w <= out[out.length - 1].w) continue;
-    out.push(s);
-  }
-  return out;
 }
 
 // Shared AudioContext primed inside the tap gesture so iOS lets the
@@ -796,7 +779,7 @@ function routineSessionMovedAwayFromDate(profile = {}, plannedDate, routineDay) 
   });
 }
 
-function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, targetLabel, finished, canRemoveSet, first, setsCount, suggestion, progressionRules, skipNextTargets, onToggleSkipNextTargets, onDragStart, onDragEnd, onRemoveExercise, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onSetCompleted, onAddWarmups, onOpenPlates, showWarmupTool, showPlateTool }) {
+function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, targetLabel, finished, canRemoveSet, first, setsCount, suggestion, progressionRules, skipNextTargets, onToggleSkipNextTargets, onDragStart, onDragEnd, onRemoveExercise, onMoveUp, onMoveDown, canMoveUp, canMoveDown, onSetCompleted, onOpenPlates, showPlateTool }) {
   const durationMode = isDurationExercise(exercise);
   const isBW = !durationMode && set.unit === "bw";
   const [noteOpen, setNoteOpen] = useState(!!set.note);
@@ -844,14 +827,9 @@ function SetRow({ set, idx, exercise, lastSet, onChange, onRemove, avgBW, target
                 <span>{ruleLabel(exercise, progressionRules)}</span>
                 <span>{setsCount} set{setsCount === 1 ? "" : "s"}</span>
               </div>
-              {!finished && (showWarmupTool || showPlateTool) && (
+              {!finished && showPlateTool && (
                 <div className="sheet-ex-tools">
-                  {showPlateTool && (
-                    <button type="button" className="sheet-tool" title="Plate calculator" onClick={onOpenPlates}>plates</button>
-                  )}
-                  {showWarmupTool && (
-                    <button type="button" className="sheet-tool" title="Insert a warm-up ramp before the working sets" onClick={onAddWarmups}>+ warm-up</button>
-                  )}
+                  <button type="button" className="sheet-tool" title="Plate calculator" onClick={onOpenPlates}>plates</button>
                 </div>
               )}
             </div>
@@ -1018,26 +996,6 @@ function ExerciseRow({ exercise, sets, index, totalExercises, onUpdateSets, onRe
   };
 
   const barbell = !durationMode && (exercise.unit || "kg") === "kg" && isBarbellExercise(exercise.name);
-  const hasWarmups = sets.some(s => s.type === "warmup");
-
-  const addWarmups = () => {
-    const w = workingWeightGuess();
-    const scheme = warmupScheme(w, barbell);
-    if (!scheme.length) return;
-    const warmups = scheme.map(x => ({
-      id: nextSetId(),
-      weight: String(x.w),
-      reps: String(x.reps),
-      unit: exercise.unit || "kg",
-      duration: "",
-      rpe: "",
-      note: "",
-      type: "warmup",
-      _prefilled: false,
-      _edited: true
-    }));
-    onUpdateSets([...warmups, ...sets]);
-  };
   const addSet = () => {
     const last = sets[sets.length - 1];
     onUpdateSets([...sets, {
@@ -1085,9 +1043,7 @@ function ExerciseRow({ exercise, sets, index, totalExercises, onUpdateSets, onRe
           onRemoveExercise={onRemove}
           canRemoveSet={sets.length > 1}
           onSetCompleted={(s) => onSetCompleted?.(exercise, s)}
-          onAddWarmups={addWarmups}
           onOpenPlates={() => setPlateOpen(v => !v)}
-          showWarmupTool={!durationMode && !hasWarmups}
           showPlateTool={barbell}
         />
       ))}

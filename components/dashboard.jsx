@@ -42,7 +42,7 @@ function LatestPrStrip({ setView }) {
         <div>
           <div className="pr-strip-title">
             Latest PR — {pr.exercise} <span className="mono tnum">
-              {Math.round(pr.maxWeight * 10) / 10}kg{Number.isFinite(Number(pr.topReps)) && Number(pr.topReps) > 0 ? ` × ${Number(pr.topReps)}` : ""}
+              {window.RepsStrength.displayWeight(pr.maxWeight, pr.unit)}{Number.isFinite(Number(pr.topReps)) && Number(pr.topReps) > 0 ? ` × ${Number(pr.topReps)}` : ""}
             </span>
           </div>
           <div className="pr-strip-sub mono">

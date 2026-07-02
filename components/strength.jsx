@@ -242,7 +242,7 @@ function HeroTooltip({ session, pinned, hoverIsPinned, annotation }) {
       <div className="strength-tooltip-row">
         <span className="lbl">top set</span>
         <span className="val">
-          <strong>{session.maxWeight}</strong>{session.unit} × {session.topReps}
+          <strong>{RepsStrength.displayWeightParts(session.maxWeight, session.unit).value}</strong>{RepsStrength.displayWeightParts(session.maxWeight, session.unit).unit} × {session.topReps}
           {session.isWeightPR && <span className="pr-pill" title="All-time weight PR">PR</span>}
         </span>
       </div>
@@ -972,7 +972,7 @@ function BlockSmallMultiples({ history, blockRanges, onPickRange }) {
             title="Click to zoom the hero chart to this block">
             <div className="strength-multiple-head">
               <span className="strength-multiple-name mono">{block.label}</span>
-              <span className="strength-multiple-peak mono">{peak.maxWeight}{peak.unit} × {peak.topReps}</span>
+              <span className="strength-multiple-peak mono">{RepsStrength.displayWeight(peak.maxWeight, peak.unit)} × {peak.topReps}</span>
             </div>
             <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{display: "block", width: "100%"}}>
               <path d={dPath} fill="none" stroke="currentColor" strokeWidth="1.4" />
@@ -1069,7 +1069,7 @@ function SessionsTable({ history }) {
                   <tr style={{cursor: "pointer"}} onClick={() => setOpenId(o => o === s.date ? null : s.date)}>
                     <td className="mono">{RepsData.shortDate(s.date)}</td>
                     <td className="muted">{s.split || "—"}</td>
-                    <td className="num mono">{s.maxWeight}{s.unit} × {s.topReps}</td>
+                    <td className="num mono">{RepsStrength.displayWeight(s.maxWeight, s.unit)} × {s.topReps}</td>
                     <td className="num mono">{s.totalSets}</td>
                     <td className="num mono">{s.totalReps}</td>
                     <td className="num mono">{RepsStrength.avgSetWeight(s)?.toFixed(1) || "—"}</td>
