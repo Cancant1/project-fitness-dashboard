@@ -403,7 +403,7 @@ function SessionEditModal({ sessionId, onClose }) {
               onChange={e => applyNewExerciseChoice(e.target.value)}
               style={{height:30, padding:"0 8px", border:"var(--hair)", borderRadius:"var(--r-sm)", background:"var(--bg)", fontSize:"var(--t-sm)"}}>
               <option value="">Choose exercise…</option>
-              {exerciseCatalog.map(ex => <option key={ex.name} value={ex.name}>{ex.name}</option>)}
+              {[...exerciseCatalog].sort((a, b) => a.name.localeCompare(b.name)).map(ex => <option key={ex.name} value={ex.name}>{ex.name}</option>)}
             </select>
             <input
               value={newExerciseTarget}

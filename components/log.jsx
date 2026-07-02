@@ -941,7 +941,7 @@ function LogView() {
   const app = window.RepsState.useApp();
   const progressionRules = normalizedRulesForProfile(app.activeProfile);
   const ruleOptions = progressionRuleOptions(app.activeProfile);
-  const todayIso = window.RepsData.TODAY;
+  const todayIso = app.todayIso || window.RepsData.TODAY;
   const todayDay = window.RepsData.dayName(todayIso);
   const exerciseCatalog = useMemo(
     () => window.RepsData.exerciseCatalog(app.activeProfile.customExercises || [], app.activeProfile.hiddenExercises || []),
@@ -949,6 +949,17 @@ function LogView() {
   );
   const [selectedDay, setSelectedDay] = useState(todayDay);
   const [sessionDate, setSessionDate] = useState(todayIso);
+  // Day rollover: if the log sat on "today" when the date flipped (tab open past
+  // midnight), follow the calendar so the session saves under the right date.
+  const logPrevTodayRef = React.useRef(todayIso);
+  React.useEffect(() => {
+    if (logPrevTodayRef.current !== todayIso) {
+      const prior = logPrevTodayRef.current;
+      setSessionDate(d => (d === prior ? todayIso : d));
+      setSelectedDay(d => (d === window.RepsData.dayName(prior) ? window.RepsData.dayName(todayIso) : d));
+      logPrevTodayRef.current = todayIso;
+    }
+  }, [todayIso]);
   const [rpe, setRpe] = useState("");
   const [notes, setNotes] = useState("");
   const [skipProgressionKeys, setSkipProgressionKeys] = useState(new Set());
@@ -1821,7 +1832,7 @@ function LogView() {
           <div className="ex-add log-add-exercise">
             <select value={newExName} onChange={e => applyCatalogChoice(e.target.value)}>
               <option value="">Choose exercise...</option>
-              {exerciseCatalog.map(ex => (
+              {[...exerciseCatalog].sort((a, b) => a.name.localeCompare(b.name)).map(ex => (
                 <option key={ex.name} value={ex.name}>{ex.name}</option>
               ))}
             </select>

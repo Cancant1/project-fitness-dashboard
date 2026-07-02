@@ -160,7 +160,10 @@
     const width = LEFT + WEEKS * STEP;
     const height = TOP + 7 * STEP;
     return (
+      // Explicit aspect-ratio: iOS Safari computes 0 height for width-only
+      // SVGs with viewBox inside scroll containers, hiding the heatmap.
       <svg viewBox={`0 0 ${width} ${height}`} className="records-heatmap" role="img"
+           style={{ aspectRatio: `${width} / ${height}` }}
            aria-label="Training sets per day, last 12 months">
         {monthLabels.map((m, i) => (
           <text key={i} x={m.x} y={10} className="chart-axis">{m.label}</text>

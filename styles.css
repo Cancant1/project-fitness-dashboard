@@ -3687,8 +3687,14 @@ table { border-collapse: collapse; }
 .split-chip { border-color: transparent; background: var(--surface-2); }
 
 /* ---------- records view ---------- */
-.records-heatmap-wrap { overflow-x: auto; }
-.records-heatmap { display: block; width: 100%; min-width: 640px; height: auto; }
+.records-heatmap-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.records-heatmap {
+  display: block;
+  width: 100%;
+  min-width: 640px;
+  height: auto;
+  aspect-ratio: 715 / 107; /* iOS Safari: prevent 0-height collapse of viewBox-only SVG */
+}
 .hm-cell, .hm-swatch { transition: opacity var(--t-fast) var(--ease); }
 .hm-l0 { fill: var(--surface-2); }
 .hm-l1 { fill: color-mix(in oklab, var(--accent) 28%, var(--surface-2)); }
@@ -5437,13 +5443,23 @@ table { border-collapse: collapse; }
   .m-drawer-brand .brand-mark { width: 24px; height: 24px; font-size: 13px; }
   .m-drawer-brand .brand-name { font-size: 16px; }
 
+  .m-drawer-profiles { border-bottom: var(--hair); }
   .m-drawer-profile {
     display: flex; align-items: center; gap: 10px;
     width: 100%; padding: 12px 16px;
-    border-bottom: var(--hair);
     text-align: left; color: var(--ink);
   }
   .m-drawer-profile:active { background: var(--surface-2); }
+  .m-drawer-profile.is-active { background: var(--accent-soft); }
+  .m-drawer-profile .chip { flex: 0 0 auto; }
+  .m-drawer-manage {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%; padding: 10px 16px 12px;
+    color: var(--muted); font-size: var(--t-sm);
+    text-align: left;
+  }
+  .m-drawer-manage svg { width: 14px; height: 14px; }
+  .m-drawer-manage:active { background: var(--surface-2); color: var(--ink); }
   .m-drawer-profile .profile-avatar { width: 30px; height: 30px; font-size: 13px; }
   .m-drawer-profile-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
   .m-drawer-profile-name { font-weight: 600; font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

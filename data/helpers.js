@@ -7,7 +7,9 @@
     const pad = (n) => String(n).padStart(2, "0");
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   }
-  const TODAY = localToday();
+  // Always fresh — a const here goes stale when a tab stays open past midnight
+  // (food logged "today" landed on the load date). Call sites use todayIso().
+  const todayIso = localToday;
 
   const weekdays = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
   const weekdayNames = {
@@ -57,7 +59,7 @@
     const dt = new Date(Date.UTC(y, m - 1, d));
     return weekdays[(dt.getUTCDay() + 6) % 7];
   }
-  function daysBetween(a, b = TODAY) {
+  function daysBetween(a, b = todayIso()) {
     if (!a || !b) return null;
     const pa = a.split("-").map(Number);
     const pb = b.split("-").map(Number);
@@ -216,7 +218,7 @@
   };
 
   function isPerformedSession(session = {}) {
-    return session.date <= TODAY && session.status !== "skipped" && sessionSetCount(session) > 0;
+    return session.date <= todayIso() && session.status !== "skipped" && sessionSetCount(session) > 0;
   }
 
   function normalizedMovement(group, name) {
@@ -351,7 +353,7 @@
     const foodByDate = (profile && profile.foodByDate) || {};
     const overrides = (profile && profile.dailyOverrides) || {};
     const hasOverrideField = (ov) => Object.prototype.hasOwnProperty.call(ov || {}, field);
-    const cutoff = days ? addDays(TODAY, -days + (excludeToday ? 0 : 1)) : "0000-01-01";
+    const cutoff = days ? addDays(todayIso(), -days + (excludeToday ? 0 : 1)) : "0000-01-01";
     const dates = new Set([
       ...Object.keys(foodByDate),
       ...Object.entries(overrides)
@@ -360,7 +362,7 @@
     ]);
 
     return Array.from(dates)
-      .filter(date => date >= cutoff && date <= TODAY && (!excludeToday || date !== TODAY))
+      .filter(date => date >= cutoff && date <= todayIso() && (!excludeToday || date !== todayIso()))
       .map(date => {
         const ov = overrides[date] || {};
         const hasOverride = hasOverrideField(ov);
@@ -380,13 +382,13 @@
   }
 
   function localWeightData(profile, days = 28) {
-    const cutoff = days ? addDays(TODAY, -days + 1) : "0000-01-01";
+    const cutoff = days ? addDays(todayIso(), -days + 1) : "0000-01-01";
     const local = (profile?.weightEntries || window.__repsLocalWeightEntries || [])
-      .filter(w => w.date >= cutoff && w.date <= TODAY)
+      .filter(w => w.date >= cutoff && w.date <= todayIso())
       .map(w => ({ date: w.date, value: Number(w.weight), label: shortDate(w.date), note: w.note }));
     const map = new Map(local.filter(w => Number.isFinite(w.value)).map(w => [w.date, w]));
     for (const [date, ov] of Object.entries(profile?.dailyOverrides || {})) {
-      if (date < cutoff || date > TODAY || !Object.prototype.hasOwnProperty.call(ov || {}, "weight")) continue;
+      if (date < cutoff || date > todayIso() || !Object.prototype.hasOwnProperty.call(ov || {}, "weight")) continue;
       if (ov.weight == null) {
         map.delete(date);
         continue;
@@ -415,7 +417,7 @@
     return rows.filter(b => !hidden.has(b.sheet));
   }
 
-  function currentTrainingBlock(profile, date = TODAY) {
+  function currentTrainingBlock(profile, date = todayIso()) {
     const ranges = [];
     const addRange = (range) => {
       if (!range || !range.start || !range.end) return;
@@ -1006,12 +1008,12 @@
   }
 
   function streakDays() {
-    const dates = [...new Set(allSessions().map(s => s.date).filter(d => d <= TODAY))].sort();
+    const dates = [...new Set(allSessions().map(s => s.date).filter(d => d <= todayIso()))].sort();
     if (!dates.length) return 0;
     return Math.max(0, daysBetween(dates[dates.length-1]));
   }
 
-  function thisWeekStart(iso = TODAY) { return mondayOf(iso); }
+  function thisWeekStart(iso = todayIso()) { return mondayOf(iso); }
 
   const isCompoundName = (name = "") => {
     const t = name.toLowerCase();
@@ -1029,7 +1031,7 @@
   }
 
   function mergedWeightData(profile, days = null, options = {}) {
-    const endDate = options.endDate || TODAY;
+    const endDate = options.endDate || todayIso();
     const excludeToday = !!options.excludeToday;
     const maxDate = excludeToday ? addDays(endDate, -1) : endDate;
     const cutoff = days ? addDays(endDate, -days + (excludeToday ? 0 : 1)) : "0000-01-01";
@@ -1066,7 +1068,7 @@
   }
 
   function mergedNutritionData(profile, field = "kcal", days = 14, positiveOnly = true, options = {}) {
-    const endDate = options.endDate || TODAY;
+    const endDate = options.endDate || todayIso();
     const excludeToday = !!options.excludeToday;
     const maxDate = excludeToday ? addDays(endDate, -1) : endDate;
     const cutoff = days ? addDays(endDate, -days + (excludeToday ? 0 : 1)) : "0000-01-01";
@@ -1168,8 +1170,8 @@
     return {
       ready,
       windowDays,
-      startDate: addDays(TODAY, -windowDays + 1),
-      endDate: TODAY,
+      startDate: addDays(todayIso(), -windowDays + 1),
+      endDate: todayIso(),
       tdee,
       adaptiveMaintenanceKcal,
       recommendedTargetKcal,
@@ -1216,7 +1218,7 @@
 
   // Average bodyweight from last N days of data (merged historical + local weight entries)
   function avgBodyweight(days = 14) {
-    const cutoff = addDays(TODAY, -days);
+    const cutoff = addDays(todayIso(), -days);
     // Historical body data
     const hist = (D.body?.daily || [])
       .filter(b => b.weight != null && b.date >= cutoff)
@@ -1251,7 +1253,7 @@
   }
 
   window.RepsData = {
-    TODAY,
+    get TODAY() { return todayIso(); },
     weekdays,
     movementFor,
     renamedExercise,

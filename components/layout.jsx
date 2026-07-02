@@ -173,7 +173,7 @@ function TopBar({ view, setView }) {
   const labels = {
     dashboard: "Dashboard", log: "Log", routines: "Routines",
     exercises: "Exercises", body: "Body", plan: "Plan", export: "AI Export",
-    settings: "Settings", sessions: "Sessions", strength: "Strength"
+    settings: "Settings", sessions: "Sessions", strength: "Strength", records: "Records"
   };
   const app = window.RepsState?.useApp?.();
   const profile = app?.activeProfile;
@@ -284,7 +284,7 @@ function MobileNav({ view, setView }) {
   const labels = {
     dashboard: "Dashboard", log: "Log", routines: "Routines",
     exercises: "Exercises", body: "Body", plan: "Plan", export: "AI Export",
-    settings: "Settings", sessions: "Sessions", strength: "Strength"
+    settings: "Settings", sessions: "Sessions", strength: "Strength", records: "Records"
   };
 
   useEffect(() => {
@@ -369,14 +369,29 @@ function MobileNav({ view, setView }) {
         </div>
 
         {profile && (
-          <button className="m-drawer-profile" onClick={() => go("settings")}>
-            <span className="brand-mark profile-avatar">{profile.name[0]}</span>
-            <span className="m-drawer-profile-copy">
-              <span className="m-drawer-profile-name">{profile.name}</span>
-              <span className="m-drawer-profile-meta">{profile.unit || "kg"} · {profile.preset || "maintain"}</span>
-            </span>
-            <span className="icon m-drawer-profile-chev"><I.Chevron /></span>
-          </button>
+          <div className="m-drawer-profiles" role="group" aria-label="Switch profile">
+            {(app?.state?.profiles || [profile]).map(p => {
+              const isActive = p.id === profile.id;
+              return (
+                <button
+                  key={p.id}
+                  className={`m-drawer-profile ${isActive ? "is-active" : ""}`}
+                  role="menuitemradio"
+                  aria-checked={isActive}
+                  onClick={() => { if (!isActive) app?.setActiveProfile?.(p.id); }}>
+                  <span className="brand-mark profile-avatar">{p.name[0]}</span>
+                  <span className="m-drawer-profile-copy">
+                    <span className="m-drawer-profile-name">{p.name}</span>
+                    <span className="m-drawer-profile-meta">{p.unit || "kg"} · {p.preset || "maintain"}</span>
+                  </span>
+                  {isActive && <span className="chip accent">active</span>}
+                </button>
+              );
+            })}
+            <button className="m-drawer-manage" onClick={() => go("settings")}>
+              <I.Settings /> Manage profiles
+            </button>
+          </div>
         )}
 
         <SyncQuickActions />

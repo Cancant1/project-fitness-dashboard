@@ -28,7 +28,10 @@ function Delta({ value, suffix = "", positive = true }) {
 }
 
 function LatestPrStrip({ setView }) {
-  const pr = useMemo(() => window.RepsRecords?.latestPR?.() || null, []);
+  const app = window.RepsState.useApp();
+  // Recompute when the profile (or its sessions) change — a stale memo here
+  // showed the previous profile's PR after switching.
+  const pr = useMemo(() => window.RepsRecords?.latestPR?.() || null, [app.activeProfile]);
   if (!pr) return null;
   const days = RepsData.daysBetween(pr.date) ?? 0;
   const when = days === 0 ? "today" : days === 1 ? "yesterday" : `${RepsData.shortDate(pr.date)}`;

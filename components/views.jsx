@@ -186,7 +186,7 @@ function DayEditor({ day, onUpdate, onRemove, catalog, ruleOptions }) {
           <select value={newEx.name} onChange={e => applyCatalogPick(e.target.value)}
             style={{height:26, padding:"0 6px", border:"var(--hair)", borderRadius:"var(--r-sm)", background:"var(--bg)", fontSize:"var(--t-sm)"}}>
             <option value="">Choose exercise…</option>
-            {(catalog || []).map(ex => (
+            {[...(catalog || [])].sort((a, b) => a.name.localeCompare(b.name)).map(ex => (
               <option key={ex.name} value={ex.name}>{ex.name}{ex.group ? ` · ${ex.group}` : ""}</option>
             ))}
           </select>
@@ -2160,9 +2160,19 @@ function GoalTrajectoryBand({ profile, estimate, bodyD }) {
 
 function Body() {
   const { activeProfile, addFoodEntry, removeFoodEntry, updateProfile, addCustomFoodItem,
-          updateDailyOverride, clearDailyOverride } = window.RepsState.useApp();
-  const todayIso = window.RepsData.TODAY;
+          updateDailyOverride, clearDailyOverride, todayIso: liveToday } = window.RepsState.useApp();
+  const todayIso = liveToday || window.RepsData.TODAY;
   const [selectedDate, setSelectedDate] = useState(todayIso);
+  // Follow the calendar: if the view sat on "today" and the date rolled over
+  // (tab open past midnight), move the cockpit to the new day so food logs
+  // land on the right date.
+  const prevTodayRef = React.useRef(todayIso);
+  _ue(() => {
+    if (prevTodayRef.current !== todayIso) {
+      setSelectedDate(d => (d === prevTodayRef.current ? todayIso : d));
+      prevTodayRef.current = todayIso;
+    }
+  }, [todayIso]);
   const [showWeightModal, setShowWeightModal] = useState(false);
   const [showFoodLibrary, setShowFoodLibrary] = useState(false);
   const [tdeeWindowDays, setTdeeWindowDays] = useState(28);
@@ -2288,8 +2298,8 @@ function Body() {
           entries={entries}
           activeProfile={activeProfile}
           foodItems={foodItems}
-          addFoodEntry={addFoodEntry}
-          removeFoodEntry={removeFoodEntry}
+          addFoodEntry={(date, entry) => addFoodEntry(date, entry, activeProfile.id)}
+          removeFoodEntry={(date, id) => removeFoodEntry(date, id, activeProfile.id)}
           setShowWeightModal={setShowWeightModal}
           onAddFoodForDate={openAddFoodForDate} />
 
@@ -2310,7 +2320,7 @@ function Body() {
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           onAddFoodForDate={openAddFoodForDate}
-          onRemoveFoodForDate={removeFoodEntry}
+          onRemoveFoodForDate={(date, id) => removeFoodEntry(date, id, activeProfile.id)}
           foodsOpen={ledgerFoodsOpen}
           onFoodsOpenChange={(open) => updateProfile(activeProfile.id, { bodyLedgerFoodsOpen: !!open })} />
       </div>
@@ -2320,7 +2330,7 @@ function Body() {
         activeProfile={activeProfile} updateProfile={updateProfile}
         targetDate={foodModalDate || selectedDate}
         onClose={closeAddFood}
-        onAdd={(entry) => addFoodEntry(foodModalDate || selectedDate, entry)}
+        onAdd={(entry) => addFoodEntry(foodModalDate || selectedDate, entry, activeProfile.id)}
         onSaveToCatalog={(item) => addCustomFoodItem && addCustomFoodItem(item)} />}
       {showFoodLibrary && <FoodLibraryModal
         activeProfile={activeProfile}

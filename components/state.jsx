@@ -141,7 +141,9 @@ function readJsonStorage(key, fallback) {
 }
 
 function writeJsonStorage(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {
+    console.warn(`Reps: failed to persist ${key} (storage full or unavailable)`, e);
+  }
 }
 
 function base64EncodeUtf8(value) {
@@ -1396,11 +1398,13 @@ function AppStateProvider({ children }) {
     });
   };
 
-  const addFoodEntry = (date, entry) => {
+  // profileId pins the write to the profile that was active when the modal
+  // opened — otherwise a mid-edit profile switch logs food to the wrong person.
+  const addFoodEntry = (date, entry, profileId) => {
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => {
-        if (p.id !== s.activeProfileId) return p;
+        if (p.id !== (profileId || s.activeProfileId)) return p;
         const id = entry.id || `food-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         return {
           ...p,
@@ -1413,11 +1417,11 @@ function AppStateProvider({ children }) {
     }));
   };
 
-  const removeFoodEntry = (date, id) => {
+  const removeFoodEntry = (date, id, profileId) => {
     setState(s => ({
       ...s,
       profiles: s.profiles.map(p => {
-        if (p.id !== s.activeProfileId) return p;
+        if (p.id !== (profileId || s.activeProfileId)) return p;
         const foodByDate = { ...(p.foodByDate || {}) };
         const existing = foodByDate[date] || [];
         const removed = existing.find(f => foodEntryIdentity(date, f) === String(id));
@@ -1824,9 +1828,28 @@ function AppStateProvider({ children }) {
     }));
   };
 
+  // Live "today" — re-renders the tree when the local date rolls over
+  // (interval + wake-from-sleep catch-up), so date defaults never go stale.
+  const [todayIso, setTodayIso] = useState(window.RepsData.TODAY);
+  useEffect(() => {
+    const refresh = () => setTodayIso(prev => {
+      const now = window.RepsData.TODAY;
+      return prev === now ? prev : now;
+    });
+    const timer = setInterval(refresh, 30000);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+
   const value = {
     state, setState,
     activeProfile,
+    todayIso,
     replaceState, exportEffectiveState,
     updateProfile, updateMacros, setMacroPreset,
     addProfile, setActiveProfile, deleteProfile,
