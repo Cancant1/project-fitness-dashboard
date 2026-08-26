@@ -1727,7 +1727,7 @@ function AppStateProvider({ children }) {
 
   // Routines
   const addRoutine = (routine) => {
-    const id = "routine-" + Date.now().toString(36);
+    const id = routine.id || ("routine-" + Date.now().toString(36));
     const newRoutine = { ...routine, id, updatedAt: new Date().toISOString() };
     setState(s => ({
       ...s,

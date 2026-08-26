@@ -1,4 +1,4 @@
-/* global React, ReactDOM, RepsLayout, RepsDashboard, RepsLog, RepsViews */
+/* global React, ReactDOM, RepsLayout, RepsDashboard, RepsLog, RepsViews, RepsReturnBlock */
 const { useState, useEffect } = React;
 
 // Minimal theming state hook (replaces the old prototype tweaks-panel host
@@ -128,7 +128,7 @@ function App() {
   useEffect(() => {
     const handler = (e) => {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
-      const map = { "1":"dashboard","2":"log","3":"sessions","4":"strength","5":"routines","6":"exercises","7":"body","8":"plan","9":"export","0":"settings","r":"records" };
+      const map = { "1":"dashboard","2":"log","3":"sessions","4":"strength","5":"routines","6":"exercises","7":"body","8":"plan","9":"export","0":"settings","r":"records","b":"return" };
       if (map[e.key]) setView(map[e.key]);
     };
     window.addEventListener("keydown", handler);
@@ -152,6 +152,7 @@ function App() {
           {view === "sessions"  && window.RepsSessions && <window.RepsSessions setView={setView} />}
           {view === "strength"  && window.RepsStrengthView && <window.RepsStrengthView />}
           {view === "records"   && window.RepsRecords && <window.RepsRecords.View setView={setView} />}
+          {view === "return"    && <RepsReturnBlock />}
           {view === "routines"  && <Routines />}
           {view === "exercises" && <Exercises />}
           {view === "body"      && <Body />}

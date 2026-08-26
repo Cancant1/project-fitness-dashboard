@@ -207,6 +207,29 @@ function WeekStrip({ weekStart }) {
   );
 }
 
+function ReturnBlockStrip({ profile, setView }) {
+  const meta = window.RepsReturnBlockMeta;
+  if (!meta || RepsData.TODAY > meta.endDate) return null;
+  const completedDates = new Set((profile.loggedSessions || [])
+    .filter(session => session.returnBlockKey === meta.key && session.status === "performed")
+    .map(session => session.plannedDate || session.date));
+  const completed = meta.sessions.filter(slot => completedDates.has(slot.date)).length;
+  const next = meta.sessions.find(slot => !completedDates.has(slot.date) && slot.date >= RepsData.TODAY)
+    || meta.sessions.find(slot => !completedDates.has(slot.date));
+  const progress = Math.round((completed / meta.sessions.length) * 100);
+  return (
+    <div className="panel return-dashboard-strip">
+      <span className="return-dashboard-icon"><RI.Calendar /></span>
+      <div className="return-dashboard-copy">
+        <div><strong>8-Week Return</strong><span className="chip accent">{completed}/16</span></div>
+        <small>{next ? `Next: ${RepsData.shortDate(next.date)} · Return ${next.workout}` : "Block complete"} · holiday {meta.holiday}</small>
+        <span className="return-dashboard-track"><i style={{width:`${progress}%`}} /></span>
+      </div>
+      <button className="btn primary sm" onClick={() => setView?.("return")}>Open block <RI.Chevron /></button>
+    </div>
+  );
+}
+
 function Dashboard({ setView }) {
   const app = window.RepsState.useApp();
   const profile = app.activeProfile;
@@ -331,6 +354,8 @@ function Dashboard({ setView }) {
           <button className="btn primary sm" onClick={() => setView?.("log")}><span className="icon"><RI.Plus /></span> Log workout</button>
         </div>
       </div>
+
+      <ReturnBlockStrip profile={profile} setView={setView} />
 
       {!hasHistory && performedSessions.length === 0 && (
         <div className="panel" style={{borderColor:"var(--accent-line)", background:"var(--accent-soft)"}}>

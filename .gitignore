@@ -2,6 +2,9 @@
 reps-backup-*.json
 reps-effective-state-*.json
 Reps-migration.html
-.github/workflows/pages.yml
 data/*data*.js
 uploads/
+node_modules/
+dist/
+.vite/
+coverage/

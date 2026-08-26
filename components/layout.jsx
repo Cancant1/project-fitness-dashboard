@@ -65,6 +65,7 @@ const NAV_ITEMS = [
   { id: "sessions",  label: "Sessions",  icon: I.Log,       kbd: "3" },
   { id: "strength",  label: "Strength",  icon: I.Trend,     kbd: "4" },
   { id: "records",   label: "Records",   icon: I.Trophy,    kbd: "R" },
+  { id: "return",    label: "Return 8W", icon: I.Calendar,  kbd: "B" },
   { id: "routines",  label: "Routines",  icon: I.Routine,   kbd: "5" },
   { id: "exercises", label: "Exercises", icon: I.Exercises, kbd: "6" },
   { id: "body",      label: "Body",      icon: I.Body,      kbd: "7" },
@@ -173,7 +174,7 @@ function TopBar({ view, setView }) {
   const labels = {
     dashboard: "Dashboard", log: "Log", routines: "Routines",
     exercises: "Exercises", body: "Body", plan: "Plan", export: "AI Export",
-    settings: "Settings", sessions: "Sessions", strength: "Strength", records: "Records"
+    settings: "Settings", sessions: "Sessions", strength: "Strength", records: "Records", return: "8-Week Return"
   };
   const app = window.RepsState?.useApp?.();
   const profile = app?.activeProfile;
@@ -284,7 +285,7 @@ function MobileNav({ view, setView }) {
   const labels = {
     dashboard: "Dashboard", log: "Log", routines: "Routines",
     exercises: "Exercises", body: "Body", plan: "Plan", export: "AI Export",
-    settings: "Settings", sessions: "Sessions", strength: "Strength", records: "Records"
+    settings: "Settings", sessions: "Sessions", strength: "Strength", records: "Records", return: "8-Week Return"
   };
 
   useEffect(() => {
