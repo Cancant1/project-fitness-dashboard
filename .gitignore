@@ -5,6 +5,10 @@ Reps-migration.html
 data/*data*.js
 uploads/
 node_modules/
-dist/
+dist/Reps.html
+dist/app.bundle.js
+dist/styles.css
+dist/data/
+dist/assets/*.map
 .vite/
 coverage/

@@ -17,7 +17,8 @@ createRoot(document.getElementById("root")!).render(
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
-    void navigator.serviceWorker.register("./sw.js").catch(() => undefined);
+    const entry = document.querySelector<HTMLScriptElement>("#reps-app-script");
+    const base = entry?.dataset.appBase || "./";
+    void navigator.serviceWorker.register(new URL(`${base}sw.js`, document.baseURI)).catch(() => undefined);
   });
 }
-

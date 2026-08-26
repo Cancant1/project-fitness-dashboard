@@ -1,23 +1,41 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { migrateLegacySources } from "./migrate";
 
-const runLegacy = (file: string) => {
-  const source = readFileSync(resolve(process.cwd(), file), "utf8");
-  Function("window", source)(window);
+const fitnessFixture = {
+  metadata: { sourceWorkbook: "anonymized-ci-fixture.xlsx" },
+  workouts: {
+    sessions: [
+      {
+        id: "fixture-performed",
+        date: "2026-01-05",
+        split: "Full body",
+        block: "Fixture block",
+        performedSetCount: 1,
+        entries: [{ exercise: "Fixture squat", group: "Legs", unit: "kg", targetSets: 1, targetReps: "5", sets: [{ set: 1, weight: 100, repsNumber: 5, rpe: 8 }] }]
+      },
+      {
+        id: "fixture-note-only",
+        date: "2026-01-07",
+        split: "Recovery",
+        performedSetCount: 0,
+        dayNote: "Preserved recovery note",
+        entries: [{ exercise: "Fixture row", group: "Pull", unit: "kg", targetSets: 1, targetReps: "8", sets: [{ set: 1, note: "Preserved set note" }] }]
+      }
+    ],
+    blockSummaries: [{ sheet: "Fixture block", weeks: [{ weekStart: "2026-01-05" }] }]
+  },
+  body: { daily: [{ date: "2026-01-05", weight: 80, kcal: 2400, protein: 170 }] },
+  nutrition: { foodItems: [{ id: "fixture-food", product: "Fixture meal", unit: "serving", kcal: 500, protein: 35 }] },
+  stats: { lifetimePrs: [{ exercise: "Fixture squat", weight: 100, reps: 5 }] }
 };
 
 describe("canonical migration", () => {
   it("reconciles the embedded workbook without unexplained drops", async () => {
-    runLegacy("data/fitness-data.js");
-    runLegacy("data/food-catalog.js");
-    runLegacy("data/routine.js");
     const snapshot = await migrateLegacySources({
-      fitnessData: window.FITNESS_DATA,
-      foodCatalog: window.REPS_FOOD_CATALOG as any[],
+      fitnessData: fitnessFixture,
+      foodCatalog: [{ id: "public-fixture-food", name: "Public fixture food", unit: "serving", kcal: 120, protein: 8 }],
       fitnessOsV3: { unknownFutureField: { preserve: true } },
-      legacyRoutine: (window.PLANNED_ROUTINE || []) as unknown[],
+      legacyRoutine: [],
       clientId: "test-device"
     });
     expect(snapshot.schemaVersion).toBe(2);

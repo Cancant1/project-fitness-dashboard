@@ -6,17 +6,17 @@
     <meta name="theme-color" content="#101312" />
     <meta name="color-scheme" content="light dark" />
     <meta name="description" content="Reps. — a local-first training and nutrition journal." />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="icon" href="./icon-180.png" />
-    <link rel="apple-touch-icon" href="./icon-180.png" />
+    <link rel="manifest" href="./dist/manifest.webmanifest" />
+    <link rel="icon" href="./dist/icon-180.png" />
+    <link rel="apple-touch-icon" href="./dist/icon-180.png" />
+    <link rel="stylesheet" href="./dist/assets/reps-app.css" />
     <title>Reps.</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script vite-ignore src="./data/fitness-data.js"></script>
-    <script vite-ignore src="./data/food-catalog.js"></script>
-    <script vite-ignore src="./data/routine.js"></script>
-    <script vite-ignore src="./data/helpers.js"></script>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="root"><div style="min-height:100vh;background:#f4f5f2"></div></div>
+    <script src="./data/food-catalog.js"></script>
+    <script src="./data/routine.js"></script>
+    <script src="./data/helpers.js"></script>
+    <script id="reps-app-script" data-app-base="./dist/" type="module" src="./dist/assets/reps-app.js"></script>
   </body>
 </html>

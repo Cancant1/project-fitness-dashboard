@@ -5,7 +5,7 @@ Reps. is a local-first training, nutrition, planning, and progress journal. The 
 ## Data safety
 
 - On first launch, the app copies the existing Reps and Fitness OS browser values into an untouched IndexedDB backup before activating schema 2.
-- The embedded workout export, public food catalog, routines, browser data, notes, weight history, targets, and legacy facts are reconciled into one versioned snapshot.
+- Existing browser and GitHub data, the public food catalog, routines, notes, weight history, targets, and legacy facts are reconciled into one versioned snapshot. The private workbook export is also reconciled when running the local migration copy.
 - A migration with unexplained record drops is refused.
 - Deletions are soft and recoverable; imports, sync operations, and program installation create checkpoints.
 - The GitHub token stays only in local browser settings and is never included in exported or synced state.
@@ -20,6 +20,8 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
+Open `/app.html` for the source-development entry. The root page is a compiled fallback retained because this repository may be published directly from `main` by GitHub Pages.
+
 ## Verification and production build
 
 ```sh
@@ -28,7 +30,7 @@ pnpm audit:data
 node tests/sync-merge.test.mjs
 ```
 
-The production site is written to `dist/`. The build copies the legacy fallback and source data into that package. GitHub Pages builds and verifies the app through `.github/workflows/pages.yml`.
+The production site is written to `dist/`. The build copies the legacy fallback and public seed data into that package. The git-ignored private `data/fitness-data.js` workbook export is deliberately excluded. GitHub Pages builds and verifies the app through `.github/workflows/pages.yml`; the committed `dist/` package also keeps branch-based Pages publishing functional.
 
 ## Main areas
 
@@ -39,4 +41,4 @@ The production site is written to `dist/`. The build copies the legacy fallback 
 - Plan: calendar, agenda, routines, blocks, and the optional 8-week return plan.
 - Settings: profile, appearance, logging defaults, backups, imports, migration evidence, and GitHub sync.
 
-The detailed implementation and release checklist is in `../docs/reps-2026-full-revamp-master-plan.md`.
+The detailed implementation and release checklist is in `docs/reps-2026-full-revamp-master-plan.md`.

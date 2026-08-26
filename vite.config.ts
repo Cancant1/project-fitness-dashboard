@@ -8,7 +8,15 @@ export default defineConfig({
     target: "baseline-widely-available",
     sourcemap: true,
     outDir: "dist",
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      input: "app.html",
+      output: {
+        entryFileNames: "assets/reps-app.js",
+        chunkFileNames: "assets/[name].js",
+        assetFileNames: (asset) => asset.names.some((name) => name.endsWith(".css")) ? "assets/reps-app.css" : "assets/[name][extname]"
+      }
+    }
   },
   test: {
     environment: "jsdom",

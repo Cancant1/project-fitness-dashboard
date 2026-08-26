@@ -1,0 +1,17 @@
+{
+  "name": "Reps. Training & Nutrition",
+  "short_name": "Reps.",
+  "description": "A local-first training and nutrition journal.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f5f2",
+  "theme_color": "#101312",
+  "icons": [
+    {
+      "src": "./icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
