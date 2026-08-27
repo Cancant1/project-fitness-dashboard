@@ -25,9 +25,10 @@ import {
   X
 } from "lucide-react";
 import { useAppStore } from "../../app/AppStore";
-import { Button, EmptyState, Field, IconButton, Modal, ProgressBar, Segmented } from "../../components/ui";
+import { Button, EmptyState, Field, IconButton, Modal, ProgressBar } from "../../components/ui";
+import { discardWorkoutDraft } from "../../domain/factories";
 import type { ExercisePerformance, SetResult, SetType, WorkoutSession } from "../../domain/types";
-import { deepClone, epley, formatShortDate, movementFor, nowIso, searchExercise, sessionVolume, uid, unitFor } from "../../domain/utils";
+import { deepClone, epley, formatShortDate, nowIso, searchExercise, sessionVolume, todayIso, uid } from "../../domain/utils";
 
 const formatElapsed = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${Math.floor(seconds % 60).toString().padStart(2, "0")}`;
 
@@ -45,7 +46,10 @@ export function WorkoutPage() {
   const [restLeft, setRestLeft] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [savedState, setSavedState] = useState("Saved locally");
+  const [discarding, setDiscarding] = useState(false);
   const hydratedId = useRef<string | null>(stored?.id || null);
+  const autosaveTimer = useRef<number | null>(null);
+  const discardingRef = useRef(false);
 
   useEffect(() => {
     if (!stored || hydratedId.current === stored.id) return;
@@ -55,12 +59,17 @@ export function WorkoutPage() {
 
   useEffect(() => {
     if (!draft) return;
+    const isLive = draft.status === "inProgress" && draft.actualDate === todayIso();
+    if (!isLive) {
+      setElapsed(Math.max(0, (draft.durationMinutes || 0) * 60));
+      return;
+    }
     const start = Date.parse(draft.startedAt || draft.createdAt);
     const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [draft?.id]);
+  }, [draft?.id, draft?.status, draft?.actualDate, draft?.startedAt, draft?.durationMinutes]);
 
   useEffect(() => {
     if (restLeft <= 0) return;
@@ -69,17 +78,20 @@ export function WorkoutPage() {
   }, [restLeft > 0]);
 
   useEffect(() => {
-    if (!draft || !snapshot || draft.id !== stored?.id) return;
+    if (!draft || draft.id !== stored?.id || discardingRef.current) return;
     setSavedState("Saving…");
-    const timer = window.setTimeout(() => {
+    autosaveTimer.current = window.setTimeout(() => {
+      if (discardingRef.current) return;
       void mutate("Autosaved active workout", (state) => {
         const index = state.sessions.findIndex((session) => session.id === draft.id);
-        const next = { ...deepClone(draft), status: draft.status === "draft" ? "inProgress" : draft.status, updatedAt: nowIso() } as WorkoutSession;
+        const next = { ...deepClone(draft), updatedAt: nowIso() } as WorkoutSession;
         if (index >= 0) state.sessions[index] = next;
       }).then(() => setSavedState(navigator.onLine ? "Saved locally" : "Offline · saved"));
     }, 420);
-    return () => window.clearTimeout(timer);
-  }, [draft, snapshot, stored?.id, mutate]);
+    return () => {
+      if (autosaveTimer.current != null) window.clearTimeout(autosaveTimer.current);
+    };
+  }, [draft, stored?.id, mutate]);
 
   if (!snapshot || !draft) {
     return <div className="workout-missing"><EmptyState icon={<Dumbbell />} title="Workout not found" description="It may have been deleted or is not available in this profile." action={<Button onClick={() => navigate("/train")}>Back to Train</Button>} /></div>;
@@ -114,7 +126,19 @@ export function WorkoutPage() {
 
   const completeSet = (set: SetResult) => {
     const nextCompleted = !set.completed;
-    updateSet(set.id, { completed: nextCompleted, completedAt: nextCompleted ? nowIso() : undefined });
+    const stamp = nowIso();
+    setDraft((value) => {
+      if (!value) return value;
+      const next = deepClone(value);
+      const result = next.performances[exerciseIndex]?.sets.find((item) => item.id === set.id);
+      if (!result) return next;
+      Object.assign(result, { completed: nextCompleted, completedAt: nextCompleted ? stamp : undefined, updatedAt: stamp });
+      if (nextCompleted && next.status === "draft" && next.actualDate === todayIso()) {
+        next.status = "inProgress";
+        next.startedAt = stamp;
+      }
+      return next;
+    });
     if (nextCompleted) setRestLeft(snapshot.settings.restSeconds);
   };
 
@@ -169,7 +193,8 @@ export function WorkoutPage() {
 
   const finish = async () => {
     const completedAt = nowIso();
-    const finished = { ...draft, status: "completed" as const, completedAt, durationMinutes: Math.max(1, Math.round(elapsed / 60)), updatedAt: completedAt };
+    const durationMinutes = Math.max(1, Number(draft.durationMinutes) || Math.round(elapsed / 60) || 1);
+    const finished = { ...draft, status: "completed" as const, completedAt, durationMinutes, updatedAt: completedAt };
     await mutate("Finished workout", (state) => {
       const index = state.sessions.findIndex((session) => session.id === draft.id);
       if (index >= 0) state.sessions[index] = finished;
@@ -182,13 +207,19 @@ export function WorkoutPage() {
   };
 
   const discard = async () => {
+    if (discardingRef.current || draft.status === "completed") return;
+    discardingRef.current = true;
+    setDiscarding(true);
+    if (autosaveTimer.current != null) window.clearTimeout(autosaveTimer.current);
     const deletedAt = nowIso();
-    await mutate("Discarded workout", (state) => {
-      const session = state.sessions.find((item) => item.id === draft.id);
-      if (session) { session.status = "discarded"; session.deletedAt = deletedAt; session.updatedAt = deletedAt; }
-      state.tombstones.push({ entityType: "session", entityId: draft.id, deletedAt, revision: `${state.revision + 1}` });
-    });
-    navigate("/train");
+    try {
+      await mutate("Discarded workout", (state) => { discardWorkoutDraft(state, draft.id, deletedAt); });
+      navigate("/train", { replace: true });
+    } catch {
+      discardingRef.current = false;
+      setDiscarding(false);
+      setSavedState("Discard failed · try again");
+    }
   };
 
   const suggestion = useMemo(() => {
@@ -207,11 +238,14 @@ export function WorkoutPage() {
     updatePerformance((performance) => performance.sets.forEach((set) => { if (!set.completed) set.load = suggestion.load; }));
   };
 
+  const isLiveWorkout = draft.status === "inProgress" && draft.actualDate === todayIso();
+  const sessionModeLabel = draft.status === "completed" ? "Editing completed session" : draft.actualDate < todayIso() ? "Logging a past workout" : draft.status === "draft" ? "Workout draft" : "Workout in progress";
+
   return (
     <div className="workout-page">
       <header className="workout-top">
-        <div className="workout-top-left"><IconButton label="Back to Train" onClick={() => navigate("/train")}><ArrowLeft /></IconButton><div><span className="eyebrow">{draft.status === "completed" ? "Editing completed session" : "Workout in progress"}</span><h1>{draft.title}</h1><small>{formatShortDate(draft.actualDate, true)} · {savedState}</small></div></div>
-        <div className="workout-timers"><span><Clock3 />{formatElapsed(elapsed)}</span>{restLeft > 0 && <button onClick={() => setRestLeft(0)}><TimerReset />Rest {formatElapsed(restLeft)}<X /></button>}</div>
+        <div className="workout-top-left"><IconButton label="Back to Train" onClick={() => navigate("/train")}><ArrowLeft /></IconButton><div><span className="eyebrow">{sessionModeLabel}</span><h1>{draft.title}</h1><small>{formatShortDate(draft.actualDate, true)} · {savedState}</small></div></div>
+        <div className="workout-timers">{isLiveWorkout && <span><Clock3 />{formatElapsed(elapsed)}</span>}{restLeft > 0 && <button onClick={() => setRestLeft(0)}><TimerReset />Rest {formatElapsed(restLeft)}<X /></button>}</div>
         <Button variant="primary" onClick={() => setFinishOpen(true)}><CheckCircle2 />Finish</Button>
       </header>
       <ProgressBar value={completedSets} max={Math.max(totalSets, 1)} label="Workout completion" />
@@ -279,11 +313,11 @@ export function WorkoutPage() {
 
       <Modal open={finishOpen} title="Finish workout" onClose={() => setFinishOpen(false)} className="finish-modal">
         <div className="modal-body finish-summary">
-          <div className="finish-metrics"><span><strong>{completedSets}/{totalSets}</strong><small>sets complete</small></span><span><strong>{draft.performances.length}</strong><small>exercises</small></span><span><strong>{Math.round(sessionVolume(draft)).toLocaleString()}</strong><small>kg volume</small></span><span><strong>{Math.max(1, Math.round(elapsed / 60))}</strong><small>minutes</small></span></div>
+          <div className="finish-metrics"><span><strong>{completedSets}/{totalSets}</strong><small>sets complete</small></span><span><strong>{draft.performances.length}</strong><small>exercises</small></span><span><strong>{Math.round(sessionVolume(draft)).toLocaleString()}</strong><small>kg volume</small></span><span><strong>{draft.durationMinutes || Math.max(1, Math.round(elapsed / 60))}</strong><small>minutes</small></span></div>
           {completedSets < totalSets && <div className="finish-warning">{totalSets - completedSets} set{totalSets - completedSets === 1 ? " is" : "s are"} incomplete. They remain preserved as incomplete in the session.</div>}
-          <div className="field-grid"><Field label="Session RPE"><input type="number" min="1" max="10" step="0.5" value={draft.sessionRpe ?? ""} onChange={(event) => setDraft((value) => value ? { ...value, sessionRpe: event.target.value === "" ? null : Number(event.target.value) } : value)} /></Field><Field label="Energy"><input type="number" min="1" max="10" value={draft.energy ?? ""} onChange={(event) => setDraft((value) => value ? { ...value, energy: event.target.value === "" ? null : Number(event.target.value) } : value)} /></Field></div>
+          <div className="field-grid"><Field label="Workout name"><input value={draft.title} onChange={(event) => setDraft((value) => value ? { ...value, title: event.target.value } : value)} /></Field><Field label="Workout date"><input type="date" max={todayIso()} value={draft.actualDate} onChange={(event) => setDraft((value) => value ? { ...value, actualDate: event.target.value } : value)} /></Field><Field label="Duration (minutes)"><input type="number" min="1" step="1" value={draft.durationMinutes ?? ""} placeholder={String(Math.max(1, Math.round(elapsed / 60)))} onChange={(event) => setDraft((value) => value ? { ...value, durationMinutes: event.target.value === "" ? undefined : Number(event.target.value) } : value)} /></Field><Field label="Session RPE"><input type="number" min="1" max="10" step="0.5" value={draft.sessionRpe ?? ""} onChange={(event) => setDraft((value) => value ? { ...value, sessionRpe: event.target.value === "" ? null : Number(event.target.value) } : value)} /></Field><Field label="Energy"><input type="number" min="1" max="10" value={draft.energy ?? ""} onChange={(event) => setDraft((value) => value ? { ...value, energy: event.target.value === "" ? null : Number(event.target.value) } : value)} /></Field></div>
           <Field label="Session notes"><textarea value={draft.notes || ""} onChange={(event) => setDraft((value) => value ? { ...value, notes: event.target.value } : value)} placeholder="What mattered today?" /></Field>
-          <div className="finish-actions"><Button variant="danger" onClick={() => void discard()}>Discard draft</Button><span /><Button variant="default" onClick={() => setFinishOpen(false)}>Keep training</Button><Button variant="primary" onClick={() => void finish()}><CheckCircle2 />Finish & save</Button></div>
+          <div className="finish-actions">{draft.status !== "completed" ? <Button variant="danger" disabled={discarding} onClick={() => void discard()}>{discarding ? "Discarding…" : "Discard draft"}</Button> : <span />}<span /><Button variant="default" onClick={() => setFinishOpen(false)}>Keep editing</Button><Button variant="primary" onClick={() => void finish()}><CheckCircle2 />Finish & save</Button></div>
         </div>
       </Modal>
     </div>

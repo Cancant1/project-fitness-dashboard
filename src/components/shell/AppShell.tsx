@@ -19,7 +19,7 @@ import {
   X
 } from "lucide-react";
 import { useAppStore } from "../../app/AppStore";
-import { activeProfile } from "../../domain/utils";
+import { activeProfile, todayIso } from "../../domain/utils";
 import { IconButton, Modal } from "../ui";
 
 const nav = [
@@ -51,7 +51,12 @@ export function AppShell() {
   const [mobileMore, setMobileMore] = useState(false);
   const [query, setQuery] = useState("");
   const profile = snapshot ? activeProfile(snapshot) : null;
-  const activeSession = snapshot?.sessions.find((session) => session.profileId === profile?.id && (session.status === "draft" || session.status === "inProgress"));
+  const activeSession = snapshot?.sessions.find((session) => session.profileId === profile?.id && !session.deletedAt && (session.status === "draft" || session.status === "inProgress"));
+  const activeIsLive = activeSession?.status === "inProgress" && activeSession.actualDate === todayIso();
+  const activeAction = activeIsLive ? "Resume active workout" : "Open workout draft";
+  const routeTitle = location.pathname.includes("/train/live") && activeSession
+    ? activeIsLive ? "Active workout" : activeSession.actualDate < todayIso() ? "Past workout draft" : "Workout draft"
+    : titleFor(location.pathname);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -68,7 +73,7 @@ export function AppShell() {
     if (!snapshot) return [];
     const needle = query.trim().toLowerCase();
     const actions = [
-      { type: "Action", label: activeSession ? "Resume active workout" : "Start a workout", detail: activeSession?.title || "Train", to: activeSession ? `/train/live/${activeSession.id}` : "/train" },
+      { type: "Action", label: activeSession ? activeAction : "Start a workout", detail: activeSession?.title || "Train", to: activeSession ? `/train/live/${activeSession.id}` : "/train" },
       { type: "Action", label: "Add food", detail: "Nutrition diary", to: "/nutrition?add=food" },
       { type: "Action", label: "Log weight", detail: "Bodyweight check-in", to: "/nutrition/energy?add=weight" }
     ];
@@ -78,7 +83,7 @@ export function AppShell() {
     return [...actions, ...exercises, ...sessions, ...foods]
       .filter((item) => !needle || `${item.label} ${item.detail} ${item.type}`.toLowerCase().includes(needle))
       .slice(0, 14);
-  }, [snapshot, query, activeSession]);
+  }, [snapshot, query, activeSession, activeAction]);
 
   const go = (to: string) => {
     navigate(to);
@@ -111,7 +116,7 @@ export function AppShell() {
       <div className="app-main">
         <header className="top-bar">
           <div className="mobile-brand"><span>R</span><strong>Reps.</strong></div>
-          <div className="route-title"><span>{titleFor(location.pathname)}</span>{activeSession && !location.pathname.includes("/train/live") && <button onClick={() => navigate(`/train/live/${activeSession.id}`)}><span className="live-dot" />Resume {activeSession.title}</button>}</div>
+          <div className="route-title"><span>{routeTitle}</span>{activeSession && !location.pathname.includes("/train/live") && <button onClick={() => navigate(`/train/live/${activeSession.id}`)}>{activeIsLive && <span className="live-dot" />}{activeIsLive ? "Resume" : "Open draft"} {activeSession.title}</button>}</div>
           <button className="command-trigger" onClick={() => setCommandOpen(true)}><Search /><span>Search anything</span><kbd>⌘K</kbd></button>
           <div className="top-actions">
             <button className="profile-trigger" onClick={() => navigate("/settings/profile")}><span>{profile?.name?.slice(0, 1).toUpperCase() || "R"}</span><small>{profile?.name}</small></button>
@@ -122,8 +127,8 @@ export function AppShell() {
         {activeSession && !location.pathname.includes("/train/live") && (
           <button className="active-session-strip" onClick={() => navigate(`/train/live/${activeSession.id}`)}>
             <span className="active-session-icon"><Dumbbell /></span>
-            <span><small>Workout in progress</small><strong>{activeSession.title}</strong></span>
-            <span className="active-session-resume">Resume <ChevronRight /></span>
+            <span><small>{activeIsLive ? "Workout in progress" : activeSession.actualDate < todayIso() ? "Past workout draft" : "Workout draft"}</small><strong>{activeSession.title}</strong></span>
+            <span className="active-session-resume">{activeIsLive ? "Resume" : "Open"} <ChevronRight /></span>
           </button>
         )}
 
@@ -148,7 +153,7 @@ export function AppShell() {
 
       <Modal open={quickOpen} title="Quick add" onClose={() => setQuickOpen(false)} className="quick-modal">
         <div className="quick-grid">
-          <button onClick={() => go(activeSession ? `/train/live/${activeSession.id}` : "/train")}><span><Dumbbell /></span><strong>{activeSession ? "Resume workout" : "Start workout"}</strong><small>{activeSession?.title || "Routine or empty"}</small></button>
+          <button onClick={() => go(activeSession ? `/train/live/${activeSession.id}` : "/train")}><span><Dumbbell /></span><strong>{activeSession ? activeIsLive ? "Resume workout" : "Open workout draft" : "Start workout"}</strong><small>{activeSession?.title || "Routine or empty"}</small></button>
           <button onClick={() => go("/nutrition?add=food")}><span><Utensils /></span><strong>Add food</strong><small>Search or quick add</small></button>
           <button onClick={() => go("/nutrition/energy?add=weight")}><span><Weight /></span><strong>Log weight</strong><small>Fast check-in</small></button>
           <button onClick={() => go("/plan")}><span><CalendarDays /></span><strong>Open plan</strong><small>Schedule and blocks</small></button>

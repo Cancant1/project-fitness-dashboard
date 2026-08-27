@@ -47,7 +47,7 @@ export function performanceFromPlanned(item: PlannedExercise, order: number, tar
   };
 }
 
-export function createSessionFromPlan(profileId: string, plan?: PlannedWorkout, title = "Empty workout"): WorkoutSession {
+export function createSessionFromPlan(profileId: string, plan?: PlannedWorkout, title = "Empty workout", actualDate?: string): WorkoutSession {
   const stamp = nowIso();
   return {
     id: uid("session"),
@@ -59,7 +59,7 @@ export function createSessionFromPlan(profileId: string, plan?: PlannedWorkout, 
     split: plan?.split,
     plannedWorkoutId: plan?.id,
     plannedDate: plan?.date,
-    actualDate: plan?.date || todayIso(),
+    actualDate: actualDate || plan?.date || todayIso(),
     status: "draft",
     startedAt: stamp,
     notes: "",
@@ -67,6 +67,22 @@ export function createSessionFromPlan(profileId: string, plan?: PlannedWorkout, 
     programInstanceId: plan?.programInstanceId,
     performances: (plan?.exercises || []).sort((a, b) => a.order - b.order).map((item, index) => performanceFromPlanned(item, index))
   };
+}
+
+export function discardWorkoutDraft(snapshot: RepsSnapshot, sessionId: string, deletedAt = nowIso()) {
+  const session = snapshot.sessions.find((item) => item.id === sessionId && !item.deletedAt);
+  if (!session || (session.status !== "draft" && session.status !== "inProgress")) return false;
+  session.status = "discarded";
+  session.deletedAt = deletedAt;
+  session.updatedAt = deletedAt;
+  const tombstone = snapshot.tombstones.find((item) => item.entityType === "session" && item.entityId === sessionId);
+  if (tombstone) {
+    tombstone.deletedAt = deletedAt;
+    tombstone.revision = `${snapshot.revision + 1}`;
+  } else {
+    snapshot.tombstones.push({ entityType: "session", entityId: sessionId, deletedAt, revision: `${snapshot.revision + 1}` });
+  }
+  return true;
 }
 
 export function plannedFromRoutineDay(profileId: string, routineId: string, day: RoutineDay, date = todayIso()): PlannedWorkout {
@@ -216,4 +232,3 @@ export function installReturnProgram(snapshot: RepsSnapshot, profileId: string) 
     }
   }
 }
-

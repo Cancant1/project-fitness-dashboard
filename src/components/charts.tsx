@@ -47,3 +47,15 @@ export function Bars({ data, label, unit = "" }: { data: ChartPoint[]; label: st
   );
 }
 
+export function ComparisonBars({ data, label, secondaryLabel, unit = "" }: { data: ChartPoint[]; label: string; secondaryLabel: string; unit?: string }) {
+  const max = Math.max(...data.flatMap((point) => [point.value, point.secondary ?? 0]), 1);
+  const summary = data.map((point) => `${point.label}: ${point.value} ${label}, ${point.secondary ?? 0} ${secondaryLabel}`).join(", ");
+  return (
+    <div>
+      <div className="bar-chart comparison-bars" role="img" aria-label={`${label} compared with ${secondaryLabel}. ${summary}`}>
+        {data.map((point) => <div key={point.label} className="bar-item"><span className="bar-value">{Math.round(point.value)}/{Math.round(point.secondary ?? 0)}</span><span className="bar-pair"><i style={{ height: `${point.value ? Math.max(3, point.value / max * 100) : 0}%` }} /><i className="secondary" style={{ height: `${point.secondary ? Math.max(3, point.secondary / max * 100) : 0}%` }} /></span><small>{point.label}</small></div>)}
+      </div>
+      <div className="chart-legend"><span><i />{label}{unit ? ` (${unit})` : ""}</span><span><i className="secondary" />{secondaryLabel}</span></div>
+    </div>
+  );
+}

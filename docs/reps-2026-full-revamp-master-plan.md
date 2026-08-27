@@ -1,6 +1,6 @@
 # Reps. 2026 Full Revamp — Master Product, UX, Architecture, and Migration Plan
 
-**Status:** core revamp implemented in the working tree; release acceptance and real-device restore drill remain  
+**Status:** core revamp implemented; advanced workflow completion, release acceptance, and real-device restore drill remain
 **Created:** 26 August 2026  
 **Scope:** the current `dashboard/` application, its predecessor in `app/`, the embedded workbook export, browser state, and GitHub synchronization  
 **Primary constraint:** no workout, food, bodyweight, plan, note, or settings data may be silently lost, rewritten, or made unreachable  
@@ -1193,3 +1193,28 @@ The revamp is complete when Reps. feels like one product rather than a collectio
 - Verify Safari/iOS Safari, Chrome/Android, Firefox, installed PWA behavior, offline reload, 200% zoom, and the full width matrix from §18.5.
 - Measure production Core Web Vitals and split the main JavaScript chunk if the real-device interaction budget requires it.
 - Keep `Reps.html`, the source data scripts, legacy browser keys, and automatic backups until the user signs off after using the new logger with real entries.
+
+## 23. Continuation checkpoint — 27 August 2026
+
+### Added in this continuation
+
+- **TRN-03 lifecycle correction:** opening or autosaving a workout no longer changes a `draft` into `inProgress`. A current-day session becomes active only when the first set is completed; a backdated session remains a draft until it is explicitly finished.
+- **Deterministic discard:** pending autosave is cancelled before discard, tombstones are idempotent, completed history is protected, navigation replaces the deleted live route, and Train provides a second confirmed discard entry point.
+- **Historical workout logging:** Train now has a dedicated “Log past workout” entry point with an actual-date field. The logger clearly identifies past logging, does not run a live timer, and the finish sheet permits title, date, and duration correction.
+- **PRG-03 adherence:** Progress now compares planned and completed workouts over the last twelve calendar weeks, including zero-activity weeks, with a responsive and text-described paired-bar visualization.
+- **EXP-01 CSV slice:** Settings can export training sets, nutrition entries, and body measurements as escaped, identifier-preserving CSV files in addition to the full canonical JSON backup. Deleted-record metadata is retained where relevant.
+- **Cross-surface semantics:** Today, Train, the global header, the active-session strip, quick actions, and command search now distinguish a draft from a genuinely active workout.
+
+### Automated and browser evidence
+
+- TypeScript type checking, nine automated tests across five files, and the production build pass.
+- Browser flow verified: select yesterday, create a backdated draft, confirm no live timer/status, open the finish sheet, discard, and return to Train with no active draft.
+- Browser flow verified: create a current-day empty workout, allow autosave to run, navigate to Today, and confirm it is still presented as “Workout draft · not marked in progress.”
+
+### Functionality still not fully implemented from the master plan
+
+- **Workout power features:** explicit superset/circuit groups, multi-exercise add, duplicate/soft-delete sets, distance modes, desktop bulk paste, and a pure tested injury-aware progression policy.
+- **Nutrition completion:** daily note/completeness state, copy-one-meal and paste-to-multiple-dates flows, broader duplicate-food review tooling, and energy-estimate confidence/explanation.
+- **Progress depth:** muscle/load foundation, goal/body-composition views, chart data tables, and richer annotations/comparisons.
+- **Data administration:** add/switch/archive profiles, conflict inbox, human/AI context exports, dry-run bulk tools, and the guarded wipe flow.
+- **Release proof:** the two-device GitHub matrix, real backup/GitHub restore drill, accessibility assistive-technology pass, cross-browser/installed-PWA matrix, and production performance measurements remain mandatory before legacy removal.

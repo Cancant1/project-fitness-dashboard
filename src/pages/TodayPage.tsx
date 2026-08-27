@@ -14,7 +14,8 @@ export function TodayPage() {
   const today = todayIso();
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
-  const activeSession = snapshot.sessions.find((session) => session.profileId === profile.id && (session.status === "draft" || session.status === "inProgress"));
+  const activeSession = snapshot.sessions.find((session) => session.profileId === profile.id && !session.deletedAt && (session.status === "draft" || session.status === "inProgress"));
+  const activeIsLive = activeSession?.status === "inProgress" && activeSession.actualDate === today;
   const completedPlanIds = new Set(snapshot.sessions.filter((session) => session.status === "completed").map((session) => session.plannedWorkoutId));
   const nextPlan = snapshot.plannedWorkouts
     .filter((plan) => plan.profileId === profile.id && !plan.deletedAt && plan.date >= today && plan.status !== "skipped" && !completedPlanIds.has(plan.id))
@@ -36,7 +37,7 @@ export function TodayPage() {
 
   const startWorkout = async () => {
     if (activeSession) { navigate(`/train/live/${activeSession.id}`); return; }
-    const session = createSessionFromPlan(profile.id, nextPlan);
+    const session = createSessionFromPlan(profile.id, nextPlan, undefined, today);
     await mutate("Started workout from Today", (draft) => {
       draft.sessions.push(session);
       if (nextPlan) {
@@ -61,19 +62,19 @@ export function TodayPage() {
         eyebrow={formatShortDate(today, true)}
         title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${profile.name.split(" ")[0]}.`}
         description="The next useful action, your current week, and the signals worth noticing."
-        actions={<Button variant="primary" onClick={startWorkout}><Dumbbell />{activeSession ? "Resume workout" : "Start workout"}</Button>}
+        actions={<Button variant="primary" onClick={startWorkout}><Dumbbell />{activeSession ? activeIsLive ? "Resume workout" : "Open workout draft" : "Start workout"}</Button>}
       />
 
       <Card className="next-action-card">
         <div className="next-action-main">
           <span className="next-action-icon"><Dumbbell /></span>
           <div>
-            <span className="eyebrow">{activeSession ? "In progress" : nextPlan ? "Next workout" : "Train"}</span>
+            <span className="eyebrow">{activeSession ? activeIsLive ? "In progress" : activeSession.actualDate < today ? "Past workout draft" : "Workout draft" : nextPlan ? "Next workout" : "Train"}</span>
             <h2>{activeSession?.title || nextPlan?.title || "Choose your session"}</h2>
-            <p>{activeSession ? `${activeSession.performances.reduce((sum, item) => sum + item.sets.filter((set) => set.completed).length, 0)} sets completed · saved locally` : nextPlan ? `${formatShortDate(nextPlan.date, true)} · ${nextPlan.exercises.length} exercises${nextPlan.note ? ` · ${nextPlan.note}` : ""}` : "Start empty or choose a routine day."}</p>
+            <p>{activeSession ? `${formatShortDate(activeSession.actualDate, true)} · ${activeSession.performances.reduce((sum, item) => sum + item.sets.filter((set) => set.completed).length, 0)} sets completed · ${activeIsLive ? "timer running" : "not marked in progress"}` : nextPlan ? `${formatShortDate(nextPlan.date, true)} · ${nextPlan.exercises.length} exercises${nextPlan.note ? ` · ${nextPlan.note}` : ""}` : "Start empty or choose a routine day."}</p>
           </div>
         </div>
-        <Button variant="soft" onClick={startWorkout}>{activeSession ? "Resume" : "Open session"}<ArrowRight /></Button>
+        <Button variant="soft" onClick={startWorkout}>{activeSession ? activeIsLive ? "Resume" : "Open draft" : "Open session"}<ArrowRight /></Button>
       </Card>
 
       <div className="stat-grid">
