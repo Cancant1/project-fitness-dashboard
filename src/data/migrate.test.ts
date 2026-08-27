@@ -39,6 +39,8 @@ describe("canonical migration", () => {
       clientId: "test-device"
     });
     expect(snapshot.schemaVersion).toBe(2);
+    expect(snapshot.settings.workoutTimerEnabled).toBe(false);
+    expect(snapshot.settings.restTimerEnabled).toBe(false);
     expect(snapshot.migrationReport?.unexplainedDrops).toBe(0);
     expect(snapshot.sessions.filter((item) => item.status === "completed")).toHaveLength(Number(snapshot.migrationReport?.sourceCounts.workbookPerformedSessions));
     expect(snapshot.sessions.some((item) => item.status === "skipped" && item.performances.some((performance) => performance.sets.some((set) => !!set.note)))).toBe(true);

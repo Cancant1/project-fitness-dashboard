@@ -40,6 +40,8 @@ export const snapshotSchema = z.object({
   settings: z.object({
     appearance: z.object({ theme: z.enum(["system", "light", "dark"]), density: z.enum(["comfortable", "compact"]) }),
     restSeconds: z.number(),
+    workoutTimerEnabled: z.boolean().optional(),
+    restTimerEnabled: z.boolean().optional(),
     preferredRpeMode: z.enum(["rpe", "rir", "both", "off"]),
     mealView: z.enum(["meal", "time"]),
     activeProfileId: z.string()
@@ -55,4 +57,3 @@ export function validateSnapshot(value: unknown): RepsSnapshot {
   }
   return value as RepsSnapshot;
 }
-

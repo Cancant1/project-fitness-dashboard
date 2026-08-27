@@ -43,6 +43,13 @@ export const safeNumber = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+export const parseDecimalInput = (value: unknown): number | null => {
+  const normalized = String(value ?? "").trim().replace(/\s/g, "").replace(",", ".");
+  if (!normalized || !/^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 export const movementFor = (name: unknown, explicit?: unknown): MovementGroup => {
   if (["Push", "Pull", "Legs", "Conditioning", "Other"].includes(String(explicit))) {
     return explicit as MovementGroup;

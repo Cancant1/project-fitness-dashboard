@@ -1204,12 +1204,16 @@ The revamp is complete when Reps. feels like one product rather than a collectio
 - **PRG-03 adherence:** Progress now compares planned and completed workouts over the last twelve calendar weeks, including zero-activity weeks, with a responsive and text-described paired-bar visualization.
 - **EXP-01 CSV slice:** Settings can export training sets, nutrition entries, and body measurements as escaped, identifier-preserving CSV files in addition to the full canonical JSON backup. Deleted-record metadata is retained where relevant.
 - **Cross-surface semantics:** Today, Train, the global header, the active-session strip, quick actions, and command search now distinguish a draft from a genuinely active workout.
+- **Stable form focus:** shared dialogs no longer rerun their focus setup when a controlled field updates, so exercise search and other modal text entry accept uninterrupted multi-character typing while retaining Escape handling and focus return.
+- **Locale-friendly workout decimals:** load, RPE, RIR, and session RPE fields preserve editable text and accept either a comma or period as the decimal separator. Values are normalized to finite numbers only after valid input, preventing transient `NaN` state without changing recorded units or history.
+- **Opt-in workout timers:** session and rest timers are disabled by default for new and existing settings that do not define a preference. Settings → Training exposes independent toggles; disabled timers do not render, tick, auto-start, or infer a workout duration.
 
 ### Automated and browser evidence
 
-- TypeScript type checking, nine automated tests across five files, and the production build pass.
+- TypeScript type checking, eleven automated tests across six files, and the production build pass.
 - Browser flow verified: select yesterday, create a backdated draft, confirm no live timer/status, open the finish sheet, discard, and return to Train with no active draft.
 - Browser flow verified: create a current-day empty workout, allow autosave to run, navigate to Today, and confirm it is still presented as “Workout draft · not marked in progress.”
+- Browser flow verified: type a multi-character exercise query without refocusing, enter both `22,5` and `22.5` loads without `NaN`, complete a set, and confirm no session or rest timer appears with default settings.
 
 ### Functionality still not fully implemented from the master plan
 

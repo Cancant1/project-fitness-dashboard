@@ -25,7 +25,7 @@ import {
   X
 } from "lucide-react";
 import { useAppStore } from "../../app/AppStore";
-import { Button, EmptyState, Field, IconButton, Modal, ProgressBar } from "../../components/ui";
+import { Button, DecimalInput, EmptyState, Field, IconButton, Modal, ProgressBar } from "../../components/ui";
 import { discardWorkoutDraft } from "../../domain/factories";
 import type { ExercisePerformance, SetResult, SetType, WorkoutSession } from "../../domain/types";
 import { deepClone, epley, formatShortDate, nowIso, searchExercise, sessionVolume, todayIso, uid } from "../../domain/utils";
@@ -59,7 +59,7 @@ export function WorkoutPage() {
 
   useEffect(() => {
     if (!draft) return;
-    const isLive = draft.status === "inProgress" && draft.actualDate === todayIso();
+    const isLive = draft.status === "inProgress" && draft.actualDate === todayIso() && snapshot?.settings.workoutTimerEnabled === true;
     if (!isLive) {
       setElapsed(Math.max(0, (draft.durationMinutes || 0) * 60));
       return;
@@ -69,13 +69,17 @@ export function WorkoutPage() {
     tick();
     const timer = window.setInterval(tick, 1000);
     return () => window.clearInterval(timer);
-  }, [draft?.id, draft?.status, draft?.actualDate, draft?.startedAt, draft?.durationMinutes]);
+  }, [draft?.id, draft?.status, draft?.actualDate, draft?.startedAt, draft?.durationMinutes, snapshot?.settings.workoutTimerEnabled]);
 
   useEffect(() => {
+    if (snapshot?.settings.restTimerEnabled !== true) {
+      setRestLeft(0);
+      return;
+    }
     if (restLeft <= 0) return;
     const timer = window.setInterval(() => setRestLeft((value) => Math.max(0, value - 1)), 1000);
     return () => window.clearInterval(timer);
-  }, [restLeft > 0]);
+  }, [restLeft > 0, snapshot?.settings.restTimerEnabled]);
 
   useEffect(() => {
     if (!draft || draft.id !== stored?.id || discardingRef.current) return;
@@ -139,7 +143,7 @@ export function WorkoutPage() {
       }
       return next;
     });
-    if (nextCompleted) setRestLeft(snapshot.settings.restSeconds);
+    if (nextCompleted && snapshot.settings.restTimerEnabled === true) setRestLeft(snapshot.settings.restSeconds);
   };
 
   const addSet = () => updatePerformance((performance) => {
@@ -193,7 +197,8 @@ export function WorkoutPage() {
 
   const finish = async () => {
     const completedAt = nowIso();
-    const durationMinutes = Math.max(1, Number(draft.durationMinutes) || Math.round(elapsed / 60) || 1);
+    const measuredDuration = snapshot.settings.workoutTimerEnabled === true ? Math.max(1, Math.round(elapsed / 60)) : undefined;
+    const durationMinutes = Number(draft.durationMinutes) || measuredDuration;
     const finished = { ...draft, status: "completed" as const, completedAt, durationMinutes, updatedAt: completedAt };
     await mutate("Finished workout", (state) => {
       const index = state.sessions.findIndex((session) => session.id === draft.id);
@@ -239,13 +244,14 @@ export function WorkoutPage() {
   };
 
   const isLiveWorkout = draft.status === "inProgress" && draft.actualDate === todayIso();
+  const showWorkoutTimer = isLiveWorkout && snapshot.settings.workoutTimerEnabled === true;
   const sessionModeLabel = draft.status === "completed" ? "Editing completed session" : draft.actualDate < todayIso() ? "Logging a past workout" : draft.status === "draft" ? "Workout draft" : "Workout in progress";
 
   return (
     <div className="workout-page">
       <header className="workout-top">
         <div className="workout-top-left"><IconButton label="Back to Train" onClick={() => navigate("/train")}><ArrowLeft /></IconButton><div><span className="eyebrow">{sessionModeLabel}</span><h1>{draft.title}</h1><small>{formatShortDate(draft.actualDate, true)} · {savedState}</small></div></div>
-        <div className="workout-timers">{isLiveWorkout && <span><Clock3 />{formatElapsed(elapsed)}</span>}{restLeft > 0 && <button onClick={() => setRestLeft(0)}><TimerReset />Rest {formatElapsed(restLeft)}<X /></button>}</div>
+        <div className="workout-timers">{showWorkoutTimer && <span><Clock3 />{formatElapsed(elapsed)}</span>}{snapshot.settings.restTimerEnabled === true && restLeft > 0 && <button onClick={() => setRestLeft(0)}><TimerReset />Rest {formatElapsed(restLeft)}<X /></button>}</div>
         <Button variant="primary" onClick={() => setFinishOpen(true)}><CheckCircle2 />Finish</Button>
       </header>
       <ProgressBar value={completedSets} max={Math.max(totalSets, 1)} label="Workout completion" />
@@ -276,9 +282,9 @@ export function WorkoutPage() {
                 return <div key={set.id} className={`set-row-v2 ${set.completed ? "completed" : ""}`}>
                   <button className={`set-type ${set.type}`} onClick={() => { const types: SetType[] = ["working", "warmup", "drop", "amrap", "failure", "timed"]; updateSet(set.id, { type: types[(types.indexOf(set.type) + 1) % types.length] }); }} title={`Set type: ${set.type}`}><b>{set.type === "warmup" ? "W" : set.type === "drop" ? "D" : set.type === "amrap" ? "A" : set.index}</b><small>{set.type === "working" ? "work" : set.type}</small></button>
                   <button className="previous-set" disabled={!previousSet} onClick={() => previousSet && updateSet(set.id, { load: previousSet.load, unit: previousSet.unit, reps: previousSet.reps })}><strong>{previousSet?.load ?? "—"} {previousSet?.load != null ? previousSet.unit : ""}</strong><small>{previousSet?.reps != null ? `× ${previousSet.reps}` : "No prior set"}</small></button>
-                  <label className="set-input load"><span className="sr-only">Set {set.index} load</span><input inputMode="decimal" value={set.load ?? ""} onChange={(event) => updateSet(set.id, { load: event.target.value === "" ? null : Number(event.target.value) })} /><select aria-label={`Set ${set.index} unit`} value={set.unit} onChange={(event) => updateSet(set.id, { unit: event.target.value as SetResult["unit"] })}><option value="kg">kg</option><option value="lb">lb</option><option value="bodyweight">BW</option><option value="assisted">assist</option><option value="min">min</option></select></label>
+                  <label className="set-input load"><span className="sr-only">Set {set.index} load</span><DecimalInput aria-label={`Set ${set.index} load`} value={set.load} onValueChange={(load) => updateSet(set.id, { load })} /><select aria-label={`Set ${set.index} unit`} value={set.unit} onChange={(event) => updateSet(set.id, { unit: event.target.value as SetResult["unit"] })}><option value="kg">kg</option><option value="lb">lb</option><option value="bodyweight">BW</option><option value="assisted">assist</option><option value="min">min</option></select></label>
                   <label className="set-input"><span className="sr-only">Set {set.index} reps</span><input inputMode="numeric" value={set.reps ?? ""} placeholder={set.prescription?.targetReps || "reps"} onChange={(event) => updateSet(set.id, { reps: event.target.value === "" ? null : Number(event.target.value) })} /></label>
-                  {effortMode === "off" ? <span className="set-effort-off" aria-label={`Effort hidden for set ${set.index}`}>—</span> : effortMode === "both" ? <label className="set-input effort dual" data-label="RPE / RIR"><span className="sr-only">Set {set.index} RPE and RIR</span><input aria-label={`Set ${set.index} RPE`} inputMode="decimal" value={set.rpe ?? ""} placeholder="RPE" onChange={(event) => updateSet(set.id, { rpe: event.target.value === "" ? null : Number(event.target.value) })} /><input aria-label={`Set ${set.index} RIR`} inputMode="decimal" value={set.rir ?? ""} placeholder="RIR" onChange={(event) => updateSet(set.id, { rir: event.target.value === "" ? null : Number(event.target.value) })} /></label> : <label className="set-input effort" data-label={effortLabel}><span className="sr-only">Set {set.index} {effortLabel}</span><input inputMode="decimal" value={effortMode === "rir" ? set.rir ?? "" : set.rpe ?? ""} placeholder="—" onChange={(event) => updateSet(set.id, effortMode === "rir" ? { rir: event.target.value === "" ? null : Number(event.target.value) } : { rpe: event.target.value === "" ? null : Number(event.target.value) })} /></label>}
+                  {effortMode === "off" ? <span className="set-effort-off" aria-label={`Effort hidden for set ${set.index}`}>—</span> : effortMode === "both" ? <label className="set-input effort dual" data-label="RPE / RIR"><span className="sr-only">Set {set.index} RPE and RIR</span><DecimalInput aria-label={`Set ${set.index} RPE`} value={set.rpe} placeholder="RPE" onValueChange={(rpe) => updateSet(set.id, { rpe })} /><DecimalInput aria-label={`Set ${set.index} RIR`} value={set.rir} placeholder="RIR" onValueChange={(rir) => updateSet(set.id, { rir })} /></label> : <label className="set-input effort" data-label={effortLabel}><span className="sr-only">Set {set.index} {effortLabel}</span><DecimalInput aria-label={`Set ${set.index} ${effortLabel}`} value={effortMode === "rir" ? set.rir : set.rpe} placeholder="—" onValueChange={(value) => updateSet(set.id, effortMode === "rir" ? { rir: value } : { rpe: value })} /></label>}
                   <button className="set-complete" aria-label={`${set.completed ? "Mark incomplete" : "Complete"} set ${set.index}`} aria-pressed={set.completed} onClick={() => completeSet(set)}>{set.completed ? <Check /> : <span />}</button>
                   <div className="set-row-detail"><input value={set.note || ""} onChange={(event) => updateSet(set.id, { note: event.target.value })} placeholder="Optional set note" aria-label={`Set ${set.index} note`} /><IconButton label={`Remove set ${set.index}`} onClick={() => removeSet(set.id)}><Trash2 /></IconButton></div>
                 </div>;
@@ -293,7 +299,7 @@ export function WorkoutPage() {
 
         <aside className="workout-context">
           <div className="context-card"><span className="context-title"><History />Previous</span>{previous?.performance ? <><strong>{formatShortDate(previous.session.actualDate)}</strong><div className="previous-sets-list">{previous.performance.sets.filter((set) => set.completed).map((set) => <span key={set.id}><b>{set.load ?? "—"} {set.unit}</b><small>× {set.reps ?? "—"} · {set.rpe ? `RPE ${set.rpe}` : "no RPE"}</small></span>)}</div></> : <p>No earlier performance for this exercise.</p>}</div>
-          <div className="context-card"><span className="context-title"><Clock3 />Rest timer</span><strong>{restLeft ? formatElapsed(restLeft) : `${Math.round(snapshot.settings.restSeconds / 60)}:00`}</strong><div className="rest-actions"><Button className="small" variant={restLeft ? "soft" : "default"} onClick={() => setRestLeft(restLeft ? 0 : snapshot.settings.restSeconds)}>{restLeft ? <Pause /> : <Play />}{restLeft ? "Pause" : "Start"}</Button><Button className="small" variant="ghost" onClick={() => setRestLeft((value) => value + 30)}>+30s</Button></div></div>
+          {snapshot.settings.restTimerEnabled === true && <div className="context-card"><span className="context-title"><Clock3 />Rest timer</span><strong>{restLeft ? formatElapsed(restLeft) : `${Math.round(snapshot.settings.restSeconds / 60)}:00`}</strong><div className="rest-actions"><Button className="small" variant={restLeft ? "soft" : "default"} onClick={() => setRestLeft(restLeft ? 0 : snapshot.settings.restSeconds)}>{restLeft ? <Pause /> : <Play />}{restLeft ? "Pause" : "Start"}</Button><Button className="small" variant="ghost" onClick={() => setRestLeft((value) => value + 30)}>+30s</Button></div></div>}
           <PlateCalculator load={current?.sets.find((set) => set.load != null)?.load ?? 0} unit={current?.sets.find((set) => set.load != null)?.unit || "kg"} />
         </aside>
       </div>
@@ -313,9 +319,9 @@ export function WorkoutPage() {
 
       <Modal open={finishOpen} title="Finish workout" onClose={() => setFinishOpen(false)} className="finish-modal">
         <div className="modal-body finish-summary">
-          <div className="finish-metrics"><span><strong>{completedSets}/{totalSets}</strong><small>sets complete</small></span><span><strong>{draft.performances.length}</strong><small>exercises</small></span><span><strong>{Math.round(sessionVolume(draft)).toLocaleString()}</strong><small>kg volume</small></span><span><strong>{draft.durationMinutes || Math.max(1, Math.round(elapsed / 60))}</strong><small>minutes</small></span></div>
+          <div className="finish-metrics"><span><strong>{completedSets}/{totalSets}</strong><small>sets complete</small></span><span><strong>{draft.performances.length}</strong><small>exercises</small></span><span><strong>{Math.round(sessionVolume(draft)).toLocaleString()}</strong><small>kg volume</small></span><span><strong>{draft.durationMinutes || (snapshot.settings.workoutTimerEnabled === true ? Math.max(1, Math.round(elapsed / 60)) : "—")}</strong><small>minutes</small></span></div>
           {completedSets < totalSets && <div className="finish-warning">{totalSets - completedSets} set{totalSets - completedSets === 1 ? " is" : "s are"} incomplete. They remain preserved as incomplete in the session.</div>}
-          <div className="field-grid"><Field label="Workout name"><input value={draft.title} onChange={(event) => setDraft((value) => value ? { ...value, title: event.target.value } : value)} /></Field><Field label="Workout date"><input type="date" max={todayIso()} value={draft.actualDate} onChange={(event) => setDraft((value) => value ? { ...value, actualDate: event.target.value } : value)} /></Field><Field label="Duration (minutes)"><input type="number" min="1" step="1" value={draft.durationMinutes ?? ""} placeholder={String(Math.max(1, Math.round(elapsed / 60)))} onChange={(event) => setDraft((value) => value ? { ...value, durationMinutes: event.target.value === "" ? undefined : Number(event.target.value) } : value)} /></Field><Field label="Session RPE"><input type="number" min="1" max="10" step="0.5" value={draft.sessionRpe ?? ""} onChange={(event) => setDraft((value) => value ? { ...value, sessionRpe: event.target.value === "" ? null : Number(event.target.value) } : value)} /></Field><Field label="Energy"><input type="number" min="1" max="10" value={draft.energy ?? ""} onChange={(event) => setDraft((value) => value ? { ...value, energy: event.target.value === "" ? null : Number(event.target.value) } : value)} /></Field></div>
+          <div className="field-grid"><Field label="Workout name"><input value={draft.title} onChange={(event) => setDraft((value) => value ? { ...value, title: event.target.value } : value)} /></Field><Field label="Workout date"><input type="date" max={todayIso()} value={draft.actualDate} onChange={(event) => setDraft((value) => value ? { ...value, actualDate: event.target.value } : value)} /></Field><Field label="Duration (minutes)"><input type="number" min="1" step="1" value={draft.durationMinutes ?? ""} placeholder={snapshot.settings.workoutTimerEnabled === true ? String(Math.max(1, Math.round(elapsed / 60))) : "Optional"} onChange={(event) => setDraft((value) => value ? { ...value, durationMinutes: event.target.value === "" ? undefined : Number(event.target.value) } : value)} /></Field><Field label="Session RPE"><DecimalInput min={1} max={10} step={0.5} value={draft.sessionRpe} onValueChange={(sessionRpe) => setDraft((value) => value ? { ...value, sessionRpe } : value)} /></Field><Field label="Energy"><input type="number" min="1" max="10" value={draft.energy ?? ""} onChange={(event) => setDraft((value) => value ? { ...value, energy: event.target.value === "" ? null : Number(event.target.value) } : value)} /></Field></div>
           <Field label="Session notes"><textarea value={draft.notes || ""} onChange={(event) => setDraft((value) => value ? { ...value, notes: event.target.value } : value)} placeholder="What mattered today?" /></Field>
           <div className="finish-actions">{draft.status !== "completed" ? <Button variant="danger" disabled={discarding} onClick={() => void discard()}>{discarding ? "Discarding…" : "Discard draft"}</Button> : <span />}<span /><Button variant="default" onClick={() => setFinishOpen(false)}>Keep editing</Button><Button variant="primary" onClick={() => void finish()}><CheckCircle2 />Finish & save</Button></div>
         </div>

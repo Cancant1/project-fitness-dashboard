@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
-import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { parseDecimalInput } from "../domain/utils";
 
 export function Button({ variant = "default", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "primary" | "ghost" | "danger" | "soft" }) {
   return <button {...props} className={`button ${variant} ${className}`.trim()} />;
@@ -48,12 +49,16 @@ export function ProgressBar({ value, max = 100, label, tone = "accent" }: { valu
 
 export function Modal({ open, title, onClose, children, className = "" }: { open: boolean; title: string; onClose: () => void; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>("button, input, select, textarea, [tabindex]")?.focus();
+    const preferred = ref.current?.querySelector<HTMLElement>("[autofocus]");
+    const fallback = ref.current?.querySelector<HTMLElement>("input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), [tabindex='0']");
+    (preferred || fallback)?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") closeRef.current();
       if (event.key === "Tab" && ref.current) {
         const items = Array.from(ref.current.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex='0']"));
         if (!items.length) return;
@@ -68,7 +73,7 @@ export function Modal({ open, title, onClose, children, className = "" }: { open
       document.removeEventListener("keydown", onKey);
       previous?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
   if (!open) return null;
   return (
     <div className="modal-scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
@@ -78,6 +83,28 @@ export function Modal({ open, title, onClose, children, className = "" }: { open
       </div>
     </div>
   );
+}
+
+export function DecimalInput({ value, onValueChange, onFocus, onBlur, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & { value: number | null | undefined; onValueChange: (value: number | null) => void }) {
+  const [text, setText] = useState(value == null ? "" : String(value));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(value == null ? "" : String(value));
+  }, [value]);
+  return <input {...props} type="text" inputMode="decimal" value={text} onFocus={(event) => { focused.current = true; onFocus?.(event); }} onChange={(event) => {
+    const raw = event.target.value;
+    setText(raw);
+    if (!raw.trim()) onValueChange(null);
+    else {
+      const parsed = parseDecimalInput(raw);
+      if (parsed != null) onValueChange(parsed);
+    }
+  }} onBlur={(event) => {
+    focused.current = false;
+    const parsed = parseDecimalInput(text);
+    setText(parsed == null ? value == null ? "" : String(value) : String(parsed));
+    onBlur?.(event);
+  }} />;
 }
 
 export function Field({ label, hint, error, children, className = "" }: { label: string; hint?: string; error?: string; children: ReactNode; className?: string }) {
@@ -91,4 +118,3 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
 export function Tabs({ items }: { items: Array<{ to: string; label: string; active: boolean; onClick: () => void }> }) {
   return <div className="tabs" role="tablist">{items.map((item) => <button key={item.to} role="tab" aria-selected={item.active} onClick={item.onClick}>{item.label}</button>)}</div>;
 }
-

@@ -615,6 +615,8 @@ export async function migrateLegacySources(input: {
     settings: {
       appearance: { theme: "system", density: "comfortable" },
       restSeconds: 120,
+      workoutTimerEnabled: false,
+      restTimerEnabled: false,
       preferredRpeMode: "rpe",
       mealView: "meal",
       activeProfileId

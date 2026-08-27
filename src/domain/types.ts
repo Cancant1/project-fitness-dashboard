@@ -279,6 +279,8 @@ export interface AppearanceSettings {
 export interface AppSettings {
   appearance: AppearanceSettings;
   restSeconds: number;
+  workoutTimerEnabled?: boolean;
+  restTimerEnabled?: boolean;
   preferredRpeMode: "rpe" | "rir" | "both" | "off";
   mealView: "meal" | "time";
   activeProfileId: string;
@@ -370,4 +372,3 @@ export interface LegacyFitnessData {
   stats?: { profile?: string; programmingRules?: unknown[]; lifetimePrs?: unknown[]; rawRows?: unknown[][] };
   summary?: Record<string, unknown>;
 }
-
