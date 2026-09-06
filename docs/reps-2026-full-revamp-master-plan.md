@@ -1329,3 +1329,28 @@ Existing v2 targets that an earlier build generated cannot safely be distinguish
 ### Removed from required scope
 
 Superset/circuit infrastructure, bulk paste, distance modes, deeper muscle/body-composition analytics, expanded chart comparisons, multi-date meal paste, extra human/AI exports, new-profile administration, conflict inbox, bulk administration, and wipe workflows remain deferred. Reopen only for a concrete user need. Core completion means reliable logging, useful factual history, and proven recovery—not implementing every earlier wishlist item.
+
+
+## 26. Missing profiles and original GitHub data recovery — 6 September 2026
+
+### Problem and implemented fix
+
+A successful sync could leave a fresh phone showing only “Profile”. The app had no profile selector; a new v2 file did not automatically include the original v1 history. In addition, the pristine default profile uses `local`, which can be the original first user's ID, so a newer fallback could win a timestamp-based merge and replace that user's name.
+
+- Added an **Active profile** selector in Settings → Profile. The header's profile button already opens this page. Profile forms refresh after recovery and switching; the selection is saved with the journal.
+- Added **Find original profiles** to Profile and Data & GitHub settings. It reads the original `state/reps-app-state.json` using the saved private-repository connection, shows actual profile names and per-profile record counts, and waits for **Import these profiles**.
+- Recovery adds missing records and preserves existing records, edits, and deletion markers. It replaces only the untouched default profile with the original profile sharing its ID. Existing sessions with matching IDs remain unchanged. Repeated recovery does not duplicate records.
+- Recovery preserves the full original state and migration report as a source-labelled raw fact in the canonical backup/export, including fields not supported by the current UI. A local checkpoint is created before recovery. The original GitHub file is read-only; the normal destination remains the separate v2 file.
+- Regular sync now prefers a substantive profile over an untouched fallback with the same ID, irrespective of which device has the later fallback timestamp. Intentional profile edits and deleted profiles retain the existing merge policy.
+- A GitHub file 404 now checks repository access before calling the file missing. Missing v2-file guidance points to profile recovery.
+
+### Phone steps after deployment
+
+1. Reload Reps and open Settings → Profile.
+2. If the original names appear in Active profile, select the desired profile.
+3. Otherwise choose Find original profiles. Confirm the preview contains the expected names and records, then choose Import these profiles.
+4. Select the desired profile and use Push & merge in Data & GitHub to share the recovered v2 journal, then Pull & merge on the other device. Existing enabled automatic sync can also upload the recovered journal.
+
+### Validation and remaining limits
+
+Focused tests cover Mario/Connie fixture recovery, same-ID fallback collision in both sync directions, duplicate recovery, existing edits/deletions, read-only preview, invalid backup rejection, source/destination separation, repository-access errors, one recovery checkpoint, and the profile selector/form state across reload. These fixtures are synthetic; the user's private file and phone contents have not been inspected or imported in this task. Recovery must show the actual expected profiles before it is confirmed on the phone. The real-data restore and device acceptance gates in §25 remain open; profile switching itself is now implemented.

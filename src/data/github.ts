@@ -1,5 +1,6 @@
 import type { ExercisePerformance, GithubSyncConfig, GithubSyncMeta, RepsSnapshot, VersionedEntity, WorkoutSession } from "../domain/types";
-import { nowIso, uid } from "../domain/utils";
+import { isPlaceholderProfile, nowIso, uid } from "../domain/utils";
+import { migrateLegacySources } from "./migrate";
 import { validateSnapshot } from "./schema";
 
 export const SYNC_CONFIG_KEY = "reps-github-sync-config-v2";
@@ -88,9 +89,13 @@ export const isSyncConfigured = (config: GithubSyncConfig) => !!(
   config.enabled && config.owner.trim() && config.repo.trim() && config.path.trim() && config.token.trim()
 );
 
-export async function fetchRemote(config: GithubSyncConfig): Promise<{ sha: string; snapshot: RepsSnapshot } | null> {
+async function fetchRemoteJson(config: GithubSyncConfig): Promise<{ sha: string; value: unknown } | null> {
   const response = await fetch(contentUrl(config), { headers: headers(config) });
-  if (response.status === 404) return null;
+  if (response.status === 404) {
+    const access = await fetch(`https://api.github.com/repos/${encodeURIComponent(config.owner.trim())}/${encodeURIComponent(config.repo.trim())}`, { headers: headers(config) });
+    if (!access.ok) throw new Error("Cannot access the repository. Check its name and that this token has access to it.");
+    return null;
+  }
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`GitHub pull failed (${response.status}): ${body.slice(0, 180)}`);
@@ -103,13 +108,42 @@ export async function fetchRemote(config: GithubSyncConfig): Promise<{ sha: stri
     const blob = await blobResponse.json();
     content = String(blob.content || "");
   }
+  return { sha: file.sha, value: JSON.parse(base64ToUtf8(content)) };
+}
+
+export async function fetchRemote(config: GithubSyncConfig): Promise<{ sha: string; snapshot: RepsSnapshot } | null> {
+  const remote = await fetchRemoteJson(config);
+  if (!remote) return null;
+  const parsed = remote.value as { state?: unknown };
   try {
-    const parsed = JSON.parse(base64ToUtf8(content));
-    const snapshot = validateSnapshot(parsed.state ?? parsed);
-    return { sha: file.sha, snapshot };
+    return { sha: remote.sha, snapshot: validateSnapshot(parsed?.state ?? parsed) };
   } catch (error) {
     throw new Error(`GitHub state is invalid and was not merged: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+export async function previewLegacyGithub(config: GithubSyncConfig, path: string): Promise<RepsSnapshot> {
+  if (!isSyncConfigured(config)) throw new Error("Enable GitHub sync and save the owner, repository, state file, and token first.");
+  if (!path.trim()) throw new Error("Enter the original state file path.");
+  if (path.trim() === config.path.trim()) throw new Error("Keep the sync State file set to the new v2 file so the original file will not be overwritten.");
+  const remote = await fetchRemoteJson({ ...config, path });
+  if (!remote) throw new Error("Original file not found. Check its path and the saved branch.");
+  const envelope = remote.value as { state?: unknown };
+  const raw = (envelope?.state ?? envelope) as Record<string, any>;
+  if (!raw || raw.schemaVersion === 2 || !Array.isArray(raw.profiles) || !raw.profiles.length ||
+    raw.profiles.some((profile: any) => !profile || typeof profile.id !== "string" || !profile.id || typeof profile.name !== "string") ||
+    new Set(raw.profiles.map((profile: any) => profile.id)).size !== raw.profiles.length) {
+    throw new Error("This is not an original Reps profile backup. Nothing was imported.");
+  }
+  const migrated = await migrateLegacySources({ repsV1: raw, clientId: config.clientId });
+  if ((migrated.migrationReport?.unexplainedDrops ?? 0) > 0) throw new Error("Migration found unresolved record differences. Nothing was imported.");
+  migrated.legacyFacts.push({
+    id: `legacy-github-${remote.sha}`, profileId: migrated.settings.activeProfileId,
+    type: "raw", title: "Original GitHub state and migration report", source: "reps-v1",
+    sourceRef: `${config.owner}/${config.repo}/${path}@${remote.sha}`,
+    createdAt: nowIso(), updatedAt: nowIso(), value: { state: raw, report: migrated.migrationReport }
+  });
+  return migrated;
 }
 
 export async function putRemote(config: GithubSyncConfig, snapshot: RepsSnapshot, sha?: string | null) {
@@ -150,11 +184,11 @@ const newer = <T extends VersionedEntity>(local: T, remote: T) => {
   return remoteText.length > localText.length ? remote : local;
 };
 
-const mergeEntities = <T extends VersionedEntity>(local: T[], remote: T[]) => {
+const mergeEntities = <T extends VersionedEntity>(local: T[], remote: T[], choose: (local: T, remote: T) => T = newer) => {
   const result = new Map<string, T>();
   for (const entity of [...local, ...remote]) {
     const current = result.get(entity.id);
-    result.set(entity.id, current ? newer(current, entity) : entity);
+    result.set(entity.id, current ? choose(current, entity) : entity);
   }
   return Array.from(result.values());
 };
@@ -196,7 +230,10 @@ export function mergeSnapshots(local: RepsSnapshot, remote: RepsSnapshot, client
     updatedAt: stamp,
     updatedBy: client,
     revision: Math.max(local.revision, remote.revision) + 1,
-    profiles: mergeEntities(local.profiles, remote.profiles),
+    profiles: mergeEntities(local.profiles, remote.profiles, (a, b) => {
+      if (!a.deletedAt && !b.deletedAt && isPlaceholderProfile(a) !== isPlaceholderProfile(b)) return isPlaceholderProfile(a) ? b : a;
+      return newer(a, b);
+    }),
     exercises: mergeEntities(local.exercises, remote.exercises),
     sessions: mergeWorkoutSessions(local.sessions, remote.sessions),
     plannedWorkouts: mergeEntities(local.plannedWorkouts, remote.plannedWorkouts),

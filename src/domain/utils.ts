@@ -2,6 +2,7 @@ import type {
   Exercise,
   FoodLogEntry,
   MovementGroup,
+  Profile,
   RepsSnapshot,
   SetResult,
   Unit,
@@ -124,6 +125,10 @@ export const foodTotals = (entries: FoodLogEntry[]) => entries.reduce((totals, e
   carbs: totals.carbs + (entry.carbs ?? 0),
   fat: totals.fat + (entry.fat ?? 0)
 }), { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+
+// The untouched fallback profile can share an ID with the original user's profile.
+export const isPlaceholderProfile = (profile: Profile) => profile.id === "local" && profile.name === "Profile" &&
+  profile.source === "reps-v1" && profile.createdAt === profile.updatedAt && !profile.birthday && !profile.activeRoutineId;
 
 export const activeProfile = (snapshot: RepsSnapshot) => snapshot.profiles.find(
   (profile) => profile.id === snapshot.settings.activeProfileId && !profile.deletedAt

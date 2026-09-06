@@ -46,3 +46,6 @@ The current completion scope and remaining-work overview are in [the master plan
 Local edits are saved before they are reported as saved. Pull merges into the latest saved state and remains pending until pushed. Push acknowledges only its uploaded revision; edits saved during upload remain pending. Pending status survives reload in IndexedDB. Existing automatic-sync preferences are preserved.
 
 The previous app and committed production build remain necessary: recovery acceptance is still open, and GitHub Pages is currently configured to publish from the root of `main`. Do not delete these paths until the corresponding gates in §25 pass.
+
+
+If a connected phone only shows “Profile”, open **Settings → Profile** and check **Active profile**. If the original profiles are absent, use **Find original profiles** to preview the original GitHub data file, then **Import these profiles**. Recovery preserves existing records and the original file. See [the recovery notes in §26](docs/reps-2026-full-revamp-master-plan.md#26-missing-profiles-and-original-github-data-recovery--6-september-2026).

@@ -12,6 +12,7 @@ import {
   saveSyncConfig,
   saveSyncMeta
 } from "../data/github";
+import { addRecoveredRecords } from "../data/recover";
 import { validateSnapshot } from "../data/schema";
 
 type Mutator = (draft: RepsSnapshot) => void;
@@ -27,7 +28,7 @@ interface AppStoreValue {
   setSyncConfig: (config: GithubSyncConfig) => void;
   pullGithub: () => Promise<void>;
   pushGithub: () => Promise<void>;
-  importSnapshot: (value: unknown) => Promise<void>;
+  importSnapshot: (value: unknown, mode?: "replace" | "recover") => Promise<void>;
   exportSnapshot: () => void;
   saveError: string | null;
 }
@@ -144,7 +145,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     try {
       const remote = await fetchRemote(config);
       if (!remote && direction === "pull") {
-        updateSyncMeta({ status: "idle", message: "No remote v2 file yet", lastSyncAt: nowIso() });
+        updateSyncMeta({ status: "idle", message: "No v2 file on this branch yet. Find original profiles in Settings → Profile.", lastSyncAt: nowIso() });
         return;
       }
       const outgoing = await enqueue(async () => {
@@ -189,14 +190,15 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     };
   }, [pushGithub, syncConfig, syncMeta.dirty, syncMeta.status, snapshot?.revision]);
 
-  const importSnapshot = useCallback(async (value: unknown) => {
+  const importSnapshot = useCallback(async (value: unknown, mode: "replace" | "recover" = "replace") => {
     const imported = validateSnapshot(value);
     if ((imported.migrationReport?.unexplainedDrops ?? 0) > 0) {
       throw new Error("This backup contains unresolved migration drops and was not imported.");
     }
     await enqueue(async () => {
-      const next = { ...deepClone(imported), snapshotId: uid("snapshot"), updatedAt: nowIso(), updatedBy: syncConfigRef.current.clientId, revision: Math.max(imported.revision, snapshotRef.current?.revision ?? 0) + 1 };
-      await replaceSnapshot(next, "Imported schema 2 snapshot");
+      const contents = mode === "recover" && snapshotRef.current ? addRecoveredRecords(snapshotRef.current, imported) : deepClone(imported);
+      const next = { ...contents, snapshotId: uid("snapshot"), updatedAt: nowIso(), updatedBy: syncConfigRef.current.clientId, revision: Math.max(imported.revision, snapshotRef.current?.revision ?? 0) + 1 };
+      await replaceSnapshot(next, mode === "recover" ? "Recovered original GitHub profiles" : "Imported schema 2 snapshot");
       publish(next);
       updateSyncMeta({ dirty: true, status: "idle", message: "Import complete · sync pending" });
     });
