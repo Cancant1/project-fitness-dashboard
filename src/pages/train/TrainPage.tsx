@@ -17,7 +17,7 @@ export function TrainPage() {
   if (!snapshot) return null;
   const profile = activeProfile(snapshot);
   const active = snapshot.sessions.find((session) => session.profileId === profile.id && (session.status === "draft" || session.status === "inProgress") && !session.deletedAt);
-  const completedPlanIds = new Set(snapshot.sessions.filter((session) => session.status === "completed").map((session) => session.plannedWorkoutId));
+  const completedPlanIds = new Set(snapshot.sessions.filter((session) => session.profileId === profile.id && !session.deletedAt && session.status === "completed").map((session) => session.plannedWorkoutId));
   const upcoming = snapshot.plannedWorkouts.filter((plan) => plan.profileId === profile.id && !plan.deletedAt && plan.date >= todayIso() && plan.status !== "skipped" && !completedPlanIds.has(plan.id)).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   const routines = snapshot.routines.filter((routine) => routine.profileId === profile.id && !routine.deletedAt);
   const sessions = useMemo(() => {

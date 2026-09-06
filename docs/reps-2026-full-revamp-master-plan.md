@@ -1,6 +1,6 @@
 # Reps. 2026 Full Revamp — Master Product, UX, Architecture, and Migration Plan
 
-**Status:** core revamp implemented; advanced workflow completion, release acceptance, and real-device restore drill remain
+**Status:** reduced scope adopted and cleanup implemented; release acceptance and conditional legacy retirement remain (see §25)
 **Created:** 26 August 2026  
 **Scope:** the current `dashboard/` application, its predecessor in `app/`, the embedded workbook export, browser state, and GitHub synchronization  
 **Primary constraint:** no workout, food, bodyweight, plan, note, or settings data may be silently lost, rewritten, or made unreachable  
@@ -1222,3 +1222,110 @@ The revamp is complete when Reps. feels like one product rather than a collectio
 - **Progress depth:** muscle/load foundation, goal/body-composition views, chart data tables, and richer annotations/comparisons.
 - **Data administration:** add/switch/archive profiles, conflict inbox, human/AI context exports, dry-run bulk tools, and the guarded wipe flow.
 - **Release proof:** the two-device GitHub matrix, real backup/GitHub restore drill, accessibility assistive-technology pass, cross-browser/installed-PWA matrix, and production performance measurements remain mandatory before legacy removal.
+
+## 24. First-principles review and proposed reduction plan — 6 September 2026
+
+This section records the review that led to the adopted scope in §25. At review time it was a plan, not an implementation change; it does not mark deferred features as delivered. Review evidence is the current source, README, deployment workflow, and recorded acceptance results. No fresh browser, restore, deployment, or two-device tests were performed for this review.
+
+### Objective and decision
+
+The working objective is a personal journal that makes it easy to record workouts, food, and weight, see useful history, and recover or transfer that history. This is inferred from the existing project and usage notes. Becoming a general coaching, analytics, or multi-user platform is not necessary to achieve it.
+
+Keep the current app and stack. Another rewrite, schema redesign, or navigation redesign would add risk without establishing a better everyday outcome. The implementation is substantial enough to move from feature expansion to acceptance, but the recorded release gaps and persistence concerns below prevent calling it finished yet.
+
+### 1. Delete obligations before adding implementation
+
+Remove these items from the proposed definition of core completion: superset/circuit infrastructure, desktop bulk paste, distance modes, expanded chart comparisons/annotations, body-composition and muscle-load systems, multi-date meal paste, human/AI export variants, bulk administration, and a wipe workflow. Reopen individual items only when an actual logging task requires them. Existing JSON and CSV export already cover backup and portable records.
+
+Do not build new-profile creation and administration merely because the schema supports profiles. First check whether imported data contains multiple profiles: if it does, access to every existing profile remains essential. Preserve profile identifiers and records regardless.
+
+Do not build a conflict inbox merely to complete the old roadmap. First establish an explicit sync contract and test it. The historical usage notes describe manual overwrite behavior, while v2 exposes merge behavior; neither should silently replace the other in a cleanup. Any contract change must be called out separately.
+
+### 2. Remove unsupported conclusions from the interface
+
+`src/pages/TodayPage.tsx` labels protein as behind based on logged intake and a fallback target, and labels training rhythm on track after any completed weekly session. Missing food logs and one completed workout do not establish those conclusions. Prefer factual amounts and counts; show targets only when configured. Delete the conditional coaching card if it merely repeats those facts. Do not replace it with a more elaborate recommendation engine.
+
+The session detail's cross-exercise “Top e1RM” card is also a deletion candidate: the largest estimate across different movements does not reliably identify the most useful result. Keep exercise-specific history instead. These are proposed UI removals, not deletion of underlying training or nutrition records.
+
+### 3. Simplify persistence and sync where duplication is demonstrated
+
+In `src/data/db.ts`, each save writes a whole snapshot plus an outbox row containing only a revision and reason. Sync sends the whole snapshot; outbox rows are counted and cleared, not replayed. Replace the per-edit queue and queued-change counter with one durable pending-sync marker tied to the saved revision. Remove redundant independently maintained dirty state. Keep existing database data readable; a new schema architecture is unnecessary.
+
+`AppStore.tsx` explicitly creates a checkpoint before pull/import, then `replaceSnapshot` creates another checkpoint of the current state. Choose one owner for the pre-replacement checkpoint and remove duplicate calls. Preserve pre-push protection, explicit manual checkpoints, and the original migration backup. Do not combine this with deletion of existing backups.
+
+Before these changes are accepted, resolve the concrete correctness issues exposed by the current flow:
+
+- Local mutations are queued, but pull/push capture a snapshot before network work and later replace state outside that queue. A newer edit can therefore be overwritten. Serialize replacement with local saves and preserve edits made during a request.
+- Pull clears pending changes even when the merge includes local records absent remotely. Only mark the state clean when the relevant saved content is known to be on GitHub.
+- Local saving reports success before the write completes, and the save-chain catch consumes the failure. Report “saved” only after persistence succeeds and propagate failures to the caller.
+
+Prove these with focused delayed-network and failed-write tests, including reload with unsynced changes. Keep manual sync available. If automatic sync complicates a safe fix, propose removing its timer and toggle before adding retries or scheduling machinery; do not silently change an enabled user preference.
+
+### 4. Delete legacy delivery only after recovery is proven
+
+The largest removable body of code is the previous dashboard: `Reps.html`, `app.jsx`, `components/*.jsx`, `app.bundle.js`, `build-bundle.mjs`, `vendor/babel.min.js`, and the old root stylesheet. First complete the existing restore, migration reconciliation, and real-use acceptance gates. Preserve a recoverable archive and verify references before removing any file. Do not delete the workbook, private exports, browser history, or migration sources as part of code cleanup.
+
+Public seed scripts currently serve the new app too. Keep `food-catalog.js`, routine data, and any helper required by migration until their consumers are checked; an old directory name is not evidence that its contents are dead. Review the sibling `app/` predecessor separately before archiving it.
+
+The repository also supports both an Actions-built site and a committed `dist/` fallback through root `index.html`. Confirm the actual Pages publishing setting. If Actions is the active supported route, remove the branch-publishing fallback and tracked generated output, then use one source entry and one build artifact. If the fallback remains necessary, leave it alone. Remove legacy asset-copy branches only after legacy retirement.
+
+### 5. Simplify the remaining calculations, then stop
+
+Use existing domain helpers for repeated metrics rather than introducing a selector framework. For example, Today computes weekly volume inline without filtering completed sets or normalizing units, while other screens use `sessionVolume`. Establish one definition of completed, non-deleted sessions and valid set volume, then use it consistently. Check mixed units, incomplete sets, and deleted sessions with focused tests.
+
+Keep the five primary areas, single workout editor, food library, routine/plan distinction, typed records, IndexedDB, import validation, soft deletes, migration evidence, and opt-in timers. They serve concrete tasks or protect history. Do not optimize whole-snapshot cloning, split bundles, introduce more state infrastructure, or automate more workflows without a measured problem.
+
+### Execution order and stopping rule
+
+1. Adopt the smaller core scope; retain deferred requirements as historical context, not release obligations.
+2. Remove unsupported summary claims and demonstrated duplicate persistence bookkeeping; verify save/sync correctness as part of that work.
+3. Exercise the essential user journeys: log and edit a workout, resume after reload, log food and weight, inspect history, work offline, export/restore, and sync without losing edits. Complete the existing applicable accessibility and device acceptance checks.
+4. Retire legacy code and the alternate publishing route only when their respective recovery and deployment gates pass.
+5. Stop. If the everyday journeys are dependable, the journal is complete for this scope. No additional feature or performance work is implied by an unfinished item in the earlier wishlist.
+
+
+## 25. Implementation and remaining-work overview — 6 September 2026
+
+The user authorized implementation and publication of §24. The reduced scope is now the governing completion scope; earlier feature lists remain historical context. Deferred features are not release obligations and have not been marked delivered.
+
+### Completed
+
+- Removed Today’s conditional coaching card and its unused styles, the session-wide cross-exercise “Top e1RM” card, and the energy “Target range” card that compared historical intake against the current Monday target.
+- Removed fallback nutrition targets from Today and the food diary, and prefilled numeric targets from the target editor. New journals no longer receive a target when there are no legacy macro settings. Existing stored targets and the existing interpretation of partially populated legacy macro settings remain intact.
+- Unified completed-set counts and external-load volume: ignore deleted/skipped performances and deleted/incomplete sets, exclude time/bodyweight loads, reject invalid numbers, and convert pounds to kilograms for aggregate volume. Today uses the shared helper and excludes deleted completed sessions; deleted sessions no longer suppress planned-workout launch options in Today or Train.
+- Replaced the per-save outbox rows and queued-change counter with a single pending snapshot/revision marker saved in the same IndexedDB transaction as the snapshot. The old empty store remains for compatibility. On first upgrade, old rows are cleared and existing snapshots are conservatively marked pending once, including builds that previously cleared the counter too early.
+- Stopped persisting a second dirty flag in localStorage; the UI reads durable pending state when opening. Removed unused conflict fields from the current sync metadata type.
+- Serialized local mutation, merge, import, and acknowledgement writes while leaving GitHub requests outside that queue. Pull merges the latest saved state. Push saves its outgoing merge before upload and never replaces newer local state after upload. Only the uploaded revision can be acknowledged; later edits or imports remain pending. Overlapping sync requests are coalesced.
+- Pull remains pending until pushed. Kept manual merge behavior and existing automatic-sync preferences. Automatic push waits for the last saved revision rather than the first edit in a burst.
+- Local mutations publish only after the database write succeeds. Failed writes reject the operation, display an error without unmounting the journal, and do not report “saved”; the workout autosave label handles the rejection. Initialization rereads saved state when reopening while still coalescing concurrent initializations.
+- Removed duplicate pre-replacement checkpoints for pull/import/push merges. Kept one checkpoint per operation, explicit pre-push protection, manual checkpoints, original migration backups, and existing backup records.
+- Fixed session detail sorting to avoid mutating the shared snapshot during rendering.
+
+### Verification in this implementation
+
+- `pnpm verify`: type checking, 22 tests across 8 files, and production build pass with Node 24.
+- Added delayed-pull/upload tests, overlapping sync tests, import-during-upload protection, failed-write/retry tests, reopening with stale localStorage metadata, upgrade compatibility, checkpoint counts, mixed-unit/deleted/incomplete-set totals, and new-journal/imported-target migration tests.
+- `pnpm audit:data` passes; source inventory remains 144 workout slots, 48 performed sessions, 85 workbook foods, 96 catalog foods, and 121 raw stats rows. This inventory is not a substitute for restoring a real user backup.
+- Legacy sync-merge regression tests pass.
+- Built-site browser smoke check: Today displays the reduced layout, a newly created local workout draft survives reload, and Data settings show pending status without the old counter. Desktop viewport was 1280 px with no horizontal overflow and no captured console warnings/errors. The browser viewport override did not take effect, so this is not a fresh mobile acceptance claim. Existing local browser targets remained intact.
+- GitHub Pages settings were read through the repository’s existing authentication: `build_type: legacy`, source `main` at `/`. Recent history shows both the custom workflow and branch-based Pages deployment. Therefore root `index.html`, tracked `dist/`, and their supporting paths are still required and were rebuilt rather than removed.
+- The build still emits its approximately 500 kB chunk advisory. There is no new measured interaction problem justifying bundle restructuring in this change.
+
+### What is still left
+
+| Work | Why it remains | Completion evidence |
+|---|---|---|
+| Real backup and GitHub restore drill | Unit fixtures do not prove restoration of the user's actual history. | Restore an exported backup and a known private GitHub commit into a disposable copy; reconcile records and inspect restored entries. |
+| Real two-device sync acceptance | Simulated delayed requests cover the fixed races, not the complete device/network matrix or all existing merge policy behavior. | Same-session edits, offline/reconnect, revoked credentials, remote creation, stale SHA, rate limits, and files over 1 MB, with no unexplained loss. Resolve failures before sign-off. |
+| Multiple-tab and same-field conflict behavior | The local write queue is per app instance; it is not a cross-tab lock. Existing timestamp-based same-field merge policy remains. | Verify actual usage and resolve any demonstrated loss; do not claim collaborative editing support from this patch. |
+| Real logging and existing-profile access | The imported data may include more than one profile, and fixture tests cannot establish everyday usability. | Log/edit/resume a populated workout, food and weight; inspect history and confirm all imported profiles are reachable. |
+| Accessibility, mobile, browser, and installed/offline checks | Desktop smoke checks do not satisfy the existing acceptance matrix. | Keyboard and assistive-technology checks; actual phone layouts, Safari/Android/Firefox, 200% zoom, installed PWA, offline reload/update. |
+| Legacy app retirement | Restore and real-use sign-off are still outstanding. | Once gates pass, archive the recoverable predecessor, check references, then remove its UI, bundle, build script, vendor compiler, and obsolete copied assets. Preserve seed/migration consumers and user data. |
+| Publishing-route consolidation | Branch publishing is currently configured; deleting its entry/build would break a supported route. | Choose one supported route, verify deployment under that setting, then remove only the unused delivery path. No hosting settings changed here. |
+| Performance work, only if measured | A size advisory is not an interaction failure. | Measure on a real device; optimize only if an acceptance budget is missed. |
+
+Existing v2 targets that an earlier build generated cannot safely be distinguished from intentional targets by their values alone. Review them in the existing target editor if necessary; no blanket target deletion was performed.
+
+### Removed from required scope
+
+Superset/circuit infrastructure, bulk paste, distance modes, deeper muscle/body-composition analytics, expanded chart comparisons, multi-date meal paste, extra human/AI exports, new-profile administration, conflict inbox, bulk administration, and wipe workflows remain deferred. Reopen only for a concrete user need. Core completion means reliable logging, useful factual history, and proven recovery—not implementing every earlier wishlist item.

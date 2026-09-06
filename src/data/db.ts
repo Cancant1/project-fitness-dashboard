@@ -61,7 +61,17 @@ const readLegacyJson = (key: string) => {
 async function initializeSnapshot(clientId: string) {
   const db = await openRepsDatabase();
   const existing = await db.get("snapshots", CURRENT_KEY);
-  if (existing?.schemaVersion === 2) return existing;
+  if (existing?.schemaVersion === 2) {
+    // Older builds could clear their outbox after a pull without uploading local
+    // additions. Treat every upgraded snapshot as pending once, conservatively.
+    if (await db.get("meta", "pendingSync") === undefined) {
+      const tx = db.transaction(["meta", "outbox"], "readwrite");
+      await tx.objectStore("meta").put({ snapshotId: existing.snapshotId, revision: existing.revision }, "pendingSync");
+      await tx.objectStore("outbox").clear();
+      await tx.done;
+    }
+    return existing;
+  }
 
   const legacyRaw = {
     "reps-app-state-v1": typeof localStorage !== "undefined" ? localStorage.getItem("reps-app-state-v1") : null,
@@ -89,7 +99,7 @@ async function initializeSnapshot(clientId: string) {
   if ((snapshot.migrationReport?.unexplainedDrops ?? 0) > 0) {
     throw new Error("Migration reconciliation found unexplained record drops. The v2 database was not activated.");
   }
-  await db.put("snapshots", snapshot, CURRENT_KEY);
+  await saveSnapshot(snapshot, "Initial migration");
   await db.put("meta", backupId, "legacyBackupId");
   await db.put("meta", true, "legacyImported");
   return snapshot;
@@ -97,9 +107,8 @@ async function initializeSnapshot(clientId: string) {
 
 export function loadOrInitializeSnapshot(clientId: string) {
   if (!initializationPromise) {
-    initializationPromise = initializeSnapshot(clientId).catch((error) => {
+    initializationPromise = initializeSnapshot(clientId).finally(() => {
       initializationPromise = null;
-      throw error;
     });
   }
   return initializationPromise;
@@ -107,10 +116,24 @@ export function loadOrInitializeSnapshot(clientId: string) {
 
 export async function saveSnapshot(snapshot: RepsSnapshot, reason: string) {
   const db = await openRepsDatabase();
-  const tx = db.transaction(["snapshots", "outbox"], "readwrite");
+  const tx = db.transaction(["snapshots", "meta"], "readwrite");
   await tx.objectStore("snapshots").put(snapshot, CURRENT_KEY);
-  await tx.objectStore("outbox").put({ id: uid("outbox"), createdAt: nowIso(), revision: snapshot.revision, reason });
+  await tx.objectStore("meta").put({ snapshotId: snapshot.snapshotId, revision: snapshot.revision }, "pendingSync");
   await tx.done;
+}
+
+export async function hasPendingSync() {
+  return !!(await (await openRepsDatabase()).get("meta", "pendingSync"));
+}
+
+export async function acknowledgeSynced(snapshot: RepsSnapshot) {
+  const db = await openRepsDatabase();
+  const tx = db.transaction(["snapshots", "meta"], "readwrite");
+  const current = await tx.objectStore("snapshots").get(CURRENT_KEY);
+  const matches = current?.snapshotId === snapshot.snapshotId && current?.revision === snapshot.revision;
+  if (matches) await tx.objectStore("meta").put(null, "pendingSync");
+  await tx.done;
+  return matches;
 }
 
 export async function checkpoint(snapshot: RepsSnapshot, reason: string) {
@@ -136,18 +159,6 @@ export async function loadBackupSnapshot(id: string) {
   const backup = await (await openRepsDatabase()).get("backups", id);
   if (!backup?.snapshot) throw new Error("This automatic backup contains the untouched legacy browser keys, not a restorable schema 2 snapshot.");
   return structuredClone(backup.snapshot);
-}
-
-export async function clearOutbox() {
-  const db = await openRepsDatabase();
-  const tx = db.transaction("outbox", "readwrite");
-  await tx.store.clear();
-  await tx.done;
-}
-
-export async function outboxCount() {
-  const db = await openRepsDatabase();
-  return db.count("outbox");
 }
 
 export async function replaceSnapshot(snapshot: RepsSnapshot, reason: string) {

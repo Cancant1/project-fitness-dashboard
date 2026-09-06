@@ -23,7 +23,6 @@ export const defaultSyncMeta = (): GithubSyncMeta => ({
   lastSyncAt: null,
   lastPushAt: null,
   dirty: false,
-  conflict: false,
   status: navigator.onLine ? "idle" : "offline",
   message: navigator.onLine ? "Saved locally" : "Offline · saved locally"
 });
@@ -54,9 +53,12 @@ export const loadSyncConfig = () => {
   };
 };
 
-export const loadSyncMeta = () => readJson<GithubSyncMeta>(SYNC_META_KEY, defaultSyncMeta());
+export const loadSyncMeta = () => ({ ...readJson<GithubSyncMeta>(SYNC_META_KEY, defaultSyncMeta()), dirty: false });
 export const saveSyncConfig = (config: GithubSyncConfig) => localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(config));
-export const saveSyncMeta = (meta: GithubSyncMeta) => localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta));
+export const saveSyncMeta = ({ dirty: _dirty, ...meta }: GithubSyncMeta) => {
+  // Sync history is advisory; IndexedDB owns the durable pending revision.
+  try { localStorage.setItem(SYNC_META_KEY, JSON.stringify(meta)); } catch { /* Keep local writes usable if preferences storage is unavailable. */ }
+};
 
 const utf8ToBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);

@@ -90,7 +90,8 @@ export function WorkoutPage() {
         const index = state.sessions.findIndex((session) => session.id === draft.id);
         const next = { ...deepClone(draft), updatedAt: nowIso() } as WorkoutSession;
         if (index >= 0) state.sessions[index] = next;
-      }).then(() => setSavedState(navigator.onLine ? "Saved locally" : "Offline · saved"));
+      }).then(() => setSavedState(navigator.onLine ? "Saved locally" : "Offline · saved"))
+        .catch(() => setSavedState("Not saved · retry the edit"));
     }, 420);
     return () => {
       if (autosaveTimer.current != null) window.clearTimeout(autosaveTimer.current);

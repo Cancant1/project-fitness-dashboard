@@ -103,12 +103,20 @@ export const epley = (load: number, reps: number) => reps <= 1 ? load : load * (
 
 export const setHasResult = (set: SetResult) => set.completed || set.reps != null || set.durationMinutes != null;
 
-export const sessionSetCount = (session: WorkoutSession) => session.performances
-  .reduce((sum, performance) => sum + performance.sets.filter(setHasResult).length, 0);
+export const isCompletedSession = (session: WorkoutSession) => session.status === "completed" && !session.deletedAt;
 
-export const sessionVolume = (session: WorkoutSession) => session.performances.reduce((total, performance) => (
-  total + performance.sets.reduce((sum, set) => sum + ((set.load ?? 0) * (set.reps ?? 0)), 0)
-), 0);
+export const sessionSetCount = (session: WorkoutSession) => session.deletedAt ? 0 : session.performances
+  .filter((performance) => !performance.deletedAt && !performance.skipped)
+  .reduce((sum, performance) => sum + performance.sets.filter((set) => set.completed && !set.deletedAt).length, 0);
+
+// One unit for aggregate volume; time/bodyweight sets have no external load.
+export const sessionVolume = (session: WorkoutSession) => session.deletedAt ? 0 : session.performances
+  .filter((performance) => !performance.deletedAt && !performance.skipped)
+  .reduce((total, performance) => total + performance.sets.reduce((sum, set) => {
+    if (!set.completed || set.deletedAt || (set.unit !== "kg" && set.unit !== "lb") ||
+      !Number.isFinite(set.load) || !Number.isFinite(set.reps) || (set.load ?? 0) <= 0 || (set.reps ?? 0) <= 0) return sum;
+    return sum + set.load! * set.reps! * (set.unit === "lb" ? 0.45359237 : 1);
+  }, 0), 0);
 
 export const foodTotals = (entries: FoodLogEntry[]) => entries.reduce((totals, entry) => ({
   kcal: totals.kcal + entry.kcal,

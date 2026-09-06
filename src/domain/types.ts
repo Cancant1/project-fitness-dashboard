@@ -348,8 +348,7 @@ export interface GithubSyncMeta {
   lastSyncAt: string | null;
   lastPushAt: string | null;
   dirty: boolean;
-  conflict: boolean;
-  status: "idle" | "syncing" | "synced" | "offline" | "conflict" | "error";
+  status: "idle" | "syncing" | "synced" | "offline" | "error";
   message: string;
 }
 

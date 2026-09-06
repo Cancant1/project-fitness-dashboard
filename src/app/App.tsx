@@ -17,7 +17,7 @@ import { PlanPage } from "../pages/PlanPage";
 import { SettingsPage } from "../pages/SettingsPage";
 
 export function App() {
-  const { loading, error, snapshot } = useAppStore();
+  const { loading, error, snapshot, saveError } = useAppStore();
 
   if (loading) {
     return (
@@ -46,6 +46,8 @@ export function App() {
   }
 
   return (
+    <>
+    {saveError && <div className="data-error" role="alert">{saveError} Keep this page open and retry the edit.</div>}
     <Routes>
       <Route element={<AppShell />}>
         <Route path="/today" element={<TodayPage />} />
@@ -66,6 +68,7 @@ export function App() {
         <Route path="*" element={<Navigate to="/today" replace />} />
       </Route>
     </Routes>
+    </>
   );
 }
 

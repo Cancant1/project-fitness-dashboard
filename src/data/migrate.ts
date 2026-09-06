@@ -464,7 +464,7 @@ export async function migrateLegacySources(input: {
     }
   }
 
-  const nutritionTargets: NutritionTarget[] = legacyProfiles.map((profile, index) => stamped({
+  const nutritionTargets: NutritionTarget[] = legacyProfiles.flatMap((profile, index) => profile.macros && Object.keys(profile.macros).length ? [stamped({
     id: legacyId("nutrition-target", `${profile.id}-current`),
     profileId: profile.id,
     effectiveFrom: "2026-01-01",
@@ -476,7 +476,7 @@ export async function migrateLegacySources(input: {
       carbs: safeNumber(profile.macros?.[day]?.carbs) ?? DEFAULT_MACROS.carbs,
       fat: safeNumber(profile.macros?.[day]?.fat) ?? DEFAULT_MACROS.fat
     }]))
-  }, "reps-v1", `profiles[${index}].macros`) as NutritionTarget);
+  }, "reps-v1", `profiles[${index}].macros`) as NutritionTarget] : []);
 
   const annotations: Annotation[] = [];
   for (const profile of legacyProfiles) {

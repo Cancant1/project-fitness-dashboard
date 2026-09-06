@@ -55,3 +55,9 @@ describe("canonical migration", () => {
     }
   });
 });
+
+it("does not invent nutrition targets for a new journal and retains imported targets", async () => {
+  expect((await migrateLegacySources({ clientId: "new" })).nutritionTargets).toHaveLength(0);
+  const imported = await migrateLegacySources({ clientId: "import", repsV1: { profiles: [{ id: "existing", name: "Existing", macros: { Mon: { kcal: 2300, protein: 150, carbs: 240, fat: 75 } } }] } });
+  expect(imported.nutritionTargets[0].weekdays.Mon).toEqual({ kcal: 2300, protein: 150, carbs: 240, fat: 75 });
+});

@@ -4,7 +4,7 @@ import { Award, ChevronRight, Dumbbell, LineChart as LineChartIcon, Scale, Searc
 import { useAppStore } from "../../app/AppStore";
 import { Bars, ComparisonBars, LineChart } from "../../components/charts";
 import { Card, EmptyState, PageHeader, Segmented } from "../../components/ui";
-import { activeProfile, addDays, epley, formatShortDate, sessionSetCount, sessionVolume, startOfWeek, todayIso } from "../../domain/utils";
+import { activeProfile, addDays, epley, formatShortDate, isCompletedSession, sessionSetCount, sessionVolume, startOfWeek, todayIso } from "../../domain/utils";
 
 type ProgressView = "Overview" | "Strength" | "Records" | "Body weight";
 
@@ -15,7 +15,7 @@ export function ProgressPage() {
   const [query, setQuery] = useState("");
   if (!snapshot) return null;
   const profile = activeProfile(snapshot);
-  const sessions = snapshot.sessions.filter((item) => item.profileId === profile.id && item.status === "completed" && !item.deletedAt).sort((a, b) => a.actualDate.localeCompare(b.actualDate));
+  const sessions = snapshot.sessions.filter((item) => item.profileId === profile.id && isCompletedSession(item)).sort((a, b) => a.actualDate.localeCompare(b.actualDate));
   const weights = snapshot.measurements.filter((item) => item.profileId === profile.id && item.type === "weight" && !item.deletedAt).sort((a, b) => a.date.localeCompare(b.date));
   const exerciseStats = useMemo(() => {
     const map = new Map<string, { id: string; name: string; sessions: number; sets: number; lastDate: string; best: number; unit: string; bestLoad: number; bestReps: number }>();
