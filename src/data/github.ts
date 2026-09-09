@@ -252,5 +252,13 @@ export function mergeSnapshots(local: RepsSnapshot, remote: RepsSnapshot, client
     settings: remoteIsNewer ? remote.settings : local.settings,
     migrationReport: local.migrationReport || remote.migrationReport
   };
+  // Removed/replaced workout rows must not reappear from another device's older copy.
+  const removedPerformances = new Set(merged.tombstones.filter((item) => item.entityType === "performance").map((item) => item.entityId));
+  const removedSets = new Set(merged.tombstones.filter((item) => item.entityType === "set").map((item) => item.entityId));
+  merged.sessions = merged.sessions.map((session) => ({ ...session,
+    performances: session.performances.filter((item) => !removedPerformances.has(item.id)).map((performance) => ({ ...performance,
+      sets: performance.sets.filter((set) => !removedSets.has(set.id))
+    }))
+  }));
   return merged;
 }

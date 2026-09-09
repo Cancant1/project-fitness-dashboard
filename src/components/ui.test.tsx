@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DecimalInput, Modal } from "./ui";
 
 function FocusHarness() {
@@ -14,7 +14,22 @@ function DecimalHarness() {
   return <><DecimalInput aria-label="Set load" value={value} onValueChange={setValue} /><output aria-label="Parsed load">{value ?? "empty"}</output></>;
 }
 
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
 describe("shared form controls", () => {
+  it("escapes clipped page containers and keeps a short visible viewport", () => {
+    const viewport = new EventTarget() as EventTarget & { height: number; width: number; offsetTop: number; offsetLeft: number };
+    Object.assign(viewport, { height: 360, width: 390, offsetTop: 44, offsetLeft: 0 });
+    vi.stubGlobal("visualViewport", viewport);
+    const { unmount } = render(<div style={{ transform: "translateY(0)", overflow: "hidden" }}><Modal open title="Confirm" onClose={() => undefined}><button>Save</button></Modal></div>);
+    const scrim = screen.getByRole("dialog").parentElement!;
+    expect(scrim.parentElement).toBe(document.body);
+    expect(scrim.style.height).toBe("360px"); expect(scrim.style.top).toBe("44px");
+    act(() => { viewport.height = 280; viewport.dispatchEvent(new Event("resize")); });
+    expect(scrim.style.height).toBe("280px"); expect(document.body.style.overflow).toBe("hidden");
+    unmount(); expect(document.body.style.overflow).not.toBe("hidden");
+  });
+
   it("keeps focus in a controlled modal field while typing", async () => {
     const user = userEvent.setup();
     render(<FocusHarness />);

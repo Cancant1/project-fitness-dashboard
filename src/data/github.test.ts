@@ -39,5 +39,9 @@ describe("GitHub entity merge", () => {
     const sets = merged.sessions.find((item) => item.id === "shared-session")!.performances[0].sets;
     expect(sets.map((item) => item.id)).toEqual(expect.arrayContaining(["base-set", "local-set"]));
     expect(sets.find((item) => item.id === "base-set")?.reps).toBe(6);
+    local.tombstones.push({ entityType: "set", entityId: "base-set", deletedAt: remoteStamp, revision: "2" });
+    local.sessions[0].performances[0].sets = local.sessions[0].performances[0].sets.filter((item) => item.id !== "base-set");
+    const afterRemoval = mergeSnapshots(local, remote, "merge-device");
+    expect(afterRemoval.sessions[0].performances[0].sets.map((item) => item.id)).toEqual(["local-set"]);
   });
 });

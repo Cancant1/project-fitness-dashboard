@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { parseDecimalInput } from "../domain/utils";
 
 export function Button({ variant = "default", className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "primary" | "ghost" | "danger" | "soft" }) {
@@ -47,17 +48,37 @@ export function ProgressBar({ value, max = 100, label, tone = "accent" }: { valu
   );
 }
 
+const openDialogs: symbol[] = [];
+let bodyOverflow = "";
+
 export function Modal({ open, title, onClose, children, className = "" }: { open: boolean; title: string; onClose: () => void; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const scrimRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement as HTMLElement | null;
+    const token = Symbol();
+    if (!openDialogs.length) { bodyOverflow = document.body.style.overflow; document.body.style.overflow = "hidden"; }
+    openDialogs.push(token);
+    const viewport = window.visualViewport;
+    const updateViewport = () => {
+      if (!scrimRef.current || !viewport) return;
+      scrimRef.current.style.height = `${viewport.height}px`;
+      scrimRef.current.style.top = `${viewport.offsetTop}px`;
+      scrimRef.current.style.left = `${viewport.offsetLeft}px`;
+      scrimRef.current.style.width = `${viewport.width}px`;
+    };
+    updateViewport();
+    viewport?.addEventListener("resize", updateViewport);
+    viewport?.addEventListener("scroll", updateViewport);
     const preferred = ref.current?.querySelector<HTMLElement>("[autofocus]");
     const fallback = ref.current?.querySelector<HTMLElement>("input:not(:disabled), select:not(:disabled), textarea:not(:disabled), button:not(:disabled), [tabindex='0']");
-    (preferred || fallback)?.focus();
+    (preferred || fallback)?.focus({ preventScroll: true });
     const onKey = (event: KeyboardEvent) => {
+      if (openDialogs.at(-1) !== token) return;
       if (event.key === "Escape") closeRef.current();
       if (event.key === "Tab" && ref.current) {
         const items = Array.from(ref.current.querySelectorAll<HTMLElement>("button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex='0']"));
@@ -71,17 +92,21 @@ export function Modal({ open, title, onClose, children, className = "" }: { open
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
-      previous?.focus();
+      viewport?.removeEventListener("resize", updateViewport);
+      viewport?.removeEventListener("scroll", updateViewport);
+      openDialogs.splice(openDialogs.indexOf(token), 1);
+      if (!openDialogs.length) document.body.style.overflow = bodyOverflow;
+      if (previous?.isConnected) previous.focus({ preventScroll: true });
     };
   }, [open]);
   if (!open) return null;
-  return (
-    <div className="modal-scrim" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className={`modal ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby="modal-title" ref={ref}>
-        <header><h2 id="modal-title">{title}</h2><IconButton label="Close" onClick={onClose}><X /></IconButton></header>
-        {children}
+  return createPortal(
+    <div className="modal-scrim" ref={scrimRef} onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className={`modal ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref}>
+        <header><h2 id={titleId}>{title}</h2><IconButton label="Close" onClick={onClose}><X /></IconButton></header>
+        <div className="modal-content">{children}</div>
       </div>
-    </div>
+    </div>, document.body
   );
 }
 
