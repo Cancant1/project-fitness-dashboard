@@ -246,6 +246,8 @@ export interface PrescribedExercise {
   unit: Unit;
   loadBasis: LoadBasis;
   group?: 'shoulder_care';
+  /** Care work (wrist extensions): not counted as a working set. */
+  rehab?: boolean;
   sets: PrescribedSet[];
   restSec: number;
   restBeforeRepOutSec?: number;

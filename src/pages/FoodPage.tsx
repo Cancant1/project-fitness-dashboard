@@ -155,7 +155,7 @@ export function FoodPage() {
             <section className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <h2 style={{ fontSize: 17, fontWeight: 600 }}>Plan targets</h2>
               <ul className="muted" style={{ fontSize: 15, margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
-                {!planTarget && <li>From Mon 12 Oct 2026: 2,800 kcal and 150 g protein a day (lean bulk).</li>}
+                {!planTarget && <li>From Mon 12 Oct 2026: 2,800 kcal and about 180 g protein a day (lean bulk).</li>}
                 {!planDay && <li>The plan's usual day (everything but dinner) as a saved meal, about 1,700 kcal.</li>}
               </ul>
               <button className="btn btn-tinted food-chip" style={{ alignSelf: "flex-start" }} onClick={() => void addPlanSetup()}>

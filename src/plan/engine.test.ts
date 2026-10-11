@@ -290,7 +290,7 @@ describe('week shapes', () => {
     expect(shape(ex(0, 'lower_a', 'romanian_deadlift').sets)).toEqual([['working', 80, 10], ['working', 80, 10]]);
     expect(shape(ex(0, 'upper_a', 'cable_lateral_raise').sets)).toEqual([['working', 20, 20], ['working', 20, 20]]);
     expect(ex(0, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
-    expect(prescribeWeek(P, 0, STATE).map((d) => d.workingSetCount)).toEqual([15, 12, 0, 0, 16, 16, 0]);
+    expect(prescribeWeek(P, 0, STATE).map((d) => d.workingSetCount)).toEqual([15, 12, 0, 0, 14, 16, 0]);
   });
 
   it('training week: compounds end with a rep-out, isolation goes to failure', () => {
@@ -316,7 +316,7 @@ describe('week shapes', () => {
     });
     expect(ex(7, 'upper_a', 'cable_external_rotation').sets).toHaveLength(2); // shoulder care unchanged
     expect(ex(7, 'lower_b', 'wrist_extension').sets).toHaveLength(2); // elbow care unchanged
-    expect(prescribeWeek(P, 7, STATE).map((d) => d.workingSetCount)).toEqual([10, 11, 0, 0, 10, 8, 0]);
+    expect(prescribeWeek(P, 7, STATE).map((d) => d.workingSetCount)).toEqual([10, 11, 0, 0, 8, 8, 0]);
   });
 
   it('taper: squat 2 × 2 at 85%, deadlift one single at 90%, no rep-outs', () => {
@@ -344,7 +344,7 @@ describe('week shapes', () => {
   });
 
   it('weeks 15–17: one set fewer on isolation slots only, never below 1 (default 4)', () => {
-    expect(prescribeWeek(P, 15, STATE).map((d) => d.workingSetCount)).toEqual([13, 15, 0, 0, 12, 14, 0]);
+    expect(prescribeWeek(P, 15, STATE).map((d) => d.workingSetCount)).toEqual([13, 15, 0, 0, 10, 14, 0]);
     expect(ex(15, 'upper_b', 'cable_lateral_raise').sets).toHaveLength(2);
     expect(ex(15, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
     expect(ex(15, 'upper_b', 'barbell_row').sets).toHaveLength(3);
@@ -353,7 +353,7 @@ describe('week shapes', () => {
   });
 
   it('weekly totals across the block', () => {
-    expect([0, 1, 7, 15, 18, 19].map((w) => weekTotal(w))).toEqual([59, 74, 39, 54, 38, 4]);
+    expect([0, 1, 7, 15, 18, 19].map((w) => weekTotal(w))).toEqual([57, 72, 37, 52, 36, 4]);
   });
 });
 
@@ -370,9 +370,9 @@ describe('extra sets and checkpoint fallbacks', () => {
     const s: PlanState = { ...STATE, extraSetsMuscles: ['triceps', 'rear_delts'] };
     expect(ex(8, 'lower_a', 'cross_body_triceps_extension', s).sets).toHaveLength(3);
     expect(ex(9, 'upper_b', 'cable_rear_delt_fly', s).sets).toHaveLength(3);
-    expect(weekTotal(8, s)).toBe(76);
-    expect(weekTotal(11, s)).toBe(74);
-    expect(weekTotal(7, s)).toBe(39);
+    expect(weekTotal(8, s)).toBe(74);
+    expect(weekTotal(11, s)).toBe(72);
+    expect(weekTotal(7, s)).toBe(37);
   });
 
   it('adds one normal set to a lagging main lift; deadlift gets a back-off set at 85%', () => {

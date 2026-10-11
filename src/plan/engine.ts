@@ -505,10 +505,10 @@ export function prescribeWeek(program: ProgramDefinition, weekNo: number, state:
     .map((d) => prescribeDay(program, weekNo, d.key, state, profile));
 }
 
-/** Working sets excluding warm-ups and the shoulder-care block. */
+/** Working sets excluding warm-ups and care work (shoulder block, wrist extensions): 72 in a normal week. */
 export function countWorkingSets(exercises: readonly PrescribedExercise[]): number {
   return exercises
-    .filter((e) => e.role !== 'shoulder')
+    .filter((e) => e.role !== 'shoulder' && !e.rehab)
     .reduce((n, e) => n + e.sets.filter((s) => s.kind !== 'warmup').length, 0);
 }
 
@@ -532,6 +532,7 @@ function exerciseShell(slot: ProgramSlot, ctx: SlotContext): Omit<PrescribedExer
     unit: slot.unit,
     loadBasis: slot.loadBasis,
     ...(slot.group ? { group: slot.group } : {}),
+    ...(slot.rehab ? { rehab: true } : {}),
     restSec: slot.restSec ?? ctx.program.restSecByRole[slot.role],
     notes: [...slot.notes],
   };

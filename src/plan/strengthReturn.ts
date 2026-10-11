@@ -302,5 +302,5 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
   repOutRestSec: 240,
   // Every 2 weeks from week 3: < +0.1 kg/wk → +100 kcal; > +0.25 → −100 kcal.
   bodyweightRate: { minKgPerWeek: 0.1, maxKgPerWeek: 0.25, adjustKcal: 100, fromWeek: 3 },
-  nutrition: { kcal: 2800, proteinG: 150, fatG: 80, carbsG: 370, targetBodyweightKg: [76, 78] },
+  nutrition: { kcal: 2800, proteinG: 180, fatG: 80, carbsG: 370, targetBodyweightKg: [76, 78] },
 };

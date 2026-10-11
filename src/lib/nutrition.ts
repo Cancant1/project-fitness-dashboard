@@ -211,7 +211,7 @@ export function hasPlanTarget(targets: NutritionTarget[]): boolean {
 }
 
 export function planTargetRow(): Omit<NutritionTarget, keyof Base> {
-  return { effective_from: PLAN_TARGET_FROM, phase: "lean bulk", kcal: 2800, protein: 150, carbs: 370, fat: 80, per_weekday: null, target_weight: 77, note: "Strength Return Plan" };
+  return { effective_from: PLAN_TARGET_FROM, phase: "lean bulk", kcal: 2800, protein: 180, carbs: 310, fat: 80, per_weekday: null, target_weight: 77, note: "Strength Return Plan" };
 }
 
 /** The plan's usual day (everything but dinner) as one saved meal; uses your foods where they exist. */

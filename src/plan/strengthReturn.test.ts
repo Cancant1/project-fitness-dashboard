@@ -117,18 +117,18 @@ describe('days', () => {
   });
 });
 
-describe('weekly working sets (normal week, shoulder block excluded)', () => {
-  // The plan text says "72 sets a week"; its own day lists add up to 74 because the wrist extension
-  // (2 × 15, elbow care) was added later. Default 3: follow the day lists.
+describe('weekly working sets (normal week; shoulder block and wrist extensions are care work)', () => {
+  // The agreed plan (chat export, Part 1): 72 working sets a week. The wrist extension (2 × 15) is elbow care.
   const count = (week: number, day: LiftingDayKey) => prescribeDay(P, week, day, STATE).workingSetCount;
 
-  it('is 19 / 19 / 17 / 19 = 74 in an A week', () => {
-    expect([count(1, 'lower_a'), count(1, 'upper_a'), count(1, 'lower_b'), count(1, 'upper_b')]).toEqual([19, 19, 17, 19]);
+  it('is 19 / 19 / 15 / 19 = 72 in an A week', () => {
+    expect([count(1, 'lower_a'), count(1, 'upper_a'), count(1, 'lower_b'), count(1, 'upper_b')]).toEqual([19, 19, 15, 19]);
   });
 
-  it('is 72 without the wrist extension', () => {
-    const fri = prescribeDay(P, 1, 'lower_b', STATE).exercises.filter((e) => e.exerciseKey !== 'wrist_extension');
-    expect(19 + 19 + countWorkingSets(fri) + 19).toBe(72);
+  it('keeps the wrist extension in the session but out of the count', () => {
+    const fri = prescribeDay(P, 1, 'lower_b', STATE).exercises;
+    expect(fri.some((e) => e.exerciseKey === 'wrist_extension' && e.rehab)).toBe(true);
+    expect(countWorkingSets(fri)).toBe(15);
   });
 });
 
