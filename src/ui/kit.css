@@ -76,7 +76,7 @@
 
 /* Segmented and pills */
 .k-seg { display: inline-flex; background: var(--seg); border-radius: 99px; padding: 3px; gap: 2px; max-width: 100%; overflow-x: auto; }
-.k-seg button { height: 32px; padding: 0 14px; border: 0; border-radius: 99px; background: transparent; font: 500 13px var(--sans); color: var(--fg); cursor: pointer; white-space: nowrap; }
+.k-seg button { height: 38px; padding: 0 14px; border: 0; border-radius: 99px; background: transparent; font: 500 13px var(--sans); color: var(--fg); cursor: pointer; white-space: nowrap; }
 .k-seg button[aria-pressed="true"] { background: var(--seg-on); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .k-pill { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 11px; border-radius: 99px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .k-pill-plain { background: var(--seg); color: var(--fg2); }

@@ -1,0 +1,39 @@
+/* History: search + a slim timeline. Tokens only. */
+.history > section, .history .h-search { width: 100%; max-width: 820px; }
+.history > section .k-label { margin-bottom: 8px; }
+.history.page { gap: 20px; }
+.h-search svg { color: var(--fg2); flex: none; }
+
+.h-month { padding: 4px 0; }
+.h-row {
+  display: grid; grid-template-columns: 34px 18px minmax(0, 1fr) auto 52px; align-items: center; column-gap: 10px;
+  min-height: 52px; padding: 0 18px 0 14px; color: var(--fg);
+}
+.h-row:hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.h-date { display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.h-date small { font-size: 11px; color: var(--fg2); }
+.h-date b { font-family: var(--num); font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* The rail: a hairline through every row, a dot per session. Filled = exact, grey = week known, hollow = estimated. */
+.h-rail { position: relative; align-self: stretch; display: grid; place-items: center; }
+.h-rail::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 1.5px; margin-left: -0.75px; background: var(--sep); }
+.h-month .h-row:first-child .h-rail::before { top: 50%; }
+.h-month .h-row:last-child .h-rail::before { bottom: 50%; }
+.h-month .h-row:only-child .h-rail::before { display: none; }
+.h-rail i { position: relative; width: 10px; height: 10px; border-radius: 5px; background: var(--chart-1); box-shadow: 0 0 0 3px var(--surface); }
+.h-row.week .h-rail i { background: var(--chart-3); }
+.h-row.est .h-rail i { background: var(--surface); box-shadow: inset 0 0 0 2px var(--chart-3), 0 0 0 3px var(--surface); }
+.h-row.live .h-rail i { background: var(--warm); }
+
+.h-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 15px; font-weight: 500; }
+.h-title > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.h-est { flex: none; font-style: normal; font-size: 11px; font-weight: 600; color: var(--fg2); background: var(--seg); border-radius: 99px; padding: 1px 7px; }
+.h-sets { font-size: 12px; color: var(--fg2); white-space: nowrap; text-align: right; }
+.h-sets b { font-family: var(--num); font-size: 15px; font-weight: 600; color: var(--fg); margin-right: 2px; }
+.h-vol { display: block; }
+
+.h-more { align-self: center; max-width: 240px; }
+
+@media (max-width: 420px) {
+  .h-row { grid-template-columns: 30px 14px minmax(0, 1fr) auto 36px; column-gap: 8px; padding: 0 14px 0 10px; }
+}

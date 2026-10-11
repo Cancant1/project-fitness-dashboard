@@ -3,8 +3,9 @@ import type { Food, Meal } from "../../data/types";
 import { fmtNum, parseDecimal } from "../../lib/format";
 import { servingOf, stepQuantity } from "../../lib/nutrition";
 import { MinusIcon, PlusIcon } from "../../ui/icons";
+import "./food.css";
 
-// Shared bits for the Food pages: meal names, a few icons, the undo toast, the quantity stepper, scoped styles.
+// Shared bits for the Food pages: meal names, a few icons, the undo toast, the quantity stepper. Styles live in food.css.
 
 export const MEALS: { key: Meal; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -117,51 +118,20 @@ export function FoodLine({ food }: { food: Food }) {
 
 export const needsCheck = (f: Food) => f.source === "plan-estimate" && !f.legacy_ref?.checked_at;
 
-// ------------------------------------------------------------------ scoped styles (tokens only)
 
-const CSS = `
-.food-layout { display: grid; gap: 24px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "totals" "side" "meals"; }
-.food-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.food-meals { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-@media (min-width: 900px) {
-  .food-layout { grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr); grid-template-areas: "totals side" "meals side"; align-items: start; column-gap: 28px; }
-  .food-side { position: sticky; top: 28px; }
-}
-.food-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.food-row { flex: 1; min-width: 0; min-height: 56px; border: 0; background: transparent; padding: 8px 0; color: inherit; text-align: left; cursor: pointer;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; }
-.food-row-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
-.food-row-nums { flex: none; text-align: right; display: flex; flex-direction: column; gap: 2px; }
-.food-item { display: flex; align-items: center; gap: 4px; }
-.food-item + .food-item, .food-item + .row, .row + .food-item { border-top: 1px solid var(--sep); }
-.food-icon-btn { width: 44px; height: 44px; flex: none; border: 0; border-radius: 22px; background: transparent; color: var(--fg2); display: grid; place-items: center; cursor: pointer; }
-.food-icon-btn:hover { background: var(--seg); }
-.food-icon-btn.danger { color: var(--bad); }
-.food-icon-btn.star[aria-pressed="true"] { color: var(--warm); }
-.food-icon-btn.add { color: var(--accent-text); background: var(--accent-tint); }
-.food-add-row { width: 100%; min-height: 44px; border: 0; background: transparent; color: var(--accent-text); font-size: 15px; font-weight: 500;
-  display: flex; align-items: center; gap: 8px; padding: 0; cursor: pointer; }
-.food-chip { height: 44px; border-radius: 22px; padding: 0 16px; font-size: 15px; }
-.food-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); width: 100%; border-radius: 25px; }
-.food-seg button { height: 44px; border-radius: 22px; padding: 0 4px; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.food-switch { width: 55px; height: 44px; flex: none; border: 0; background: transparent; padding: 0; cursor: pointer; display: grid; place-items: center; }
-.food-switch > span { position: relative; width: 51px; height: 31px; border-radius: 16px; background: var(--track); transition: background 160ms ease; }
-.food-switch > span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 14px; background: #FFFFFF;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18); transition: transform 160ms ease; }
-.food-switch[aria-checked="true"] > span { background: var(--good); }
-.food-switch[aria-checked="true"] > span::after { transform: translateX(20px); }
-.food-toast { display: flex; gap: 8px; align-items: center; max-width: calc(100vw - 32px); padding: 0 6px 0 16px; min-height: 48px; }
-.food-label { flex: none; width: 76px; font-size: 15px; color: var(--fg2); }
-.food-form .field input { text-align: right; }
-.food-form .field input[name="name"], .food-form .field input[name="brand"], .food-form .field input[name="serving"] { text-align: left; }
-.food-sticky { position: sticky; bottom: 0; z-index: 1; margin: 0 calc(-1 * var(--gutter)); padding: 12px var(--gutter);
-  background: var(--bg); box-shadow: 0 -1px 0 var(--sep); display: flex; flex-direction: column; gap: 8px; }
-.food-lib { width: 100%; max-width: 820px; display: flex; flex-direction: column; gap: 16px; }
-.food-search { flex: 1; min-width: 0; }
-.food-search svg { color: var(--fg2); flex: none; }
-.food-back { display: inline-flex; align-items: center; gap: 2px; height: 44px; margin-left: -6px; padding: 0 6px; font-size: 17px; color: var(--accent-text); }
-`;
-
-export function FoodStyles() {
-  return <style href="reps-food" precedence="default">{CSS}</style>;
+/**
+ * Compact date pill that opens the native date picker (max = today, so no future days).
+ * The input lies transparently over the pill: a tap on iOS opens the wheel; elsewhere showPicker() opens it.
+ */
+export function DateButton({ value, max, onChange, label, children }: {
+  value: string; max: string; onChange: (iso: string) => void; label: string; children: ReactNode;
+}) {
+  return (
+    <label className="date-btn">
+      <span aria-hidden="true">{children}</span>
+      <input type="date" aria-label={label} value={value} max={max}
+        onClick={(e) => { try { e.currentTarget.showPicker(); } catch { /* not supported: native focus is enough */ } }}
+        onChange={(e) => { const v = e.target.value; if (/^\d{4}-\d{2}-\d{2}$/.test(v) && v <= max) onChange(v); }} />
+    </label>
+  );
 }

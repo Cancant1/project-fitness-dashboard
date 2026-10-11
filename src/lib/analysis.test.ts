@@ -1,7 +1,7 @@
 import type { Session, SetRow } from "../data/types";
 import {
   blockComparison, blockLabel, confidenceLabel, detectPRs, e1rm, fractionalVolume, goalValue, isFlagged, linearFit,
-  metricValue, monthIndex, monthFromIndex, monthlyAverages, monthlyBests, pearson, regainCurve, repBests, rolling7,
+  metricValue, monthIndex, monthFromIndex, monthlyAverages, monthlyBests, pearson, regainCurve, repBests, rolling7, runningBests, windowBest,
   sessionBests, weeklyCounts, workSets, worstConfidence, type WorkSet
 } from "./analysis";
 
@@ -230,3 +230,23 @@ describe("blocks and labels", () => {
   });
 });
 
+
+describe("windows and staircases", () => {
+  const pts = [
+    { date: "2026-01-01", value: 100 },
+    { date: "2026-02-01", value: 110 },
+    { date: "2026-02-20", value: 105 },
+    { date: "2026-03-01", value: 110 },
+    { date: "2026-03-10", value: 120 }
+  ];
+  it("windowBest takes the best inside the window, edges included", () => {
+    expect(windowBest(pts, "2026-03-10", 1)!.value).toBe(120);
+    expect(windowBest(pts, "2026-03-09", 9)!.value).toBe(110);
+    expect(windowBest(pts, "2026-02-25", 25)!.date).toBe("2026-02-01");
+    expect(windowBest(pts, "2025-12-31", 30)).toBeNull();
+  });
+  it("runningBests keeps only new highs, ties excluded", () => {
+    expect(runningBests([...pts].reverse()).map((p) => p.value)).toEqual([100, 110, 120]);
+    expect(runningBests([])).toEqual([]);
+  });
+});

@@ -56,8 +56,8 @@ export function SetupSheet({ foods, entries, onClose, onApplied }: {
           Keep {counts.keep} <span className="muted" style={{ fontWeight: 500 }}>·</span> Archive {counts.archive}
         </p>
         <p className="row-sub">
-          {counts.create > 0 && `${counts.create} new from the plan and your log. `}
-          Archived foods leave the Add list but stay under Manage foods, so you can bring them back. Nothing is deleted.
+          {counts.create > 0 && `${counts.create} new · `}
+          Archived foods can be restored.
         </p>
       </div>
 

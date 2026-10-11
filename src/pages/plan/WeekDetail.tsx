@@ -2,245 +2,211 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useRows, useStore } from "../../data/store";
 import { fmtNum, fmtShortDate, todayIso } from "../../lib/format";
-import { getDay, getWeek, prescribeDay } from "../../plan/engine";
+import { getWeek } from "../../plan/engine";
 import { PLAN, ensurePlanExercises } from "../../plan/bridge";
 import { startWorkout } from "../../plan/workout";
-import type { PrescribedDay, PrescribedExercise } from "../../plan/types";
-import { ChevronDown, ChevronLeft, ChevronRight, PlayIcon } from "../../ui/icons";
+import type { DayKey, PrescribedDay, PrescribedExercise, WeekType } from "../../plan/types";
+import { Card, Label, Pill } from "../../ui/kit";
+import { CheckIcon, ChevronDown, PlayIcon } from "../../ui/icons";
 import {
-  DAY_SHORT, EXAMPLE_TMS, ROLE_NAME, TYPE_NAME, fmtLoad, fmtPct, fmtRange, fmtRest, groupLabel, groupSets, pctOfTm, typeChip,
-  weekDays, weekEnd, type PlanContext
+  DAY_SHORT, dayDef, doneSlots, fmtLoadShort, fmtPct, fmtRest, mainSummary, rowSummary, shortName, tryDay, weekDays,
+  type PlanContext
 } from "./planView";
 
-/** One week: every day with every exercise, set, load and rest. `embedded` drops the back button (desktop column). */
-export function WeekDetail({ weekNo, ctx, embedded = false }: { weekNo: number; ctx: PlanContext; embedded?: boolean }) {
+/** The selected week: four lifting cards, the three conditioning days as chips, notes behind a disclosure. */
+export function WeekDays({ weekNo, ctx, onSetMax }: { weekNo: number; ctx: PlanContext; onSetMax: () => void }) {
   const week = getWeek(PLAN, weekNo);
   const today = todayIso();
+  const sessions = useRows("sessions");
+  const { slots } = doneSlots(sessions, ctx.program);
   const { days, error } = weekDays(weekNo, ctx);
+  const lifting = days.filter((d) => dayDef(d.dayKey).kind === "lifting");
+  const cardio = days.filter((d) => dayDef(d.dayKey).kind === "conditioning");
   const usesTm = week.type !== "calibration" && week.type !== "test";
-  const exampleLifts = (["squat", "deadlift"] as const).filter((l) => ctx.example[l]);
-  const stepDefault = ctx.state.currentLoads.incline_db_press == null || ctx.state.currentLoads.weighted_pullup == null;
-  const prev = weekNo > 0 ? weekNo - 1 : null;
-  const next = weekNo < PLAN.weeks.length - 1 ? weekNo + 1 : null;
+  const example = usesTm && (ctx.example.squat || ctx.example.deadlift);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-      {!embedded && (
-        <Link to={{ search: "" }} className="btn btn-plain" style={{ alignSelf: "flex-start", marginLeft: -8, height: 44 }}><ChevronLeft /> Plan</Link>
-      )}
-      <header className="page-head" style={{ alignItems: "flex-start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 0 }}>
-          <p className="eyebrow">{fmtRange(week.startDate, weekEnd(week))}</p>
-          <h1 className={embedded ? undefined : "large-title"} style={embedded ? { fontSize: 28, fontWeight: 700, letterSpacing: -0.3 } : undefined}>Week {week.weekNo}</h1>
-          <div className="week-chips">
-            <span className={typeChip(week.type)}>{TYPE_NAME[week.type]}</span>
-            {week.checkpoint && <span className="chip chip-plain" style={{ boxShadow: "inset 0 0 0 1.5px var(--fg)", color: "var(--fg)" }}>{week.checkpoint.name} · {fmtShortDate(week.checkpoint.date)}</span>}
-            {week.isolationSetDelta ? <span className="chip chip-plain">−1 isolation set</span> : null}
-            {week.extraSetsEligible ? <span className="chip chip-plain">Extra sets if checkpoint 1 met</span> : null}
-          </div>
+    <section className="pl-week" aria-label={`Week ${weekNo} sessions`}>
+      <Label action={example ? <span className="k-pill k-pill-plain" title="No training max yet: loads use squat 140, deadlift 200">Example loads</span> : undefined}>
+        Week {weekNo} sessions
+      </Label>
+      {error && <Card className="pl-error"><span className="k-muted">{error}</span></Card>}
+      <div className="pl-days">
+        {lifting.map((d) => (
+          <DayCard key={d.dayKey} day={d} ctx={ctx} isToday={d.date === today} done={slots.has(`${weekNo}:${d.dayKey}`)} onSetMax={onSetMax} />
+        ))}
+      </div>
+      {cardio.length > 0 && (
+        <div className="k-grid-3 pl-chips">
+          {cardio.map((d) => <CardioChip key={d.dayKey} day={d} isToday={d.date === today} />)}
         </div>
-        <nav style={{ display: "flex", gap: 4, flex: "none" }} aria-label="Other weeks">
-          {prev != null
-            ? <Link className="btn btn-glass btn-icon" to={{ search: `?week=${prev}` }} aria-label={`Week ${prev}`}><ChevronLeft /></Link>
-            : <span className="btn btn-glass btn-icon" aria-hidden="true" style={{ opacity: 0.35 }}><ChevronLeft /></span>}
-          {next != null
-            ? <Link className="btn btn-glass btn-icon" to={{ search: `?week=${next}` }} aria-label={`Week ${next}`}><ChevronRight style={{ width: 18, height: 18 }} /></Link>
-            : <span className="btn btn-glass btn-icon" aria-hidden="true" style={{ opacity: 0.35 }}><ChevronRight style={{ width: 18, height: 18 }} /></span>}
-        </nav>
-      </header>
-
+      )}
       {week.notes.length > 0 && (
-        <ul className="list" style={{ margin: 0, padding: "10px 16px 10px 34px", fontSize: 15, display: "flex", flexDirection: "column", gap: 6 }}>
-          {week.notes.map((n) => <li key={n}>{n}</li>)}
-        </ul>
+        <details className="pl-more pl-week-notes">
+          <summary>Week notes <ChevronDown style={{ width: 14, height: 14 }} /></summary>
+          <ul>{week.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+        </details>
       )}
-
-      {usesTm && exampleLifts.length > 0 && (
-        <p className="banner">
-          <strong>Example loads.</strong>{" "}
-          {exampleLifts.map((l) => `${l === "squat" ? "Squat" : "Deadlift"} TM ${EXAMPLE_TMS[l]} kg`).join(", ")} — the plan page's defaults,
-          because no training max is set yet. Week 0 sets yours from one rep-out per lift.
-        </p>
-      )}
-      {usesTm && stepDefault && (
-        <p className="row-sub" style={{ margin: "0 4px" }}>
-          Incline DB and pull-up show {ctx.state.currentLoads.incline_db_press == null ? "the calibration loads (22.5 kg, +5 kg)" : "your last loads"} until week 0 sets them.
-          Accessories show start loads until you log them.
-        </p>
-      )}
-      {error && <p className="banner">{error}</p>}
-
-      <div className="plan-days">
-        {days.map((d) => <DayCard key={d.dayKey} day={d} ctx={ctx} isToday={d.date === today} />)}
-      </div>
-      <p className="row-sub" style={{ margin: "0 4px" }}>Loads use your current training maxes and last logged loads; they move as you log rep-outs.</p>
-    </div>
-  );
-}
-
-function DayCard({ day, ctx, isToday }: { day: PrescribedDay; ctx: PlanContext; isToday: boolean }) {
-  const def = getDay(PLAN, day.dayKey);
-  const shoulder = day.exercises.filter((e) => e.group === "shoulder_care");
-  const firstShoulder = day.exercises.findIndex((e) => e.group === "shoulder_care");
-
-  return (
-    <section className={`day-card${isToday ? " is-today" : ""}`} aria-label={`${DAY_SHORT[day.weekday - 1]} ${day.title}`}>
-      <div className="day-head">
-        <div style={{ minWidth: 0 }}>
-          <p className="row-sub">{DAY_SHORT[day.weekday - 1]} {fmtShortDate(day.date)}{isToday ? " · today" : ""}</p>
-          <h2 className="day-title">{day.title}</h2>
-          <p className="row-sub">{def.focus}</p>
-        </div>
-        {day.kind === "lifting" && (
-          <div style={{ textAlign: "right", flex: "none" }}>
-            <p className="num" style={{ fontWeight: 600, fontSize: 15 }}>{day.workingSetCount} {day.workingSetCount === 1 ? "set" : "sets"}</p>
-            {day.minutes && PLAN.weekTypeRules[day.weekType].accessorySetCap === null && <p className="row-sub">≈ {day.minutes} min{day.minutesAlternating ? ` (${day.minutesAlternating} alternating)` : ""}</p>}
-          </div>
-        )}
-      </div>
-
-      {day.kind === "lifting" && (
-        <div>
-          {day.exercises.map((ex, i) => ex.group === "shoulder_care"
-            ? (i === firstShoulder ? <ShoulderBlock key="shoulder" exercises={shoulder} ctx={ctx} /> : null)
-            : <ExerciseItem key={ex.exerciseKey} ex={ex} ctx={ctx} weekType={day.weekType} />)}
-        </div>
-      )}
-
-      {day.kind !== "lifting" && <ConditioningBody day={day} />}
-
-      {(day.notes.length > 0) && (
-        <ul className="ex-notes" style={{ paddingTop: 2 }}>
-          {day.notes.map((n) => <li key={n}>{n}</li>)}
-        </ul>
-      )}
-
-      {day.kind === "lifting" && ctx.program && <StartDay day={day} ctx={ctx} />}
     </section>
   );
 }
 
-function ShoulderBlock({ exercises, ctx }: { exercises: PrescribedExercise[]; ctx: PlanContext }) {
+function DayCard({ day, ctx, isToday, done, onSetMax }: { day: PrescribedDay; ctx: PlanContext; isToday: boolean; done: boolean; onSetMax: () => void }) {
   return (
-    <div className="shoulder-block">
-      <p className="block-label">Shoulder care block · first, about 10 min · not to failure, 3 s down</p>
-      {exercises.map((ex) => <ExerciseItem key={ex.exerciseKey} ex={ex} ctx={ctx} />)}
-    </div>
-  );
-}
-
-function ExerciseItem({ ex, ctx, weekType }: { ex: PrescribedExercise; ctx: PlanContext; weekType?: string }) {
-  const groups = groupSets(ex);
-  const warmups = ex.sets.filter((s) => s.kind === "warmup");
-  const tmLift = ex.mainLift === "squat" || ex.mainLift === "deadlift" ? ex.mainLift : null;
-  const tm = tmLift ? ctx.preview.trainingMaxes[tmLift] : undefined;
-  const isMain = ex.role === "main";
-  const hasRepOut = ex.sets.some((s) => s.kind === "rep_out" || s.kind === "top");
-
-  return (
-    <div className="plan-ex">
-      <div className="plan-ex-head">
-        <span className="plan-ex-name"><span className="plan-ex-order">{ex.order}</span>{ex.name}</span>
-        {isMain ? <span className="chip chip-accent" style={{ height: 22, fontSize: 12, flex: "none" }}>Main</span>
-          : ex.role !== "shoulder" && <span className="row-sub" style={{ flex: "none" }}>{ROLE_NAME[ex.role]}</span>}
+    <Card className={`pl-day${isToday ? " is-today" : ""}`} aria-label={`${DAY_SHORT[day.weekday - 1]} ${day.title}`}>
+      <div className="pl-day-head">
+        <div className="pl-day-id">
+          <span className="pl-day-when">{isToday && <i className="pl-today-dot" />}{DAY_SHORT[day.weekday - 1]} {fmtShortDate(day.date)}</span>
+          <h3 className="pl-day-title">{day.title}</h3>
+        </div>
+        {done ? <Pill tone="good"><CheckIcon /> Done</Pill>
+          : day.kind === "lifting" && <span className="pl-day-sets"><b>{day.workingSetCount}</b> {day.workingSetCount === 1 ? "set" : "sets"}</span>}
       </div>
-
-      {groups.map((g, i) => {
-        const pct = weekType === "calibration" ? null : g.pctTm ?? pctOfTm(ex, g.load, ctx.preview.trainingMaxes);
-        return (
-          <div key={i} className={`set-line${g.kind === "rep_out" || g.kind === "failure" ? " warm" : ""}`}>
-            <span>{groupLabel(g)}</span>
-            <span>
-              <span className="load">{fmtLoad(g.load, g.unit, ex.loadBasis)}</span>
-              {pct != null && <span className="pct">{fmtPct(pct)} TM</span>}
-            </span>
-          </div>
-        );
-      })}
-
-      {tmLift && (
-        <p className="ex-meta">
-          {weekType === "calibration" ? "This rep-out sets your training max." : <>TM <span className="num">{fmtNum(tm)}</span> kg{ctx.example[tmLift] ? " (example)" : ""}</>}
-        </p>
+      {day.kind === "lifting" ? <DayBody day={day} ctx={ctx} /> : <p className="k-muted pl-day-rest">No lifting</p>}
+      {day.kind === "lifting" && ctx.program && !done && (
+        <StartDay weekNo={day.weekNo} dayKey={day.dayKey} ctx={ctx} onSetMax={onSetMax} primary={isToday} />
       )}
-      <p className="ex-meta">
-        {ex.mainLift === "deadlift" && hasRepOut ? "Ramp sets" : "Rest"} {fmtRest(ex.restSec)}{ex.mainLift === "deadlift" && hasRepOut ? " apart" : ""}{hasRepOut && ex.restBeforeRepOutSec && ex.restBeforeRepOutSec !== ex.restSec ? `, ${fmtRest(ex.restBeforeRepOutSec)} before the ${ex.mainLift === "deadlift" ? "top set" : "rep-out"}` : ""}
-      </p>
-      {ex.notes.length > 0 && <ul className="ex-notes">{ex.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
-
-      {warmups.length > 0 && (
-        <details className="disclosure">
-          <summary>Warm-up ramp · {warmups.length} sets <ChevronDown style={{ width: 14, height: 14 }} /></summary>
-          <div className="ramp">
-            {warmups.map((w, i) => {
-              const pct = weekType === "calibration" ? null : pctOfTm(ex, w.load, ctx.preview.trainingMaxes);
-              return (
-                <div key={i}>
-                  <span className="muted">{w.note && w.note !== fmtLoad(w.load, w.unit, ex.loadBasis) ? w.note : `Warm-up ${i + 1}`}</span>
-                  <span><span className="num">{fmtLoad(w.load, w.unit, ex.loadBasis)} × {w.reps}</span>{pct != null && <span className="muted num" style={{ marginLeft: 6 }}>{fmtPct(pct)}</span>}</span>
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
-    </div>
+    </Card>
   );
 }
 
-function ConditioningBody({ day }: { day: PrescribedDay }) {
-  const c = day.conditioning;
-  const rule = getDay(PLAN, day.dayKey).conditioning;
-  if (!c || c.skipped) return <p style={{ fontSize: 15 }}>No session this week.{day.weekType === "test" ? " Skip Sunday rounds in the PR test week." : ""}</p>;
-  if (c.kind === "ride") return <p style={{ fontSize: 15 }}><span className="num" style={{ fontWeight: 600 }}>{c.minutes} min</span> easy ride at talking pace: full sentences, nose breathing.</p>;
-  if (c.kind === "boxing") return <p style={{ fontSize: 15 }}><span className="num" style={{ fontWeight: 600 }}>{c.minutes} min</span> boxing class.</p>;
-  const r = rule?.kind === "rounds" ? rule : null;
+/** Main lifts as highlighted blocks, everything else as compact rows, warm-ups and notes behind a disclosure. */
+export function DayBody({ day, ctx }: { day: PrescribedDay; ctx: PlanContext }) {
+  const fixed = day.weekType === "calibration" || day.weekType === "test";
+  const mains = day.exercises.filter((e) => e.role === "main");
+  const shoulder = day.exercises.filter((e) => e.group === "shoulder_care");
+  const rows = day.exercises.filter((e) => e.role !== "main" && e.group !== "shoulder_care");
+  const notes = [...day.notes, ...mains.flatMap((m) => m.notes)];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <p style={{ fontSize: 15 }}>
-        {c.warmupMin} min warm-up, then <span className="num" style={{ fontWeight: 600 }}>{c.rounds} rounds</span> of {fmtRest(c.workSec ?? 120)} hard / {fmtRest(c.easySec ?? 60)} easy.
-      </p>
-      {r && (
-        <p className="ex-meta">
-          {day.weekType === "deload" ? "Deload: half the rounds. " : ""}Starts at {r.startRounds}; last round within {Math.round(r.dropOffFraction * 100)}% of the first → +1 round next week, up to {r.maxRounds}.
-        </p>
+    <div className="pl-day-body">
+      {mains.map((m) => <MainBlock key={m.exerciseKey} ex={m} ctx={ctx} weekType={day.weekType} />)}
+      {(rows.length > 0 || shoulder.length > 0) && (
+        <div className="pl-rows">
+          {shoulder.length > 0 && (
+            <div className="pl-row">
+              <span className="pl-row-name">Shoulder care</span>
+              <span className="pl-row-scheme">{shoulder.length} × 2</span>
+              <span className="pl-row-load k-muted">first</span>
+            </div>
+          )}
+          {rows.map((e) => <Row key={e.exerciseKey} ex={e} />)}
+        </div>
       )}
+      <details className="pl-more">
+        <summary>Warm-up &amp; notes <ChevronDown style={{ width: 14, height: 14 }} /></summary>
+        <div className="pl-more-body">
+          {mains.map((m) => {
+            const s = mainSummary(m, ctx.preview.trainingMaxes, fixed);
+            return s.warmups.length > 0 && (
+              <div key={m.exerciseKey} className="pl-ramp">
+                <span className="pl-ramp-title">{shortName(m)} warm-up · {fmtRest(m.restBeforeRepOutSec ?? m.restSec)} before the {m.mainLift === "deadlift" ? "top set" : "rep-out"}</span>
+                {s.warmups.map((w, i) => (
+                  <div key={i}><span className="k-muted">{w.note ?? `Warm-up ${i + 1}`}</span><span className="k-num">{fmtLoadShort(w.load, w.unit, m.loadBasis)} × {w.reps}</span></div>
+                ))}
+              </div>
+            );
+          })}
+          {shoulder.length > 0 && (
+            <div className="pl-ramp">
+              <span className="pl-ramp-title">Shoulder care · not to failure, 3 s down</span>
+              {shoulder.map((e) => {
+                const r = rowSummary(e);
+                return <div key={e.exerciseKey}><span className="k-muted">{shortName(e)}</span><span className="k-num">{r.scheme} · {r.load}</span></div>;
+              })}
+            </div>
+          )}
+          {notes.length > 0 && <ul className="pl-notes">{notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+        </div>
+      </details>
     </div>
   );
 }
 
-function StartDay({ day, ctx }: { day: PrescribedDay; ctx: PlanContext }) {
+function MainBlock({ ex, ctx, weekType }: { ex: PrescribedExercise; ctx: PlanContext; weekType: WeekType }) {
+  const calibration = weekType === "calibration";
+  const s = mainSummary(ex, ctx.preview.trainingMaxes, calibration || weekType === "test");
+  return (
+    <div className="pl-main">
+      <div className="pl-main-l">
+        <span className="pl-main-name">{shortName(ex)}</span>
+        <span className="pl-main-scheme">
+          {s.scheme}{s.scheme && s.repOut ? " · " : ""}{s.repOut && <b>{s.repOut}</b>}
+        </span>
+      </div>
+      <div className="pl-main-r">
+        <span className="pl-main-load">{s.loadText}<small>kg</small></span>
+        {weekType === "test" ? <span className="pl-main-pct">goal</span>
+          : s.pct != null ? <span className="pl-main-pct">{fmtPct(s.pct)} TM</span>
+          : ex.loadBasis === "per_hand" ? <span className="pl-main-pct">each hand</span>
+            : calibration && (ex.mainLift === "squat" || ex.mainLift === "deadlift") ? <span className="pl-main-pct">sets TM</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function Row({ ex }: { ex: PrescribedExercise }) {
+  const r = rowSummary(ex);
+  return (
+    <div className="pl-row" title={ex.name}>
+      <span className="pl-row-name">{shortName(ex)}</span>
+      <span className="pl-row-scheme">{r.repOut && <i className="pl-ro-dot" title="Last set is a rep-out" />}{r.scheme}</span>
+      <span className="pl-row-load">{r.load}</span>
+    </div>
+  );
+}
+
+function CardioChip({ day, isToday }: { day: PrescribedDay; isToday: boolean }) {
+  const c = day.conditioning;
+  const value = !c || c.skipped ? "Rest"
+    : c.kind === "rounds" ? `${c.rounds} × ${fmtNum((c.workSec ?? 120) / 60)} min`
+      : `${c.minutes} min`;
+  const name = { easy_ride: "Ride", boxing: "Boxing", rounds: "Rounds" }[day.dayKey as "easy_ride" | "boxing" | "rounds"] ?? day.title;
+  return (
+    <div className={`k-card pl-chip${isToday ? " is-today" : ""}`}>
+      <span className="pl-chip-day">{isToday && <i className="pl-today-dot" />}{DAY_SHORT[day.weekday - 1]}</span>
+      <span className="pl-chip-name">{name}</span>
+      <span className="pl-chip-val">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * Starts a plan day from the REAL state (never example training maxes), logged as today.
+ * Without a programme it offers to start the plan; without a training max, to set one.
+ */
+export function StartDay({ weekNo, dayKey, ctx, onSetMax, onStartPlan, primary = false, label = "Start", onStarted }: {
+  weekNo: number; dayKey: DayKey; ctx: PlanContext; onSetMax?: () => void; onStartPlan?: () => void; primary?: boolean; label?: string; onStarted?: () => void;
+}) {
   const { local } = useStore();
   const navigate = useNavigate();
   const sessions = useRows("sessions");
   const [busy, setBusy] = useState(false);
   const inProgress = sessions.find((s) => s.status === "in_progress");
 
-  // Start from the real state only: never from example training maxes.
-  let real: PrescribedDay | null = null;
-  try {
-    real = prescribeDay(PLAN, day.weekNo, day.dayKey, ctx.state, ctx.equipment);
-  } catch {
-    real = null;
-  }
-
   if (inProgress) {
-    return <Link to={`/workout/${inProgress.id}`} className="btn btn-glass btn-block" style={{ height: 44, fontSize: 15 }}>Workout in progress · Continue</Link>;
+    return <Link to={`/workout/${inProgress.id}`} className="btn btn-tinted pl-start">Continue workout</Link>;
   }
+  if (!ctx.program) {
+    return onStartPlan ? <button type="button" className="btn btn-primary pl-start" onClick={onStartPlan}>Start the plan</button> : null;
+  }
+  const real = tryDay(weekNo, dayKey, ctx.state, ctx.equipment);
   if (!real) {
-    return <Link to={{ search: "?tab=maxes" }} className="btn btn-tinted btn-block" style={{ height: 44, fontSize: 15 }}>Set your training max to start this</Link>;
+    return onSetMax ? <button type="button" className="btn btn-tinted pl-start" onClick={onSetMax}>Set training max</button> : null;
   }
-  const program = ctx.program!;
+  if (real.kind !== "lifting") return null;
+  const program = ctx.program;
   return (
-    <button className="btn btn-primary btn-block" style={{ height: 44, fontSize: 15 }} disabled={busy}
+    <button type="button" className={`btn ${primary ? "btn-primary" : "btn-tinted"} pl-start`} disabled={busy}
       onClick={async () => {
         setBusy(true);
         const ids = await ensurePlanExercises(local);
-        const id = await startWorkout(local, program, real!, ids, todayIso());
+        const id = await startWorkout(local, program, real, ids, todayIso());
         setBusy(false);
+        onStarted?.();
         navigate(`/workout/${id}`);
       }}>
-      <PlayIcon /> Start this workout
+      <PlayIcon /> {label}
     </button>
   );
 }

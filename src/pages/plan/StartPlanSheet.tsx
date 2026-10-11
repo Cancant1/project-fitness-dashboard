@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { LocalStore } from "../../data/local";
 import { useRows, useStore } from "../../data/store";
+import { fmtShortDate } from "../../lib/format";
 import { PLAN, PLAN_KEY, ensurePlanExercises, findExercise } from "../../plan/bridge";
 import { Sheet } from "../../ui/Sheet";
 
@@ -21,18 +22,18 @@ export function StartPlanSheet({ onClose }: { onClose: () => void }) {
 
   return (
     <Sheet title="Start the plan" onClose={onClose}>
-      <ul style={{ margin: 0, paddingLeft: 20, display: "flex", flexDirection: "column", gap: 8, fontSize: 15 }}>
-        <li>Week 0 starts Monday 12 October: one rep-out per main lift sets your training maxes.</li>
-        <li>Today and Workouts then show the plan's sessions.</li>
-        <li>{missing ? `Adds ${missing} exercise${missing === 1 ? "" : "s"} that are new to this plan to your library.` : "All plan exercises are already in your library."}</li>
-      </ul>
-      <button className="btn btn-primary" disabled={busy} onClick={async () => {
+      <div className="k-card k-rows pl-start-facts">
+        <div className="k-row"><span className="k-muted">Week 0</span><span className="k-num">Mon {fmtShortDate(PLAN.weeks[0]!.startDate)}</span></div>
+        <div className="k-row"><span className="k-muted">Sets your maxes</span><span className="k-num">1 rep-out per lift</span></div>
+        <div className="k-row"><span className="k-muted">New exercises</span><span className="k-num">{missing || "None"}</span></div>
+      </div>
+      <button type="button" className="btn btn-primary" disabled={busy} onClick={async () => {
         setBusy(true);
         await startPlan(local);
         setBusy(false);
         onClose();
       }}>Start the plan</button>
-      <button className="btn btn-plain" onClick={onClose}>Not yet</button>
+      <button type="button" className="btn btn-plain" onClick={onClose}>Not yet</button>
     </Sheet>
   );
 }

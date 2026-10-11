@@ -405,3 +405,27 @@ export function blockComparison(sets: readonly WorkSet[], sessions: readonly Ses
 export function planWeekOf(planStart: string, date: string): number {
   return daysBetween(planStart, date) / 7;
 }
+
+// ------------------------------------------------------------------ windows and staircases
+
+/**
+ * Highest value among points dated in the `days` days ending with `endDate` (inclusive), or null.
+ * E.g. windowBest(bests, lastDate, 56) = best of the last 8 weeks; with endDate 28 days earlier = 4 weeks ago.
+ */
+export function windowBest<T extends { date: string; value: number }>(points: readonly T[], endDate: string, days: number): T | null {
+  const from = addDays(endDate, -(days - 1));
+  let best: T | null = null;
+  for (const p of points) {
+    if (p.date < from || p.date > endDate) continue;
+    if (!best || p.value > best.value) best = p;
+  }
+  return best;
+}
+
+/** The points that set a new all-time high, in date order (the PR staircase). Ties do not count. */
+export function runningBests<T extends { date: string; value: number }>(points: readonly T[]): T[] {
+  const sorted = [...points].sort((a, b) => a.date.localeCompare(b.date));
+  const out: T[] = [];
+  for (const p of sorted) if (!out.length || p.value > out[out.length - 1]!.value + 1e-9) out.push(p);
+  return out;
+}

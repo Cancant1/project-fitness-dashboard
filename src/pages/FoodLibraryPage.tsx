@@ -2,10 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { Food } from "../data/types";
-import { libraryList, newFood } from "../lib/nutrition";
+import { fmtNum } from "../lib/format";
+import { libraryList, newFood, servingOf } from "../lib/nutrition";
+import { Card, PageHead, Segmented } from "../ui/kit";
 import { ChevronLeft, PlusIcon } from "../ui/icons";
 import { FoodFormSheet, type FoodValues } from "./food/FoodFormSheet";
-import { FoodLine, FoodStyles, SearchIcon, StarIcon, needsCheck, useToast } from "./food/ui";
+import { SearchIcon, StarIcon, needsCheck, useToast } from "./food/ui";
 
 /** Your foods: search, add, edit, favourite, remove (archive) with undo, and bring removed foods back. */
 export function FoodLibraryPage() {
@@ -47,46 +49,35 @@ export function FoodLibraryPage() {
 
   return (
     <main className="page">
-      <FoodStyles />
-      <header className="page-head">
-        <div style={{ minWidth: 0 }}>
-          <Link to="/food" className="food-back"><ChevronLeft /> Food</Link>
-          <h1 className="large-title">Foods</h1>
-        </div>
-        <button className="btn btn-primary food-chip" style={{ flex: "none" }} onClick={() => setEditing("new")}><PlusIcon /> New food</button>
-      </header>
+      <PageHead eyebrow={<Link to="/food" className="food-back"><ChevronLeft /> Food</Link>} title="Foods">
+        <button className="btn btn-primary food-chip" onClick={() => setEditing("new")}><PlusIcon /> New food</button>
+      </PageHead>
 
       <div className="food-lib">
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <label className="field food-search" htmlFor="lib-q" style={{ flexBasis: 220 }}>
+        <div className="food-lib-tools">
+          <label className="field food-search" htmlFor="lib-q">
             <SearchIcon />
             <span className="sr-only">Search foods</span>
             <input id="lib-q" type="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} autoComplete="off" />
           </label>
-          <div className="segmented food-seg" role="group" aria-label="Show" style={{ flex: "1 1 220px", width: "auto" }}>
-            <button aria-pressed={!removed} onClick={() => setRemoved(false)}>In use <span className="num">{inUse}</span></button>
-            <button aria-pressed={removed} onClick={() => setRemoved(true)}>Removed <span className="num">{archived}</span></button>
-          </div>
+          <Segmented label="Show" value={removed ? "removed" : "use"} onChange={(v) => setRemoved(v === "removed")}
+            options={[{ value: "use", label: `In use ${inUse}` }, { value: "removed", label: `Removed ${archived}` }]} />
         </div>
 
-        {removed && list.length > 0 && <p className="row-sub" style={{ margin: "0 4px" }}>Removed foods don't show when you add food. Restore any you still eat.</p>}
-
         {list.length > 0 ? (
-          <div className="list">
+          <Card pad={false} className="food-lib-list k-rows">
             {list.map((f) => (
               <div className="food-item" key={f.id}>
-                <button className="food-row" onClick={() => setEditing(f)}>
-                  <span className="food-row-text">
-                    <span className="food-ellipsis">
-                      {f.name}
-                      {f.brand && <span className="muted"> · {f.brand}</span>}
-                      {needsCheck(f) && <span className="chip chip-warm" style={{ marginLeft: 8, height: 20, fontSize: 12 }}>Check label</span>}
-                    </span>
-                    <FoodLine food={f} />
+                <button className="food-lib-row" onClick={() => setEditing(f)}>
+                  <span className="food-lib-name">
+                    <span className="food-ellipsis">{f.name}{needsCheck(f) && <span className="food-dot" role="img" title="Check the label" aria-label="Check the label" />}</span>
+                    <span className="row-sub food-ellipsis">{servingOf(f)}</span>
                   </span>
+                  <span className="food-lib-num"><b>{fmtNum(f.kcal, 0)}</b><small>kcal</small></span>
+                  <span className="food-lib-num"><b>{fmtNum(f.protein, 0)}</b><small>g prot</small></span>
                 </button>
                 {removed ? (
-                  <button className="btn btn-tinted btn-sm" style={{ height: 44, borderRadius: 22, flex: "none" }} onClick={() => restore(f)}>Restore</button>
+                  <button className="btn btn-tinted btn-sm btn-restore" onClick={() => restore(f)}>Restore</button>
                 ) : (
                   <button className="food-icon-btn star" aria-pressed={f.favorite} aria-label={f.favorite ? `Unfavourite ${f.name}` : `Favourite ${f.name}`}
                     onClick={() => void local.save("foods", { id: f.id, favorite: !f.favorite })}>
@@ -95,11 +86,9 @@ export function FoodLibraryPage() {
                 )}
               </div>
             ))}
-          </div>
+          </Card>
         ) : (
-          <p className="muted" style={{ margin: "0 4px", fontSize: 15 }}>
-            {q ? "No food matches." : removed ? "Nothing removed." : "No foods yet. Tap New food."}
-          </p>
+          <p className="k-empty" style={{ height: 120 }}>{q ? "No match" : removed ? "Nothing removed" : "No foods yet"}</p>
         )}
       </div>
 

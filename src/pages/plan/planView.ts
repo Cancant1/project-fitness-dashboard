@@ -1,13 +1,15 @@
-// Helpers for showing the plan: preview state with example training maxes, and plain-text set descriptions.
+// Helpers for showing the plan: preview state with example training maxes, compact set descriptions,
+// week intensity for the ribbon, and "what's next".
 
 import { useMemo, useSyncExternalStore } from "react";
 import { useRows } from "../../data/store";
-import type { Program } from "../../data/types";
-import { fmtNum } from "../../lib/format";
-import { addDays, prescribeWeek, weekForDate } from "../../plan/engine";
+import type { Program, Session } from "../../data/types";
+import { addDays as addDaysIso, fmtNum } from "../../lib/format";
+import { addDays, dayForDate, prescribeDay, prescribeWeek, trainingMaxFromSet, weekForDate } from "../../plan/engine";
 import { PLAN, activeProgram, equipmentFrom, latestMaxes, planState, usePlanIds } from "../../plan/bridge";
 import type {
-  EquipmentProfile, LoadBasis, PlanState, PrescribedDay, PrescribedExercise, PrescribedSet, ProgramWeek, TmLiftKey, WeekType
+  DayKey, EquipmentProfile, LiftingDayKey, LoadBasis, MainLiftKey, PlanState, PrescribedDay, PrescribedExercise, PrescribedSet,
+  ProgramDay, ProgramWeek, TmLiftKey, WeekType
 } from "../../plan/types";
 
 /** The plan page's own defaults, used when no training max is known yet. */
@@ -69,6 +71,15 @@ export function weekDays(weekNo: number, ctx: PlanContext): { days: PrescribedDa
   }
 }
 
+/** prescribeDay that returns null instead of throwing (e.g. no training max yet). */
+export function tryDay(weekNo: number, dayKey: DayKey, state: PlanState, equipment: EquipmentProfile): PrescribedDay | null {
+  try {
+    return prescribeDay(PLAN, weekNo, dayKey, state, equipment);
+  } catch {
+    return null;
+  }
+}
+
 /** The week containing `today`, or the first week before the plan starts. Null after it ends. */
 export function currentWeek(today: string): { week: ProgramWeek; status: "before" | "during" } | null {
   const w = weekForDate(PLAN, today);
@@ -78,6 +89,51 @@ export function currentWeek(today: string): { week: ProgramWeek; status: "before
 }
 
 export const weekEnd = (w: ProgramWeek) => addDays(w.startDate, 6);
+export const planEnd = () => weekEnd(PLAN.weeks[PLAN.weeks.length - 1]!);
+
+export const LIFTING_DAYS: LiftingDayKey[] = ["lower_a", "upper_a", "lower_b", "upper_b"];
+export const dayDef = (key: DayKey): ProgramDay => PLAN.days.find((d) => d.key === key)!;
+
+// ---------- done / next ----------
+
+/** "weekNo:dayKey" for every completed session of this programme. */
+export function doneSlots(sessions: Session[], program: Program | undefined): { slots: Set<string>; dates: Set<string> } {
+  const mine = program ? sessions.filter((s) => s.status === "completed" && s.program_id === program.id) : [];
+  return {
+    dates: new Set(mine.map((s) => s.date)),
+    slots: new Set(mine.map((s) => `${s.program_week_no}:${(s.legacy_ref as { plan?: { dayKey?: string } }).plan?.dayKey ?? ""}`))
+  };
+}
+
+/** First lifting day from today on that isn't done yet. */
+export function nextPlanned(sessions: Session[], program: Program | undefined, today: string): { date: string; week: ProgramWeek; day: ProgramDay } | null {
+  const first = PLAN.weeks[0]!.startDate;
+  const end = planEnd();
+  const { slots, dates } = doneSlots(sessions, program);
+  for (let d = today < first ? first : today; d <= end; d = addDaysIso(d, 1)) {
+    const slot = dayForDate(PLAN, d);
+    if (slot && slot.day.kind === "lifting" && !dates.has(d) && !slots.has(`${slot.week.weekNo}:${slot.day.key}`)) return { date: d, ...slot };
+  }
+  return null;
+}
+
+// ---------- week intensity (the ribbon) ----------
+
+export type Phase = "calibration" | "training" | "light" | "test";
+
+export function phaseOf(type: WeekType): Phase {
+  if (type === "calibration") return "calibration";
+  if (type === "test") return "test";
+  if (type === "deload" || type === "taper") return "light";
+  return "training";
+}
+
+/** Squat %TM for the week type (A 72.5 … D 87.5, deload 60, taper 85, test 100). Null for calibration. */
+export function weekIntensity(type: WeekType): number | null {
+  if (type === "calibration") return null;
+  if (type === "test") return 1;
+  return PLAN.mainLifts.squat.byWeekType[type]?.pctTm ?? null;
+}
 
 // ---------- text ----------
 
@@ -85,21 +141,28 @@ export const TYPE_NAME: Record<WeekType, string> = {
   calibration: "Calibration", A: "A · 5s", B: "B · 4s", C: "C · 3s", D: "D · 2s", deload: "Deload", taper: "Taper", test: "PR test"
 };
 
-export function typeChip(type: WeekType): string {
-  if (type === "test") return "chip chip-warm";
-  if (type === "deload" || type === "taper" || type === "calibration") return "chip chip-plain";
-  return "chip chip-accent";
-}
-
 export const LIFT_NAME: Record<string, string> = {
   squat: "Squat", deadlift: "Deadlift", incline_db_press: "Incline DB press", weighted_pullup: "Weighted pull-up"
 };
+export const LIFT_SHORT: Record<MainLiftKey, string> = { squat: "Squat", deadlift: "Deadlift", incline_db_press: "Incline DB", weighted_pullup: "Pull-up" };
+const KEY_SHORT: Record<string, string> = { barbell_row: "Barbell row", db_bench_press: "DB bench", romanian_deadlift: "RDL" };
 
-export const ROLE_NAME: Record<PrescribedExercise["role"], string> = {
-  main: "Main lift", compound: "Compound", isolation: "Isolation", shoulder: "Shoulder care"
+/** Exercise name for a compact row: the part before the comma. */
+export const shortName = (ex: Pick<PrescribedExercise, "name" | "exerciseKey" | "mainLift">): string =>
+  (ex.mainLift ? LIFT_SHORT[ex.mainLift] : KEY_SHORT[ex.exerciseKey]) ?? ex.name.split(",")[0]!;
+
+/** The lifts that define a day: its main lifts, else its first compound. */
+export function headlineLifts(day: PrescribedDay): PrescribedExercise[] {
+  const mains = day.exercises.filter((e) => e.role === "main");
+  if (mains.length) return mains;
+  const first = day.exercises.find((e) => e.role === "compound");
+  return first ? [first] : [];
+}
+
+export const GOAL_TM: Record<TmLiftKey, number> = {
+  squat: trainingMaxFromSet(PLAN.goals.squat.load, PLAN.goals.squat.reps),
+  deadlift: trainingMaxFromSet(PLAN.goals.deadlift.load, PLAN.goals.deadlift.reps)
 };
-
-const BASIS: Record<LoadBasis, string> = { total: "", per_hand: "each hand", per_arm: "each arm", per_leg: "each leg", added: "added" };
 
 export function fmtPct(p: number): string {
   return `${fmtNum(p * 100, 1)}%`;
@@ -112,6 +175,8 @@ export function fmtRest(sec: number): string {
   return s ? `${m} min ${s} s` : `${m} min`;
 }
 
+const BASIS: Record<LoadBasis, string> = { total: "", per_hand: "each hand", per_arm: "each arm", per_leg: "each leg", added: "added" };
+
 /** "100 kg", "+5 kg", "22.5 kg each hand", "Bodyweight". */
 export function fmtLoad(load: number, unit: PrescribedSet["unit"], basis: LoadBasis = "total"): string {
   if (unit === "bodyweight") return load ? `BW +${fmtNum(load)} kg` : "Bodyweight";
@@ -119,46 +184,49 @@ export function fmtLoad(load: number, unit: PrescribedSet["unit"], basis: LoadBa
   return `${fmtNum(load)} ${unit}${BASIS[basis] ? ` ${BASIS[basis]}` : ""}`;
 }
 
-export interface SetGroup {
-  kind: PrescribedSet["kind"];
-  count: number;
-  scheme: string;
-  load: number;
-  unit: PrescribedSet["unit"];
-  pctTm?: number;
-  note?: string;
+/** Compact load for a row: "80 kg", "+5 kg", "50 lb", "BW". */
+export function fmtLoadShort(load: number, unit: PrescribedSet["unit"], basis: LoadBasis = "total"): string {
+  if (unit === "bodyweight" || basis === "added") return load ? `+${fmtNum(load)} kg` : "BW";
+  return `${fmtNum(load)} ${unit}`;
 }
 
-/** Collapses identical consecutive working sets: 3 × 5, then the rep-out on its own line. Warm-ups excluded. */
-export function groupSets(ex: PrescribedExercise): SetGroup[] {
-  const out: SetGroup[] = [];
-  for (const s of ex.sets) {
-    if (s.kind === "warmup") continue;
-    const scheme = schemeText(s);
-    const last = out[out.length - 1];
-    if (last && last.kind === s.kind && last.scheme === scheme && last.load === s.load && s.kind !== "rep_out") {
-      last.count += 1;
-      continue;
-    }
-    out.push({ kind: s.kind, count: 1, scheme, load: s.load, unit: s.unit, ...(s.pctTm != null ? { pctTm: s.pctTm } : {}), ...(s.note ? { note: s.note } : {}) });
-  }
-  return out;
+const rangeText = (r: [number, number]) => (r[0] === r[1] ? String(r[0]) : `${r[0]}–${r[1]}`);
+
+/** One accessory as "3 × 6–10" with its load; `repOut` when the last set is a rep-out. */
+export function rowSummary(ex: PrescribedExercise): { sets: number; scheme: string; load: string; repOut: boolean } {
+  const work = ex.sets.filter((s) => s.kind !== "warmup");
+  const first = work[0];
+  const reps = first?.repRange ? rangeText(first.repRange) : first?.reps != null ? String(first.reps) : "max";
+  return {
+    sets: work.length,
+    scheme: `${work.length} × ${reps}`,
+    load: first ? fmtLoadShort(first.load, first.unit, ex.loadBasis) : "",
+    repOut: work.some((s) => s.kind === "rep_out")
+  };
 }
 
-function schemeText(s: PrescribedSet): string {
-  const range = s.repRange ? (s.repRange[0] === s.repRange[1] ? String(s.repRange[0]) : `${s.repRange[0]}–${s.repRange[1]}`) : null;
-  switch (s.kind) {
-    case "rep_out": return s.target != null ? `Rep-out, target ${s.target}+` : range ? `Rep-out to a stop sign (${range})` : "Rep-out to your last clean rep";
-    case "failure": return `${range ?? "max"}, to failure`;
-    case "top": return `${s.reps ?? 1}, single`;
-    case "backoff": return `${s.reps ?? ""}, back-off`;
-    default: return range ?? String(s.reps ?? "");
-  }
-}
-
-export function groupLabel(g: SetGroup): string {
-  if (g.kind === "rep_out") return g.scheme;
-  return `${g.count} × ${g.scheme}`;
+/** A main lift: "3 × 4", "rep-out 8+", the working load and %TM. */
+export function mainSummary(ex: PrescribedExercise, tms: PlanState["trainingMaxes"], noPct: boolean): {
+  load: number; loadText: string; scheme: string; repOut: string | null; pct: number | null; warmups: PrescribedSet[];
+} {
+  const work = ex.sets.filter((s) => s.kind !== "warmup");
+  const normal = work.filter((s) => s.kind === "working" || s.kind === "top");
+  const backoff = work.filter((s) => s.kind === "backoff");
+  const ro = work.find((s) => s.kind === "rep_out");
+  const head = ro ?? normal[0] ?? work[0];
+  const load = head?.load ?? 0;
+  const parts: string[] = [];
+  if (normal.length) parts.push(`${normal.length} × ${normal[0]!.reps ?? ""}`);
+  if (backoff.length) parts.push("back-off");
+  const pct = noPct ? null : head?.pctTm ?? pctOfTm(ex, load, tms);
+  return {
+    load,
+    loadText: ex.loadBasis === "added" ? (load ? `+${fmtNum(load)}` : "BW") : fmtNum(load),
+    scheme: parts.join(" + "),
+    repOut: ro ? (ro.target != null ? `rep-out ${ro.target}+` : "rep-out") : null,
+    pct,
+    warmups: ex.sets.filter((s) => s.kind === "warmup")
+  };
 }
 
 /** % of TM for a squat/deadlift load; null for other lifts. */

@@ -10,8 +10,10 @@ import { FoodLine, MealPicker, QuantityStepper, SearchIcon, StarIcon, mealLabel 
 const GROUP_LABEL: Record<AddGroup, string> = { favorite: "Favourites", recent: "Recent", all: "All foods" };
 
 /** Pick a food (favourites, recent, the rest; archived foods are hidden), set servings, add. Quick add for one-offs. */
-export function AddFoodSheet({ meal: initialMeal, foods, entries, onAdd, onClose }: {
+export function AddFoodSheet({ meal: initialMeal, day = null, foods, entries, onAdd, onClose }: {
   meal: Meal; foods: Food[]; entries: FoodEntry[];
+  /** Short name of the day being logged to ("Tue 6 Oct"), or null for today. */
+  day?: string | null;
   onAdd: (items: EntryDraft[]) => Promise<void> | void;
   onClose: () => void;
 }) {
@@ -43,7 +45,9 @@ export function AddFoodSheet({ meal: initialMeal, foods, entries, onAdd, onClose
     setQuickError(false);
   }
 
-  const title = added.length ? `Added ${added.length} to ${mealLabel(meal)}` : "Add food";
+  const title = added.length
+    ? `Added ${added.length} to ${mealLabel(meal)}${day ? ` · ${day}` : ""}`
+    : day ? `Add to ${day}` : "Add food";
 
   if (picked) {
     return (

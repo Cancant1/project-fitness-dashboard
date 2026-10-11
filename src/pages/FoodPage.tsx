@@ -2,20 +2,23 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { FoodEntry, Meal, SavedMeal } from "../data/types";
-import { addDays, fmtLongDate, fmtNum, todayIso } from "../lib/format";
+import { addDays, fmtLongDate, fmtNum, fmtShortDate, todayIso } from "../lib/format";
 import {
   PLAN_DAY_NAME, bodyweight7d, dayTotals, foodSetupDone, hasPlanTarget, mealForHour, planDaySavedMeal, planTargetRow, servingText, sumEntries, targetFor,
   type EntryDraft
 } from "../lib/nutrition";
+import { Bar, Card, Label, PageHead, Pill, Ring } from "../ui/kit";
 import { ChevronLeft, ChevronRight, PlusIcon } from "../ui/icons";
 import { AddFoodSheet } from "./food/AddFoodSheet";
 import { EntrySheet } from "./food/EntrySheet";
 import { SavedMealSheet } from "./food/SavedMealSheet";
 import { SetupSheet } from "./food/SetupSheet";
-import { FoodStyles, MEALS, RemoveIcon, fmtQty, useToast } from "./food/ui";
+import { DateButton, MEALS, RemoveIcon, fmtQty, useToast } from "./food/ui";
 
 const MAIN_MEALS: Meal[] = ["breakfast", "lunch", "dinner", "snacks"];
+const dayShort = new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
+/** Food: what have I eaten vs target. Rings first, meals below, one Add button. Logs go to the day being viewed. */
 export function FoodPage() {
   const { local } = useStore();
   const entries = useRows("food_entries");
@@ -42,21 +45,23 @@ export function FoodPage() {
     () => entries.filter((e) => e.date === date).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? "") || a.created_at.localeCompare(b.created_at)),
     [entries, date]
   );
-  const yesterday = useMemo(() => entries.filter((e) => e.date === addDays(date, -1)), [entries, date]);
+  const dayBefore = useMemo(() => entries.filter((e) => e.date === addDays(date, -1)), [entries, date]);
   const totals = dayTotals(date, entries, days);
   const target = targetFor(date, targets, bodyweight7d(weights, date));
   const setupDone = foodSetupDone(foods);
   const planTarget = hasPlanTarget(targets);
   const planDay = saved.some((s) => s.name === PLAN_DAY_NAME);
   const savedSorted = useMemo(() => [...saved].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)), [saved]);
+  const isToday = date === today;
+  const dayName = isToday ? null : dayShort.format(new Date(date + "T12:00:00")).replace(",", "");
 
   function goTo(d: string) {
-    setDate(d);
+    setDate(d > today ? today : d);
     setEditMode(false);
   }
 
   async function log(items: (EntryDraft | SavedMeal["items"][number])[]) {
-    const time = date === today ? new Date().toTimeString().slice(0, 5) : null;
+    const time = isToday ? new Date().toTimeString().slice(0, 5) : null;
     return local.save("food_entries", items.map(({ meal, food_id, name, serving_label, quantity, kcal, protein, carbs, fat, note }) => ({
       meal, food_id, name, serving_label, quantity, kcal, protein, carbs, fat, note, date, time, legacy_ref: {}
     })));
@@ -93,141 +98,142 @@ export function FoodPage() {
 
   const removing = editMode && mine.length > 0;
   const visibleMeals = MEALS.filter((m) => MAIN_MEALS.includes(m.key) || mine.some((e) => (e.meal ?? "other") === m.key));
+  const copyBefore = !mine.length && dayBefore.length > 0;
 
   return (
-    <main className="page">
-      <FoodStyles />
-      <header className="page-head">
-        <div style={{ minWidth: 0 }}>
-          <p className="eyebrow">{date === today ? "Today" : fmtLongDate(date)}</p>
-          <h1 className="large-title">Food</h1>
-        </div>
-        <nav aria-label="Day" style={{ display: "flex", gap: 6, flex: "none" }}>
-          <button className="btn btn-glass btn-icon" aria-label="Previous day" onClick={() => goTo(addDays(date, -1))}><ChevronLeft /></button>
-          {date !== today && <button className="btn btn-glass food-chip" onClick={() => goTo(today)}>Today</button>}
-          <button className="btn btn-glass btn-icon" aria-label="Next day" disabled={date >= today} onClick={() => goTo(addDays(date, 1))}><ChevronRight /></button>
+    <main className="page food">
+      <PageHead eyebrow={isToday ? fmtLongDate(today) : fmtLongDate(date)} title="Food">
+        <nav className="food-days" aria-label="Day">
+          <button aria-label="Previous day" onClick={() => goTo(addDays(date, -1))}><ChevronLeft /></button>
+          <DateButton value={date} max={today} onChange={goTo} label="Pick a day">{isToday ? "Today" : fmtShortDate(date)}</DateButton>
+          <button aria-label="Next day" disabled={date >= today} onClick={() => goTo(addDays(date, 1))}><ChevronRight size={18} /></button>
         </nav>
-      </header>
+      </PageHead>
 
       <div className="food-layout">
-        <section className="card card-pad" style={{ gridArea: "totals", display: "flex", flexDirection: "column", gap: 16 }} aria-label="Totals">
-          <div className="grid-2" style={{ gap: 20 }}>
-            <Total label="Energy" value={totals.kcal} target={target?.kcal} unit="kcal" color="var(--fg)" />
-            <Total label="Protein" value={totals.protein} target={target?.protein} unit="g" color="var(--accent)" />
-          </div>
-          <p className="row-sub num">
-            Carbs {fmtNum(totals.carbs ?? 0, 0)}{target?.carbs ? ` / ${fmtNum(target.carbs, 0)}` : ""} g
-            {" · "}Fat {fmtNum(totals.fat ?? 0, 0)}{target?.fat ? ` / ${fmtNum(target.fat, 0)}` : ""} g
-            {target?.phase ? ` · ${target.phase}` : ""}
-            {target?.proteinPerKg && target.bodyweightKg ? ` · protein ${fmtNum(target.proteinPerKg, 1)} g/kg × ${fmtNum(target.bodyweightKg, 1)} kg` : ""}
-            {totals.source === "day" && " · day total from your old log"}
-          </p>
-        </section>
-
-        <aside className="food-side" style={{ gridArea: "side" }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="btn btn-primary" style={{ flex: "1 1 160px" }} onClick={() => setAdding(mealForHour(new Date().getHours()))}>
-              <PlusIcon /> Add food
-            </button>
-            <Link className="btn btn-glass food-chip" style={{ height: 50, borderRadius: 25 }} to="/food/library">Manage foods</Link>
-          </div>
-
-          {(savedSorted.length > 0 || (!mine.length && yesterday.length > 0)) && (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {savedSorted.map((s) => <button key={s.id} className="btn btn-glass food-chip" onClick={() => setOpenSaved(s)}>{s.name}</button>)}
-              {!mine.length && yesterday.length > 0 && (
-                <button className="btn btn-glass food-chip" onClick={() => void logWithUndo(yesterday, `Copied ${yesterday.length} items from yesterday`)}>
-                  Copy yesterday
-                </button>
-              )}
+        <Card className="food-hero" aria-label="Totals">
+          {totals.source === "day" && <span className="food-hero-tag"><Pill>Day total</Pill></span>}
+          <div className="food-rings">
+            <div className="food-ring">
+              <Ring value={target ? totals.protein / target.protein : 0} size={136} stroke={12} color="var(--chart-1)" label="Protein">
+                <span className="k-num food-ring-v">{fmtNum(totals.protein, 0)}</span>
+                <span className="k-muted food-ring-l">{target ? `of ${fmtNum(target.protein, 0)} g` : "g"}</span>
+              </Ring>
+              <span className="food-ring-cap">
+                Protein
+                {target?.proteinPerKg && target.bodyweightKg
+                  ? <small>{fmtNum(target.proteinPerKg, 1)} g/kg × {fmtNum(target.bodyweightKg, 1)}</small>
+                  : target && <Left value={totals.protein} target={target.protein} unit="g" />}
+              </span>
             </div>
-          )}
+            <div className="food-ring">
+              <Ring value={target ? totals.kcal / target.kcal : 0} size={136} stroke={12} color="var(--warm)" label="Energy">
+                <span className="k-num food-ring-v">{fmtNum(totals.kcal, 0)}</span>
+                <span className="k-muted food-ring-l">{target ? `of ${fmtNum(target.kcal, 0)}` : "kcal"}</span>
+              </Ring>
+              <span className="food-ring-cap">
+                Energy
+                {target && <Left value={totals.kcal} target={target.kcal} unit="kcal" />}
+              </span>
+            </div>
+          </div>
+          <div className="food-macros">
+            <Macro label="Carbs" value={totals.carbs} target={target?.carbs ?? null} />
+            <Macro label="Fat" value={totals.fat} target={target?.fat ?? null} />
+          </div>
+        </Card>
 
-          {!setupDone && (
-            <section className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 600 }}>Set up your food list</h2>
-              <p style={{ fontSize: 15 }} className="muted">
-                Keep the plan's foods and your dinners, archive the rest. You check every item first. Nothing is deleted.
-              </p>
-              <button className="btn btn-tinted food-chip" style={{ alignSelf: "flex-start" }} onClick={() => setSetupOpen(true)}>Review list</button>
-            </section>
-          )}
+        <aside className="food-side">
+          <button className="btn btn-primary food-add-main" onClick={() => setAdding(mealForHour(new Date().getHours()))}>
+            <PlusIcon /> {dayName ? `Add to ${dayName}` : "Add food"}
+          </button>
 
-          {(!planTarget || !planDay) && (
-            <section className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <h2 style={{ fontSize: 17, fontWeight: 600 }}>Plan targets</h2>
-              <ul className="muted" style={{ fontSize: 15, margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
-                {!planTarget && <li>From Mon 12 Oct 2026: 2,800 kcal a day (lean bulk) and 2.0 g protein per kg of your 7-day average weight (about 148 g at 74 kg).</li>}
-                {!planDay && <li>The plan's usual day (everything but dinner) as a saved meal, about 1,700 kcal.</li>}
-              </ul>
-              <button className="btn btn-tinted food-chip" style={{ alignSelf: "flex-start" }} onClick={() => void addPlanSetup()}>
-                {!planTarget && !planDay ? "Add targets and usual day" : !planTarget ? "Add plan targets" : "Add usual day"}
-              </button>
-            </section>
+          <section>
+            <Label action={<Link to="/food/library">Foods</Link>}>Quick log</Label>
+            {(savedSorted.length > 0 || copyBefore) && (
+              <div className="food-chips">
+                {copyBefore && (
+                  <button className="copy" onClick={() => void logWithUndo(dayBefore, `Copied ${dayBefore.length} items`)}>
+                    {isToday ? "Copy yesterday" : "Copy day before"}
+                  </button>
+                )}
+                {savedSorted.map((s) => (
+                  <button key={s.id} onClick={() => setOpenSaved(s)}>
+                    {s.name}<small>{fmtNum(sumEntries(s.items).kcal, 0)}</small>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {(!setupDone || !planTarget || !planDay) && (
+            <Card pad={false} className="food-setup k-rows">
+              {!setupDone && (
+                <div className="k-row">
+                  <span className="k-row-main"><span>Food list</span><span>Not reviewed yet</span></span>
+                  <button className="btn btn-tinted btn-sm" onClick={() => setSetupOpen(true)}>Review</button>
+                </div>
+              )}
+              {(!planTarget || !planDay) && (
+                <div className="k-row">
+                  <span className="k-row-main">
+                    <span>{planTarget ? "Plan usual day" : "Plan targets"}</span>
+                    <span className="num">{!planTarget ? `2,800 kcal · 2 g/kg${!planDay ? " · usual day" : ""}` : "About 1,700 kcal"}</span>
+                  </span>
+                  <button className="btn btn-tinted btn-sm" onClick={() => void addPlanSetup()}>Add</button>
+                </div>
+              )}
+            </Card>
           )}
         </aside>
 
-        <div className="food-meals" style={{ gridArea: "meals" }}>
-          {mine.length > 0 && (
-            <div className="section-row" style={{ alignItems: "center", marginTop: -8, marginBottom: -12 }}>
-              <span className="row-sub num">{mine.length} item{mine.length === 1 ? "" : "s"}</span>
-              <button className="btn btn-plain btn-sm" style={{ height: 44 }} aria-pressed={removing} onClick={() => setEditMode(!removing)}>
-                {removing ? "Done" : "Edit"}
-              </button>
-            </div>
-          )}
+        <section className="food-meals" aria-label="Meals">
+          <Label action={mine.length > 0 ? (
+            <button className="food-label-btn" aria-pressed={removing} onClick={() => setEditMode(!removing)}>{removing ? "Done" : "Edit"}</button>
+          ) : undefined}>{dayName ?? "Meals"}</Label>
 
           {visibleMeals.map(({ key, label }) => {
             const items = mine.filter((e) => (e.meal ?? "other") === key);
             const sum = sumEntries(items);
             return (
-              <section className="section" key={key}>
-                <div className="section-row">
-                  <h2 className="section-label" style={{ margin: 0 }}>{label}</h2>
-                  {items.length > 0 && <span className="row-sub num">{fmtNum(sum.kcal, 0)} kcal · {fmtNum(sum.protein, 0)} g</span>}
+              <Card pad={false} key={key} className={`food-meal ${items.length ? "" : "empty"}`}>
+                <div className="food-meal-head">
+                  <h2>{label}</h2>
+                  {items.length > 0 && <span className="food-meal-total"><b>{fmtNum(sum.kcal, 0)}</b> kcal · <span className="num">{fmtNum(sum.protein, 0)}</span> g</span>}
+                  {!removing && <button className="food-icon-btn add" aria-label={`Add to ${label}`} onClick={() => setAdding(key)}><PlusIcon /></button>}
                 </div>
-                <div className="list">
-                  {items.map((e) => (
-                    <div className="food-item" key={e.id}>
-                      {removing && (
-                        <button className="food-icon-btn danger" aria-label={`Remove ${e.name}`} onClick={() => void remove([e])}><RemoveIcon /></button>
-                      )}
-                      <button className="food-row" onClick={() => setEditing(e)}>
-                        <span className="food-row-text">
-                          <span className="food-ellipsis">{e.name}</span>
-                          <span className="row-sub food-ellipsis">{e.quantity !== 1 ? `${fmtQty(e.quantity)} × ` : ""}{servingText(e.serving_label)}</span>
-                        </span>
-                        <span className="food-row-nums num">
-                          <span style={{ fontWeight: 600 }}>{fmtNum(e.kcal, 0)}</span>
-                          <span className="row-sub">{fmtNum(e.protein, 1)} g</span>
-                        </span>
-                      </button>
-                    </div>
-                  ))}
-                  {!removing && (
-                    <div className="row">
-                      <button className="food-add-row" onClick={() => setAdding(key)}><PlusIcon /> Add to {label}</button>
-                    </div>
-                  )}
-                </div>
-              </section>
+                {items.length > 0 && (
+                  <div className="food-meal-rows">
+                    {items.map((e) => (
+                      <div className="food-item" key={e.id}>
+                        {removing && (
+                          <button className="food-icon-btn danger" aria-label={`Remove ${e.name}`} onClick={() => void remove([e])}><RemoveIcon /></button>
+                        )}
+                        <button className="food-entry" onClick={() => setEditing(e)}>
+                          <span className="food-entry-name">{e.name}</span>
+                          <span className="food-entry-qty">{e.quantity !== 1 ? `${fmtQty(e.quantity)} × ` : ""}{servingText(e.serving_label)}</span>
+                          <span className="food-entry-kcal">{fmtNum(e.kcal, 0)}</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Card>
             );
           })}
-
-          {!mine.length && totals.source === "day" && (
-            <p className="muted" style={{ margin: "0 4px", fontSize: 15 }}>Only a day total was logged on this day.</p>
-          )}
-        </div>
+        </section>
       </div>
 
-      {adding && <AddFoodSheet meal={adding} foods={foods} entries={entries} onClose={closeAdd} onAdd={async (items) => { await log(items); }} />}
+      {adding && (
+        <AddFoodSheet meal={adding} day={dayName} foods={foods} entries={entries} onClose={closeAdd} onAdd={async (items) => { await log(items); }} />
+      )}
       {editing && (
         <EntrySheet entry={editing} onClose={closeEdit}
           onSave={(patch) => void local.save("food_entries", { ...patch, id: editing.id })}
           onRemove={() => void remove([editing])} />
       )}
       {openSaved && (
-        <SavedMealSheet meal={openSaved} onClose={closeSaved}
+        <SavedMealSheet meal={openSaved} day={dayName} onClose={closeSaved}
           onLog={(items) => void logWithUndo(items, items.length === 1 ? `Logged ${items[0]!.name}` : `Logged ${openSaved.name}`)}
           onDelete={() => {
             const s = openSaved;
@@ -241,23 +247,20 @@ export function FoodPage() {
   );
 }
 
-function Total({ label, value, target, unit, color }: { label: string; value: number; target?: number; unit: string; color: string }) {
-  const pct = target ? Math.min(100, (value / target) * 100) : 0;
-  const left = target ? target - value : 0;
+/** "412 left" / "120 over" under a ring. */
+function Left({ value, target, unit }: { value: number; target: number; unit: string }) {
+  const left = target - value;
+  return <small className={left < 0 ? "over" : ""}>{left >= 0 ? `${fmtNum(left, 0)} ${unit} left` : `${fmtNum(-left, 0)} ${unit} over`}</small>;
+}
+
+function Macro({ label, value, target }: { label: string; value: number | null; target: number | null }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0 }}>
-      <span className="row-sub">{label}</span>
-      <span className="num" style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.4, lineHeight: 1 }}>
-        {fmtNum(value, 0)}<span style={{ fontSize: 15, fontWeight: 500, color: "var(--fg2)", letterSpacing: 0 }}> {unit}</span>
+    <div className="food-macro">
+      <span className="food-macro-top">
+        <span>{label}</span>
+        <span><b>{value == null ? "—" : fmtNum(value, 0)}</b>{target ? ` / ${fmtNum(target, 0)}` : ""} g</span>
       </span>
-      {target ? (
-        <>
-          <div className="bar"><span style={{ width: `${pct}%`, background: left < 0 ? "var(--warm)" : color }} /></div>
-          <span className="row-sub num">
-            of {fmtNum(target, 0)} · {left >= 0 ? `${fmtNum(left, 0)} left` : `${fmtNum(-left, 0)} over`}
-          </span>
-        </>
-      ) : <span className="row-sub">No target set</span>}
+      <Bar value={target && value ? value / target : 0} color={target && value && value > target ? "var(--warm)" : "var(--chart-3)"} height={5} />
     </div>
   );
 }

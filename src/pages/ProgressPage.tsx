@@ -1,60 +1,71 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useRows } from "../data/store";
-import { fmtShortDateYear, todayIso } from "../lib/format";
+import { todayIso } from "../lib/format";
 import { PLAN, activeProgram } from "../plan/bridge";
+import type { MainLiftKey } from "../plan/types";
+import { Card, PageHead } from "../ui/kit";
+import { BodyweightCard, ConsistencyCard, LiftTile, MusclesCard, PLAN_END, ProgrammeCard } from "./progress/cards";
 import { useBodyweight, useTraining } from "./progress/data";
-import { LiftHistoryChart, LiftSummary } from "./progress/LiftHistory";
-import { StrengthVsBodyweight, VolumePanel, WeeksTrained } from "./progress/Panels";
-import { CurrentProgramme, PLAN_END, UpcomingProgramme } from "./progress/Programme";
-import { BestByYear, BlockTable } from "./progress/Tables";
-import { twoCol } from "./progress/ui";
+import { metricName } from "./progress/format";
+import { useLiftTrends } from "./progress/lifts";
+import { RangeControl, TrendChart, hasEstimated, useRange } from "./progress/TrendChart";
+import "./progress/progress.css";
 
-/**
- * Progress: lifetime insights first (main lifts over time, volume, frequency, bodyweight, blocks).
- * The running programme gets its own section only while it is active; before it starts, a compact card.
- */
+/** Progress: am I getting stronger? Four lifts up top, one chart, then muscles, consistency and bodyweight. */
 export function ProgressPage() {
   const idx = useTraining();
   const bodyweight = useBodyweight();
   const programs = useRows("programs");
   const maxes = useRows("training_maxes");
   const today = todayIso();
+  const trends = useLiftTrends(idx, today);
+  const [liftKey, setLiftKey] = useState<MainLiftKey>("squat");
+  const [range, setRange] = useRange("1y");
 
   const program = activeProgram(programs);
   const running = !!program && today >= PLAN.startDate && today <= PLAN_END;
   const upcoming = !running && today < PLAN.startDate;
+  const t = trends.find((x) => x.lift.key === liftKey) ?? trends[0]!;
+  const sets = t.id ? idx.byExercise.get(t.id) ?? [] : [];
 
   return (
-    <main className="page">
-      <header className="page-head">
-        <div>
-          <p className="eyebrow">{idx.sessions.length} workouts{idx.lastDate ? ` · last ${fmtShortDateYear(idx.lastDate)}` : ""}</p>
-          <h1 className="large-title">Progress</h1>
-        </div>
-        <Link to="/records" className="btn btn-tinted btn-sm" style={{ height: 44, borderRadius: 22, flex: "none" }}>Records</Link>
-      </header>
+    <main className="page pg">
+      <PageHead eyebrow={`${idx.sessions.length} workouts`} title="Progress">
+        <Link to="/records" className="k-pill k-pill-plain pg-head-link">Records</Link>
+      </PageHead>
 
-      {running && <CurrentProgramme idx={idx} maxes={maxes} bodyweight={bodyweight} today={today} />}
-
-      <section className="section" style={{ gap: 12 }}>
-        {running && <h2 className="section-label">All training</h2>}
-        <LiftSummary idx={idx} />
-      </section>
-
-      {upcoming && <UpcomingProgramme today={today} />}
-
-      <LiftHistoryChart idx={idx} today={today} />
-
-      <div style={twoCol}>
-        <VolumePanel idx={idx} today={today} showPlan={running || upcoming} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}>
-          <WeeksTrained idx={idx} today={today} />
-          <StrengthVsBodyweight idx={idx} bodyweight={bodyweight} />
-        </div>
+      <div className="k-grid-4">
+        {trends.map((x) => <LiftTile key={x.lift.key} t={x} on={x.lift.key === liftKey} onSelect={() => setLiftKey(x.lift.key)} />)}
       </div>
 
-      <BestByYear idx={idx} />
-      <BlockTable idx={idx} />
+      <div className="k-dash">
+        <div className="k-col">
+          <Card className="pg-hero">
+            <div className="pg-hero-head">
+              <div className="pg-hero-title">
+                <h2>{t.lift.label}</h2>
+                <span className="k-muted">{range === "all" ? "best per month" : "best per session"} · {metricName(t.lift.metric)}</span>
+              </div>
+              <RangeControl value={range} onChange={setRange} />
+            </div>
+            <TrendChart trend={t} sets={sets} range={range} today={today} height={260} label={`${t.lift.label} over time`} />
+            <div className="pg-legend">
+              <span><i className="pg-sw" /> {t.lift.label}</span>
+              <span><i className="pg-sw pg-sw-dash pg-sw-warm" /> Lifetime best</span>
+              {hasEstimated(t, range, today) && <span><i className="pg-sw pg-sw-ring" /> est. date</span>}
+              {range === "all" && <span><i className="pg-sw pg-sw-band" /> blocks</span>}
+            </div>
+          </Card>
+          <BodyweightCard idx={idx} bodyweight={bodyweight} />
+        </div>
+
+        <div className="k-col">
+          {(running || upcoming) && <ProgrammeCard idx={idx} maxes={maxes} today={today} />}
+          <MusclesCard idx={idx} today={today} />
+          <ConsistencyCard idx={idx} today={today} />
+        </div>
+      </div>
     </main>
   );
 }

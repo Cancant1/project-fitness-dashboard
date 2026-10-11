@@ -1,124 +1,121 @@
-import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { daysBetween, fmtShortDate, fmtShortDateYear, todayIso } from "../lib/format";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { daysBetween, fmtShortDateYear, todayIso } from "../lib/format";
 import { PLAN } from "../plan/bridge";
-import type { ProgramWeek } from "../plan/types";
-import { MaxesPanel } from "./plan/MaxesPanel";
-import { Overview } from "./plan/Overview";
+import { Card, Label, Pill, Stat } from "../ui/kit";
+import { ChevronLeft, ChevronRight } from "../ui/icons";
+import { MaxesPanel, SetMaxSheet, type Lift } from "./plan/MaxesPanel";
+import { HowItWorks } from "./plan/Overview";
 import { StartPlanSheet } from "./plan/StartPlanSheet";
-import { WeekDetail } from "./plan/WeekDetail";
-import { WeekList } from "./plan/WeekList";
-import { currentWeek, fmtRange, useMediaQuery, usePlanContext, weekEnd } from "./plan/planView";
+import { WeekDays } from "./plan/WeekDetail";
+import { RibbonLegend, WeekRibbon } from "./plan/WeekRibbon";
+import { TYPE_NAME, currentWeek, fmtPct, fmtRange, phaseOf, planEnd, usePlanContext, weekEnd, weekIntensity, type PlanContext } from "./plan/planView";
 import "./plan/plan.css";
 
-const weeksWhere = (f: (w: ProgramWeek) => boolean) => PLAN.weeks.filter(f).map((w) => w.weekNo).join(" and ");
+const GOALS: { lift: Lift; label: string; sub: string }[] = [
+  { lift: "squat", label: "Squat", sub: "reps" },
+  { lift: "deadlift", label: "Deadlift", sub: "reps" },
+  { lift: "incline_db_press", label: "Incline DB", sub: "each hand" },
+  { lift: "weighted_pullup", label: "Pull-up", sub: "added" },
+];
 
-type Tab = "weeks" | "rules" | "maxes";
-const TABS: [Tab, string][] = [["weeks", "Weeks"], ["rules", "How it works"], ["maxes", "Training maxes"]];
-
+/** Plan: where am I in the block, and what is this week? */
 export function PlanPage() {
   const [params, setParams] = useSearchParams();
   const ctx = usePlanContext();
-  const desktop = useMediaQuery("(min-width: 900px)");
   const [confirm, setConfirm] = useState(false);
+  const [setting, setSetting] = useState<Lift | null>(null);
   const today = todayIso();
   const now = currentWeek(today);
+  const nowNo = now?.week.weekNo ?? null;
 
   const weekParam = params.get("week");
   const weekNo = weekParam != null && /^\d+$/.test(weekParam) && Number(weekParam) < PLAN.weeks.length ? Number(weekParam) : null;
-  const tabParam = params.get("tab");
-  const tab: Tab = tabParam === "rules" || tabParam === "maxes" ? tabParam : "weeks";
-
-  useEffect(() => {
-    if (!desktop) window.scrollTo(0, 0);
-  }, [weekNo, desktop]);
-
-  // Phone: a week opens as its own view.
-  if (!desktop && weekNo != null) {
-    return <main className="page"><WeekDetail weekNo={weekNo} ctx={ctx} /></main>;
-  }
+  const selected = weekNo ?? now?.week.weekNo ?? 0;
+  const select = (n: number) => setParams(n === (now?.week.weekNo ?? 0) ? {} : { week: String(n) }, { replace: true });
 
   const first = PLAN.weeks[0]!;
-  const last = PLAN.weeks[PLAN.weeks.length - 1]!;
-  const end = weekEnd(last);
-  const status = !now
-    ? `Finished ${fmtShortDateYear(end)}`
+  const test = PLAN.weeks[PLAN.weeks.length - 1]!;
+  const lastNo = test.weekNo;
+  const status = !now ? "Finished"
     : now.status === "before"
-      ? `Starts Mon ${fmtShortDate(first.startDate)}${daysBetween(today, first.startDate) === 1 ? ", tomorrow" : ` · in ${daysBetween(today, first.startDate)} days`}`
-      : `Week ${now.week.weekNo} of ${last.weekNo} · ${now.week.label} · ${fmtRange(now.week.startDate, weekEnd(now.week))}`;
-  const selected = weekNo ?? now?.week.weekNo ?? 0;
+      ? (() => { const d = daysBetween(today, first.startDate); return d === 1 ? "Starts tomorrow" : `Starts in ${d} days`; })()
+      : `Week ${now.week.weekNo} of ${lastNo}`;
 
   return (
-    <main className="page">
-      <header className="page-head">
+    <main className="page plan">
+      <header className="k-head pl-head">
         <div>
-          <p className="eyebrow">{fmtShortDateYear(first.startDate)} → {fmtShortDateYear(end)} · {PLAN.weeks.length} weeks</p>
-          <h1 className="large-title">Plan</h1>
+          <p className="k-eyebrow">{fmtShortDateYear(first.startDate)} – {fmtShortDateYear(planEnd())}</p>
+          <h1 className="k-title">{PLAN.name}</h1>
         </div>
-        {ctx.program && <span className="chip chip-good" style={{ marginBottom: 8 }}>Started</span>}
+        <div className="k-head-actions">
+          <Pill tone={now?.status === "during" ? "accent" : "plain"}>{status}</Pill>
+          {!ctx.program && <button type="button" className="btn btn-primary pl-head-btn" onClick={() => setConfirm(true)}>Start</button>}
+        </div>
       </header>
 
-      <section className="card card-hero">
-        <div style={{ padding: "12px 12px 12px", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 24, lineHeight: "30px", fontWeight: 700, letterSpacing: -0.3 }}>{PLAN.name}</span>
-            <span className="row-sub" style={{ fontSize: 15 }}>{status}</span>
-          </div>
-          <div className="weeks" aria-hidden="true">
-            {PLAN.weeks.map((w) => (
-              <div key={w.weekNo} className={w.weekNo === now?.week.weekNo ? "now" : w.type === "test" ? "test" : w.checkpoint ? "check" : w.type === "deload" || w.type === "taper" ? "light" : undefined}>{w.weekNo}</div>
-            ))}
-          </div>
-          <div className="goal-grid" aria-label="Goals for the PR test">
-            {(["squat", "deadlift", "incline_db_press", "weighted_pullup"] as const).map((l) => {
-              const g = PLAN.goals[l];
-              return (
-                <div className="goal" key={l}>
-                  <span className="row-sub">{l === "squat" ? "Squat" : l === "deadlift" ? "Deadlift" : l === "incline_db_press" ? "Incline DB, each hand" : "Pull-up, added"}</span>
-                  <strong>{l === "weighted_pullup" ? "+" : ""}{g.load} kg × {g.reps}</strong>
-                </div>
-              );
-            })}
-          </div>
-          <p className="row-sub">PR test {fmtRange(last.startDate, end)}. Checkpoints end of week {weeksWhere((w) => !!w.checkpoint)}; deloads in weeks {weeksWhere((w) => w.type === "deload")}; taper in week {weeksWhere((w) => w.type === "taper")}.</p>
-        </div>
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {!ctx.program && (
-            <button className="btn btn-primary hero-btn" style={{ flex: "1 1 200px" }} onClick={() => setConfirm(true)}>Start the plan</button>
-          )}
-          {now && (
-            <Link to={{ search: `?week=${now.week.weekNo}` }} className={`btn ${ctx.program ? "btn-primary" : "btn-tinted"} hero-btn`} style={{ flex: "1 1 200px" }}>
-              {now.status === "before" ? "See week 0" : "This week"}
-            </Link>
-          )}
+      <section>
+        <Label>Goals · PR test {fmtRange(test.startDate, weekEnd(test))}</Label>
+        <div className="k-grid-4">
+          {GOALS.map(({ lift, label, sub }) => {
+            const g = PLAN.goals[lift];
+            return (
+              <Card key={lift} className="pl-goal">
+                <Stat label={label} value={`${lift === "weighted_pullup" ? "+" : ""}${g.load}`} unit="kg" tone="warm" sub={`× ${g.reps} ${sub}`} />
+              </Card>
+            );
+          })}
         </div>
       </section>
 
-      <div className="segmented seg-full" role="group" aria-label="Plan sections">
-        {TABS.map(([k, label]) => (
-          <button key={k} aria-pressed={tab === k} onClick={() => setParams(k === "weeks" ? {} : { tab: k })}>{label}</button>
-        ))}
+      <Ribbon selected={selected} onSelect={select} nowNo={nowNo} nowLabel={now?.status === "before" ? "Next" : "Now"} />
+
+      <div className="k-dash">
+        <div className="k-col">
+          <WeekDays weekNo={selected} ctx={ctx} onSetMax={() => setSetting(missingLift(ctx))} />
+        </div>
+        <div className="k-col">
+          <MaxesPanel ctx={ctx} onSet={setSetting} />
+          <HowItWorks />
+        </div>
       </div>
 
-      {tab === "weeks" && (desktop ? (
-        <div className="plan-cols">
-          <section className="section">
-            <h2 className="section-label">{PLAN.weeks.length} weeks</h2>
-            <WeekList nowWeekNo={now?.week.weekNo ?? null} selected={selected} />
-          </section>
-          <WeekDetail weekNo={selected} ctx={ctx} embedded />
-        </div>
-      ) : (
-        <section className="section">
-          <h2 className="section-label">{PLAN.weeks.length} weeks</h2>
-          <WeekList nowWeekNo={now?.week.weekNo ?? null} />
-        </section>
-      ))}
-
-      {tab === "rules" && <Overview />}
-      {tab === "maxes" && <MaxesPanel ctx={ctx} />}
-
       {confirm && <StartPlanSheet onClose={() => setConfirm(false)} />}
+      {setting && <SetMaxSheet initial={setting} ctx={ctx} onClose={() => setSetting(null)} />}
     </main>
   );
+}
+
+function Ribbon({ selected, onSelect, nowNo, nowLabel }: { selected: number; onSelect: (n: number) => void; nowNo: number | null; nowLabel: string }) {
+  const week = PLAN.weeks[selected]!;
+  const pct = weekIntensity(week.type);
+  const phase = phaseOf(week.type);
+  const last = PLAN.weeks.length - 1;
+  return (
+    <Card className="pl-ribbon-card" aria-label="The 20 weeks">
+      <div className="pl-rib-head">
+        <div className="pl-rib-sel">
+          <div className="pl-rib-sel-top">
+            <span className="pl-rib-sel-week">Week {week.weekNo}</span>
+            <Pill tone={phase === "test" ? "warm" : phase === "training" ? "accent" : "plain"}>{TYPE_NAME[week.type]}</Pill>
+            {week.weekNo === nowNo && <Pill tone="warm">{nowLabel}</Pill>}
+            {week.checkpoint && <Pill tone="warm">{week.checkpoint.name}</Pill>}
+          </div>
+          <span className="pl-rib-sel-sub">{fmtRange(week.startDate, weekEnd(week))}{pct != null ? ` · squat ${fmtPct(pct)}` : ""}</span>
+        </div>
+        <nav className="pl-rib-nav" aria-label="Previous or next week">
+          <button type="button" className="pl-nav-btn" disabled={selected === 0} aria-label="Previous week" onClick={() => onSelect(selected - 1)}><ChevronLeft /></button>
+          <button type="button" className="pl-nav-btn" disabled={selected === last} aria-label="Next week" onClick={() => onSelect(selected + 1)}><ChevronRight style={{ width: 18, height: 18 }} /></button>
+        </nav>
+      </div>
+      <WeekRibbon selected={selected} onSelect={onSelect} nowWeekNo={nowNo} />
+      <RibbonLegend />
+    </Card>
+  );
+}
+
+/** The lift whose training max the plan is waiting for. */
+function missingLift(ctx: PlanContext): Lift {
+  return ctx.state.trainingMaxes.squat == null ? "squat" : ctx.state.trainingMaxes.deadlift == null ? "deadlift" : "squat";
 }

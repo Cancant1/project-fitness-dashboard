@@ -1,10 +1,16 @@
 import { useMemo } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
+import type { SetRow } from "../data/types";
 import { fmtLongDate, fmtNum } from "../lib/format";
-import { ChevronLeft } from "../ui/icons";
-import { isFlagged } from "../lib/analysis";
+import { countsForStrength, e1rm, isFlagged } from "../lib/analysis";
+import { Card, PageHead, Stat } from "../ui/kit";
+import { ChevronLeft, PlayIcon } from "../ui/icons";
+import "./session.css";
 
+const KIND_NAME: Partial<Record<SetRow["kind"], string>> = { warmup: "Warm-up", rep_out: "Rep-out", top: "Top set", backoff: "Back-off", failure: "To failure", drop: "Drop set" };
+
+/** One past session: date + title, four numbers, then every exercise as a card of set chips. */
 export function SessionPage() {
   const { sessionId = "" } = useParams();
   const navigate = useNavigate();
@@ -26,49 +32,100 @@ export function SessionPage() {
     return out;
   }, [sets, sessionId]);
 
-  if (!session) return <main className="page"><p className="muted">This workout isn't on this device.</p></main>;
+  const summary = useMemo(() => {
+    const work = blocks.flatMap((b) => b.rows).filter((s) => s.kind !== "warmup");
+    let volume = 0;
+    let top: { value: number; exerciseId: string } | null = null;
+    for (const s of work) {
+      if (s.completed && !isFlagged(s) && s.load_kg != null && s.load_kg > 0 && s.reps) volume += s.load_kg * s.reps;
+      if (!countsForStrength(s)) continue;
+      const v = e1rm(Number(s.load_kg), s.reps);
+      if (v && (!top || v > top.value)) top = { value: v, exerciseId: s.exercise_id };
+    }
+    return { sets: work.length, volume, top };
+  }, [blocks]);
+
+  if (!session) return <main className="page"><p className="k-empty" style={{ height: 200 }}>Not on this device</p></main>;
+
+  const duration = session.duration_min ?? (session.started_at && session.ended_at
+    ? Math.round((new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()) / 60000) : null);
+  const tiles = [
+    <Stat key="s" size="md" label="Sets" value={summary.sets} />,
+    <Stat key="v" size="md" label="Volume" value={fmtNum(summary.volume, 0)} unit="kg" />,
+    duration != null && duration > 0 ? <Stat key="d" size="md" label="Duration" value={duration} unit="min" /> : null,
+    summary.top ? (
+      <Stat key="t" size="md" label="Top e1RM" value={fmtNum(summary.top.value, 0)} unit="kg"
+        sub={<span className="s-ellipsis">{shortName(names.get(summary.top.exerciseId) ?? "")}</span>} />
+    ) : null
+  ].filter(Boolean);
+  const title = session.title || session.source.replace(/^sheet:/, "");
 
   return (
-    <main className="page">
-      <div>
-        <button className="btn btn-plain" style={{ paddingLeft: 0 }} onClick={() => navigate(-1)}><ChevronLeft /> Back</button>
-      </div>
-      <header style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        <p className="eyebrow">
-          {fmtLongDate(session.date)}
-          {session.date_confidence !== "exact" && ` · ${session.date_confidence === "estimated" ? "date estimated" : "week known, day from the sheet"}`}
-        </p>
-        <h1 className="large-title">{session.title || session.source.replace(/^sheet:/, "")}</h1>
-        {session.date_basis && <p className="row-sub">{session.date_basis}</p>}
-      </header>
-      {session.status === "in_progress" && (
-        <Link className="btn btn-primary" to={`/workout/${session.id}`}>Continue Workout</Link>
+    <main className="page session">
+      <button className="btn btn-plain s-back" onClick={() => navigate(-1)}><ChevronLeft /> Back</button>
+      <PageHead eyebrow={fmtLongDate(session.date)} title={title} />
+      {session.date_confidence !== "exact" && (
+        <details className="s-basis">
+          <summary>{session.date_confidence === "estimated" ? "Date estimated" : "Week known"}</summary>
+          {session.date_basis && <p>{session.date_basis}</p>}
+        </details>
       )}
-      {blocks.map((b, i) => (
-        <section className="section" key={i}>
-          <h2 className="section-label">{names.get(b.exerciseId) ?? b.rows[0]?.exercise_as_logged ?? "Exercise"}</h2>
-          <div className="list">
-            {b.rows.map((s) => (
-              <div className="row" key={s.id}>
-                <span className="muted" style={{ width: 64 }}>{s.kind === "warmup" ? "Warm-up" : s.kind === "rep_out" ? "Rep-out" : s.kind === "top" ? "Top set" : `Set ${s.set_no}`}</span>
-                <span className="num" style={{ flex: 1, textAlign: "right", fontWeight: 600 }}>
-                  {s.unit === "bodyweight" ? (s.load ? `BW +${fmtNum(s.load)}` : "BW") : s.unit === "min" ? `${fmtNum(s.load)} min` : `${fmtNum(s.load)} ${s.unit}`}
-                </span>
-                <span className="num" style={{ width: 56, textAlign: "right" }}>{s.reps != null ? `× ${fmtNum(s.reps)}` : ""}</span>
-                {isFlagged(s) && <span className="chip chip-plain" title={s.flags.join(", ")}>check</span>}
+
+      {session.status === "in_progress" && (
+        <Link className="btn btn-primary s-continue" to={`/workout/${session.id}`}><PlayIcon /> Continue workout</Link>
+      )}
+
+      <div className={`k-grid-${tiles.length === 4 ? 4 : tiles.length === 3 ? 3 : 2} s-tiles`}>
+        {tiles.map((t, i) => <Card key={i} className="s-tile">{t}</Card>)}
+      </div>
+
+      <div className="s-exercises">
+        {blocks.map((b, i) => {
+          const notes = b.rows.map((s) => s.note).filter(Boolean);
+          const work = b.rows.filter((s) => s.kind !== "warmup").length;
+          return (
+            <Card key={i} className="s-ex">
+              <div className="s-ex-head">
+                <h2>{names.get(b.exerciseId) ?? b.rows[0]?.exercise_as_logged ?? "Exercise"}</h2>
+                <span className="k-muted k-num">{work}</span>
               </div>
-            ))}
-          </div>
-          {b.rows.some((s) => s.note) && <p className="row-sub" style={{ margin: "0 4px" }}>{b.rows.map((s) => s.note).filter(Boolean).join(" · ")}</p>}
-        </section>
-      ))}
-      {session.notes && <p className="card card-pad" style={{ fontSize: 15 }}>{session.notes}</p>}
+              <div className="s-chips">
+                {b.rows.map((s) => (
+                  <span key={s.id} className={`s-chip ${s.kind} ${isFlagged(s) ? "flagged" : ""} ${s.completed ? "" : "skipped"}`}
+                    title={[KIND_NAME[s.kind], isFlagged(s) ? `check: ${s.flags.join(", ")}` : null, s.completed ? null : "not done"].filter(Boolean).join(" · ") || undefined}>
+                    {chipText(s)}
+                  </span>
+                ))}
+              </div>
+              {notes.length > 0 && <p className="s-note">{notes.join(" · ")}</p>}
+            </Card>
+          );
+        })}
+      </div>
+
+      {session.notes && <p className="s-notes">{session.notes}</p>}
+
       {session.source === "app" && (
-        <button className="btn btn-plain" style={{ color: "var(--bad)" }}
+        <button className="btn btn-plain s-delete"
           onClick={async () => { await local.remove("sessions", [session.id]); navigate("/history"); }}>
-          Delete Workout
+          Delete workout
         </button>
       )}
     </main>
   );
 }
+
+/** "100 × 5", "BW+10 × 8", "BW−20 × 6", "12 min", "45 s". */
+function chipText(s: SetRow): string {
+  const reps = s.reps != null ? ` × ${fmtNum(s.reps)}` : "";
+  if (s.unit === "min") return `${fmtNum(s.load)} min`;
+  if (s.unit === "reps") return s.reps != null ? `${fmtNum(s.reps)} reps` : "—";
+  if (s.unit === "bodyweight") {
+    const add = s.load ? (s.load > 0 ? `+${fmtNum(s.load)}` : `−${fmtNum(-s.load)}`) : "";
+    return `BW${add}${reps}`;
+  }
+  if (s.load == null) return s.duration_s ? `${fmtNum(s.duration_s)} s` : reps ? `${fmtNum(s.reps)} reps` : "—";
+  return `${fmtNum(s.load)}${s.unit === "lb" ? " lb" : ""}${reps}`;
+}
+
+const shortName = (n: string) => n.split(",")[0]!.split("(")[0]!.trim();

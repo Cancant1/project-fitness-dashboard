@@ -1,0 +1,67 @@
+/* Workouts page. Tokens only. */
+
+.tr-head-btn { height: 44px; padding: 0 18px; font-size: 15px; border-radius: 22px; }
+
+/* Compact hero: the next planned workout */
+.tr-hero { padding: 20px 22px 22px; display: flex; flex-direction: column; gap: 14px; }
+.tr-hero-top { display: flex; flex-wrap: wrap; gap: 8px; }
+.tr-hero-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.tr-hero-id { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tr-hero-title { margin: 0; font-size: 36px; line-height: 40px; font-weight: 750; letter-spacing: -0.03em; }
+.tr-hero-sub { font-size: 15px; color: rgba(255, 255, 255, 0.8); }
+.tr-hero-load { flex: none; font-family: var(--num); font-size: 52px; line-height: 0.9; font-weight: 750; letter-spacing: -0.04em; }
+.tr-hero-load small { font-size: 18px; font-weight: 600; opacity: 0.75; margin-left: 3px; letter-spacing: 0; }
+.tr-hero-action { display: flex; }
+.tr-hero-action .btn, .tr-hero .tr-hero-btn {
+  width: 100%; height: 52px; margin: 0; border-radius: 26px; font-size: 17px; font-weight: 700;
+  background: #FFFFFF; color: #7E3129; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.tr-hero-btn { align-self: stretch; }
+@media (min-width: 900px) {
+  .tr-hero-action .btn, .tr-hero .tr-hero-btn { width: auto; align-self: flex-start; padding: 0 28px; }
+}
+
+.tr-done { display: flex; flex-direction: column; gap: 6px; }
+.tr-done-v { font-family: var(--num); font-size: 32px; font-weight: 700; }
+
+/* Plan day tiles */
+.tr-tile {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; min-height: 132px; padding: 16px;
+  border: 0; text-align: left; color: var(--fg); cursor: pointer; font: inherit;
+}
+.tr-tile:hover { filter: brightness(0.985); }
+.tr-tile-day { font-size: 12px; color: var(--fg2); }
+.tr-tile-title { font-size: 19px; font-weight: 700; letter-spacing: -0.2px; }
+.tr-tile-lift { max-width: 100%; font-size: 13px; color: var(--fg2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-tile-sets { margin-top: auto; padding-top: 10px; font-size: 13px; color: var(--fg2); }
+.tr-tile-sets b { font-family: var(--num); font-size: 22px; font-weight: 700; color: var(--fg); margin-right: 3px; }
+
+.tr-empty { align-self: flex-start; height: 44px; padding: 0 18px; font-size: 15px; border-radius: 22px; }
+
+/* Day sheet */
+.tr-sheet-week { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 15px; }
+.tr-sheet-week-no { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; }
+.tr-sheet-day { padding: 16px; }
+
+/* Recent: slim timeline */
+.tr-recent { padding: 6px 0; position: relative; }
+.tr-recent::before { content: ""; position: absolute; left: 25px; top: 36px; bottom: 36px; width: 2px; border-radius: 1px; background: var(--sep); }
+.tr-tl { position: relative; display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 8px 14px 8px 20px; color: var(--fg); }
+.tr-tl:hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.tr-tl-dot { width: 12px; height: 12px; border-radius: 6px; flex: none; background: var(--surface); box-shadow: inset 0 0 0 2.5px var(--chart-1); position: relative; }
+.tr-tl:first-child .tr-tl-dot { background: var(--chart-1); }
+.tr-tl-main { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.tr-tl-title { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-tl-date { font-size: 13px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+.tr-tl-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; font-size: 14px; }
+.tr-tl-right .k-muted { font-family: var(--sans); font-weight: 400; font-size: 12px; }
+.tr-tl-bar { width: 64px; height: 5px; border-radius: 3px; background: var(--track); overflow: hidden; display: block; }
+.tr-tl-bar i { display: block; height: 100%; border-radius: 3px; background: var(--chart-1); }
+.tr-tl-chev { color: var(--fg2); flex: none; }
+
+@media (max-width: 899px) {
+  .tr-hero { padding: 18px 18px 20px; }
+  .tr-hero-title { font-size: 32px; line-height: 36px; }
+  .tr-hero-load { font-size: 44px; }
+  .tr-hero-load small { font-size: 16px; }
+}

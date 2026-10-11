@@ -1,0 +1,40 @@
+/* Session detail. Tokens only. */
+.session.page { gap: 20px; }
+.s-back { align-self: flex-start; height: 44px; margin: -10px 0 -12px -8px; padding: 0 8px; font-size: 15px; gap: 2px; }
+.s-basis { margin-top: -8px; }
+.s-basis summary { display: inline-flex; align-items: center; height: 26px; padding: 0 11px; border-radius: 99px; background: var(--seg);
+  font-size: 13px; font-weight: 600; color: var(--fg2); cursor: pointer; list-style: none; }
+.s-basis summary::-webkit-details-marker { display: none; }
+.s-basis p { margin: 8px 4px 0; font-size: 13px; color: var(--fg2); max-width: 640px; }
+.s-continue { align-self: flex-start; padding: 0 26px; }
+
+.s-tile { min-height: 104px; display: flex; align-items: flex-end; }
+.s-tile .k-stat { width: 100%; }
+.s-ellipsis { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 520px) {
+  .s-tiles.k-grid-3 { gap: 8px; }
+  .s-tiles.k-grid-3 .k-pad { padding: 16px 14px; }
+  .s-tiles.k-grid-3 .k-stat-value { font-size: 24px; }
+}
+
+.s-exercises { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); align-items: start; }
+.s-ex { display: flex; flex-direction: column; gap: 14px; padding: 18px 18px 20px; }
+.s-ex-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.s-ex-head h2 { font-size: 17px; font-weight: 650; letter-spacing: -0.2px; min-width: 0; }
+.s-ex-head .k-num { font-size: 13px; }
+
+.s-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.s-chip {
+  display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border-radius: 16px;
+  background: var(--seg); color: var(--fg); font-family: var(--num); font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.s-chip.warmup { background: transparent; color: var(--fg2); font-weight: 500; box-shadow: inset 0 0 0 1px var(--sep); }
+.s-chip.rep_out { background: var(--warm); color: #FFFFFF; }
+.s-chip.top { background: var(--warm-tint); color: var(--warm-text); }
+.s-chip.flagged { box-shadow: inset 0 0 0 1.5px var(--fg2); background: transparent; }
+.s-chip.flagged::after { content: "?"; margin-left: 4px; color: var(--fg2); font-size: 12px; }
+.s-chip.skipped { opacity: 0.4; text-decoration: line-through; }
+.s-note { font-size: 13px; color: var(--fg2); }
+
+.s-notes { font-size: 15px; color: var(--fg2); max-width: 680px; margin: 0 4px; white-space: pre-wrap; }
+.s-delete { align-self: center; height: 44px; color: var(--bad); font-size: 15px; font-weight: 500; opacity: 0.8; }

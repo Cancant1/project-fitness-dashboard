@@ -5,8 +5,10 @@ import { Sheet } from "../../ui/Sheet";
 import { fmtQty, mealLabel } from "./ui";
 
 /** Log a saved meal in one go, or item by item. Each item keeps its own meal. */
-export function SavedMealSheet({ meal, onLog, onDelete, onClose }: {
+export function SavedMealSheet({ meal, day = null, onLog, onDelete, onClose }: {
   meal: SavedMeal;
+  /** Short name of the day being logged to, or null for today. */
+  day?: string | null;
   onLog: (items: SavedMeal["items"]) => void;
   onDelete: () => void;
   onClose: () => void;
@@ -28,7 +30,7 @@ export function SavedMealSheet({ meal, onLog, onDelete, onClose }: {
           </div>
         ))}
       </div>
-      <button className="btn btn-primary" onClick={() => { onLog(meal.items); onClose(); }}>Log all</button>
+      <button className="btn btn-primary" onClick={() => { onLog(meal.items); onClose(); }}>{day ? `Log all to ${day}` : "Log all"}</button>
       <button className="btn btn-plain" style={{ color: "var(--bad)", alignSelf: "center", height: 44 }} onClick={() => { onDelete(); onClose(); }}>Delete saved meal</button>
     </Sheet>
   );

@@ -1,0 +1,12 @@
+/* Form bits shared by the plan and exercise sheets. Tokens only. */
+
+.f-seg-full .k-seg { display: flex; width: 100%; }
+.f-seg-full .k-seg button { flex: 1 1 0; min-width: 0; height: 38px; padding: 0 6px; }
+.f-label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.f-label > span:first-child { font-size: 13px; font-weight: 600; color: var(--fg2); margin: 0 4px; }
+.f-pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.f-use { align-self: flex-start; height: 44px; font-size: 15px; }
+.f-hint { font-size: 13px; color: var(--fg2); margin: 0 4px; }
+.f-error { font-size: 13px; color: var(--bad); margin: 0 4px; }
+.f-select select { border: 0; background: transparent; width: 100%; min-width: 0; outline: none; appearance: none; -webkit-appearance: none; }
+.f-history { padding: 0 16px; margin-top: 8px; box-shadow: none; }

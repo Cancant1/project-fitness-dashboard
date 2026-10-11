@@ -1,166 +1,226 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
-import { detectPRs, repBests, sessionBests, type WorkSet } from "../lib/analysis";
-import { addDays, fmtNum, todayIso } from "../lib/format";
-import { ChevronRight } from "../ui/icons";
+import { detectPRs, repBests, sessionBests, type PrEvent, type SessionBest } from "../lib/analysis";
+import { addDays, daysBetween, fmtNum, fmtShortDate, todayIso } from "../lib/format";
+import { PLAN } from "../plan/bridge";
+import { ChevronRight, RecordsIcon } from "../ui/icons";
+import { Card, Label, PageHead, Pill, Stat } from "../ui/kit";
+import { RepCurve, YearBars } from "./progress/charts";
 import { LIFTS, useTraining, type LiftDef, type TrainingIndex } from "./progress/data";
-import { fmtKg, fmtSet, fmtWhen } from "./progress/ui";
+import { fmtLiftSet, fmtMetric, fmtMonthYear, fmtWhen, metricFor, metricName } from "./progress/format";
+import "./progress/progress.css";
 
-const REP_COUNTS = [1, 3, 5, 8, 10] as const;
-
+/** Records: a hall of fame. Trophy per main lift, the sheet's lifetime bests, recent PRs, then every exercise. */
 export function RecordsPage() {
   const idx = useTraining();
-  const { local } = useStore();
-  const facts = useRows("facts");
   const today = todayIso();
-  const [query, setQuery] = useState("");
-
-  const lifetime = useMemo(() => facts.filter((f) => f.kind === "lifetime_pr" && f.user_id === local.userId)
-    .sort((a, b) => a.title.localeCompare(b.title)), [facts, local.userId]);
-
-  const recent = useMemo(() => {
-    const from = addDays(today, -90);
-    return detectPRs(idx.work).filter((e) => e.date >= from);
-  }, [idx, today]);
-
-  const all = useMemo(() => {
-    return idx.exercises.filter((e) => !e.archived).map((e) => {
-      const sets = idx.byExercise.get(e.id) ?? [];
-      const best = sessionBests(sets).reduce<number | null>((m, b) => (m == null || b.value > m ? b.value : m), null);
-      const last = sets.at(-1);
-      return { e, best, sets: sets.length, last };
-    }).sort((a, b) => (b.last?.date ?? "").localeCompare(a.last?.date ?? "") || a.e.name.localeCompare(b.e.name));
-  }, [idx]);
-
-  const q = query.trim().toLowerCase();
-  const shown = q ? all.filter((r) => `${r.e.name} ${r.e.aliases.join(" ")} ${r.e.muscle_direct ?? ""}`.toLowerCase().includes(q)) : all;
-  const names = idx.exerciseById;
 
   return (
-    <main className="page">
-      <header className="page-head">
-        <div>
-          <p className="eyebrow">Flagged sets left out of every best</p>
-          <h1 className="large-title">Records</h1>
-        </div>
-      </header>
+    <main className="page pg rec">
+      <PageHead eyebrow="Hall of fame" title="Records" />
 
-      {lifetime.length > 0 && (
-        <section className="section">
-          <h2 className="section-label">Lifetime bests, as written in your sheet</h2>
-          <div className="list">
-            {lifetime.map((f) => {
-              const v = (f.value ?? {}) as { as_logged?: string; note?: string; exercise_id?: string };
-              const ex = v.exercise_id && names.has(v.exercise_id) ? v.exercise_id : null;
-              const body = (
-                <>
-                  <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                    <span style={{ fontWeight: 500 }}>{f.title}</span>
-                    <span className="row-sub">{[v.as_logged ? `“${v.as_logged}”` : null, v.note].filter(Boolean).join(" · ")}</span>
-                  </span>
-                  {ex && <ChevronRight style={{ color: "var(--fg2)", flex: "none" }} />}
-                </>
-              );
-              return ex
-                ? <Link key={f.id} to={`/exercise/${ex}`} className="row" style={{ color: "var(--fg)", padding: "8px 0" }}>{body}</Link>
-                : <div key={f.id} className="row" style={{ padding: "8px 0" }}>{body}</div>;
-            })}
-          </div>
-        </section>
-      )}
+      <div className="rec-trophies">
+        {LIFTS.map((lift) => <Trophy key={lift.key} lift={lift} idx={idx} />)}
+      </div>
 
-      <section className="section">
-        <h2 className="section-label">From your logs</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(330px, 100%), 1fr))", gap: 16, alignItems: "start" }}>
-          {LIFTS.map((lift) => <LiftRecords key={lift.key} lift={lift} idx={idx} />)}
+      <div className="k-dash">
+        <div className="k-col">
+          <RecentPRs idx={idx} today={today} />
         </div>
-      </section>
-
-      <section className="section">
-        <h2 className="section-label">Recent PRs · last 90 days</h2>
-        <div className="list">
-          {recent.map((e) => (
-            <Link key={`${e.exerciseId}-${e.sessionId}`} to={`/session/${e.sessionId}`} className="row" style={{ color: "var(--fg)", padding: "8px 0" }}>
-              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontWeight: 500 }}>{names.get(e.exerciseId)?.name ?? "Exercise"}</span>
-                <span className="row-sub">
-                  {e.kind === "e1rm"
-                    ? <>Best e1RM <span className="num" style={{ color: "var(--fg)", fontWeight: 600 }}>{fmtKg(e.value)}</span> (was {fmtKg(e.previous)}) · {fmtSet(e.set)}</>
-                    : <>Heaviest for {e.reps}+ reps: <span className="num" style={{ color: "var(--fg)", fontWeight: 600 }}>{fmtSet(e.set)}</span> (was {fmtNum(e.previous)})</>}
-                </span>
-              </span>
-              <span className="row-sub" style={{ flex: "none", textAlign: "right" }}>{fmtWhen(e.date, e.confidence)}</span>
-            </Link>
-          ))}
-          {!recent.length && <div className="row muted">No new bests in the last 90 days. They show up here as soon as you beat one.</div>}
+        <div className="k-col">
+          <SheetBests idx={idx} />
+          <AllExercises idx={idx} />
         </div>
-      </section>
-
-      <section className="section">
-        <h2 className="section-label">All exercises</h2>
-        <label className="field" htmlFor="r-q">
-          <span className="sr-only">Search exercises</span>
-          <input id="r-q" placeholder="Search exercise or muscle" value={query} onChange={(e) => setQuery(e.target.value)} />
-        </label>
-        <div className="list">
-          {shown.map(({ e, best, sets, last }) => (
-            <Link key={e.id} to={`/exercise/${e.id}`} className="row" style={{ color: "var(--fg)", padding: "8px 0" }}>
-              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontWeight: 500 }}>{e.name}</span>
-                <span className="row-sub">
-                  {sets ? <>{best != null ? <>best e1RM <span className="num">{fmtKg(best)}</span> · </> : null}last {fmtWhen(last!.date, last!.confidence)} · {sets} sets</> : "Not logged yet"}
-                </span>
-              </span>
-              <ChevronRight style={{ color: "var(--fg2)", flex: "none" }} />
-            </Link>
-          ))}
-          {!shown.length && <div className="row muted">No exercise matches “{query}”.</div>}
-        </div>
-      </section>
+      </div>
     </main>
   );
 }
 
-function LiftRecords({ lift, idx }: { lift: LiftDef; idx: TrainingIndex }) {
+// ------------------------------------------------------------------ trophies
+
+function Trophy({ lift, idx }: { lift: LiftDef; idx: TrainingIndex }) {
   const id = idx.ids.get(lift.key);
+  const sets = useMemo(() => (id ? idx.byExercise.get(id) ?? [] : []), [idx, id]);
   const data = useMemo(() => {
-    const sets = id ? idx.byExercise.get(id) ?? [] : [];
     const bests = sessionBests(sets, lift.metric);
-    const top = bests.reduce<(typeof bests)[number] | null>((a, b) => (!a || b.value > a.value ? b : a), null);
-    return { top, reps: repBests(sets, REP_COUNTS, "atLeast") };
-  }, [idx, id, lift]);
+    const top = bests.reduce<SessionBest | null>((a, b) => (!a || b.value > a.value ? b : a), null);
+    return { bests, top, heaviest: repBests(sets, [1], "atLeast").get(1) ?? null };
+  }, [sets, lift.metric]);
   const added = lift.metric === "added5";
+  const top = data.top;
+  const fmtSet = (s: Parameters<typeof fmtLiftSet>[0]) => fmtLiftSet(s, lift.metric);
 
   return (
-    <div className="section" style={{ minWidth: 0 }}>
-      <div className="section-row">
-        <h3 style={{ fontSize: 17, fontWeight: 600 }}>{lift.label}</h3>
-        {id && <Link to={`/exercise/${id}`} style={{ fontSize: 13, fontWeight: 600, minHeight: 44, display: "inline-flex", alignItems: "center" }}>All sets</Link>}
+    <Card className="rec-trophy">
+      <div className="rec-trophy-head">
+        <span className="rec-trophy-name">{lift.label}</span>
+        {id && <Link to={`/exercise/${id}`} className="rec-link">All sets <ChevronRight /></Link>}
       </div>
-      <div className="list">
-        <RecordRow label={added ? "Heaviest added, 5+ reps" : `Best e1RM${lift.key === "incline_db_press" ? " per hand" : ""}`}
-          value={data.top ? `${added && data.top.value > 0 ? "+" : ""}${fmtKg(data.top.value)} kg` : "—"} set={data.top?.set} />
-        {REP_COUNTS.map((r) => {
-          const s = data.reps.get(r);
-          return <RecordRow key={r} label={r === 1 ? "Heaviest set" : `Heaviest for ${r}+ reps`} value={s ? fmtSet(s) : "—"} set={s} />;
-        })}
-      </div>
-    </div>
+      {top ? (
+        <>
+          <div className="rec-trophy-main">
+            <Stat size="xl" tone="warm" value={fmtMetric(top.value, lift.metric)} unit={added && top.value === 0 ? undefined : "kg"}
+              sub={<>{metricName(lift.metric)}{lift.key === "incline_db_press" ? " per hand" : ""} · <span className="k-num">{fmtSet(top.set)}</span></>} />
+            <span className="rec-when">{fmtWhen(top.date, top.confidence)}</span>
+          </div>
+          {data.heaviest && (
+            <div className="rec-heaviest">
+              <Pill>Heaviest <b className="k-num">{fmtSet(data.heaviest)}</b></Pill>
+              <span className="rec-when">{fmtWhen(data.heaviest.date, data.heaviest.confidence)}</span>
+            </div>
+          )}
+          <div className="rec-trophy-charts">
+            <RepCurve sets={sets} metric={lift.metric} caption="Rep maxes" height={110} />
+            <YearBars bests={data.bests} metric={lift.metric} caption="Best per year" height={110} />
+          </div>
+        </>
+      ) : (
+        <p className="k-empty rec-none">Not logged yet</p>
+      )}
+    </Card>
   );
 }
 
-function RecordRow({ label, value, set }: { label: string; value: string; set: WorkSet | undefined }) {
-  const body = (
-    <>
-      <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-        <span>{label}</span>
-        {set && <span className="row-sub">{fmtWhen(set.date, set.confidence)}{label.startsWith("Best") || label.startsWith("Heaviest added") ? ` · ${fmtSet(set)}` : ""}</span>}
-      </span>
-      <span className="num" style={{ fontWeight: 600, flex: "none" }}>{value}</span>
-    </>
+// ------------------------------------------------------------------ lifetime bests from the sheet
+
+const SHORT: Record<string, string> = { "Incline DB Press": "Incline DB", "Weighted Pull-up": "Pull-up" };
+const ORDER = ["Squat", "Deadlift", "Incline DB", "Pull-up"];
+const rank = (name: string | null) => { const i = ORDER.indexOf(name ?? ""); return i < 0 ? ORDER.length : i; };
+
+function SheetBests({ idx }: { idx: TrainingIndex }) {
+  const { local } = useStore();
+  const facts = useRows("facts");
+  const list = useMemo(() => facts.filter((f) => f.kind === "lifetime_pr" && f.user_id === local.userId).map((f) => {
+    const v = (f.value ?? {}) as { exercise?: string; exercise_id?: string; load_kg?: number; reps?: number; note?: string };
+    const added = /added/i.test(v.note ?? "") || /pull-?up|chin/i.test(v.exercise ?? "");
+    const name = v.exercise ? SHORT[v.exercise] ?? v.exercise : null;
+    const value = v.load_kg != null && v.reps != null ? `${added ? "+" : ""}${fmtNum(v.load_kg)} × ${v.reps}` : null;
+    return { id: f.id, name, value, load: v.load_kg ?? 0, title: f.title, exerciseId: v.exercise_id && idx.exerciseById.has(v.exercise_id) ? v.exercise_id : null };
+  }).sort((a, b) => rank(a.name) - rank(b.name) || (a.name ?? a.title).localeCompare(b.name ?? b.title) || b.load - a.load), [facts, local.userId, idx]);
+
+  if (!list.length) return null;
+  return (
+    <section>
+      <Label>From your sheet</Label>
+      <div className="rec-chips">
+        {list.map((c) => {
+          const body = (
+            <>
+              <RecordsIcon size={18} className="rec-chip-icon" />
+              <span className="rec-chip-text">
+                <span className="k-muted">{c.name ?? "Lifetime best"}</span>
+                <b className="k-num">{c.value ?? c.title}</b>
+              </span>
+            </>
+          );
+          return c.exerciseId
+            ? <Link key={c.id} to={`/exercise/${c.exerciseId}`} className="rec-chip" title={c.title}>{body}</Link>
+            : <div key={c.id} className="rec-chip" title={c.title}>{body}</div>;
+        })}
+      </div>
+    </section>
   );
-  return set
-    ? <Link to={`/session/${set.sessionId}`} className="row" style={{ color: "var(--fg)", padding: "6px 0" }}>{body}</Link>
-    : <div className="row" style={{ padding: "6px 0" }}>{body}</div>;
+}
+
+// ------------------------------------------------------------------ recent PRs
+
+function RecentPRs({ idx, today }: { idx: TrainingIndex; today: string }) {
+  const [all, setAll] = useState(false);
+  const events = useMemo(() => detectPRs(idx.work).filter((e) => e.date >= addDays(today, -90)), [idx, today]);
+  const shown = all ? events : events.slice(0, 6);
+  const until = daysBetween(today, PLAN.startDate);
+
+  return (
+    <section>
+      <Label action={events.length > 6 && !all ? <button type="button" onClick={() => setAll(true)}>Show all {events.length}</button> : undefined}>
+        Recent PRs · 90 days
+      </Label>
+      {events.length ? (
+        <Card className="rec-timeline">
+          <ol>
+            {shown.map((e) => <PrItem key={`${e.exerciseId}-${e.sessionId}`} e={e} name={idx.exerciseById.get(e.exerciseId)?.name ?? "Exercise"}
+              added={e.exerciseId === idx.ids.get("weighted_pullup") || e.set.unit === "bodyweight"} />)}
+          </ol>
+        </Card>
+      ) : (
+        <Card className="rec-empty">
+          <span className="rec-empty-ring" aria-hidden="true"><RecordsIcon size={26} /></span>
+          <span className="rec-empty-text">
+            <b>No PRs yet this block</b>
+            <span className="k-muted">
+              {until > 0 ? `Week 0 starts ${until === 1 ? "tomorrow" : `in ${until} days`}` : "Next one lands here"}
+            </span>
+          </span>
+        </Card>
+      )}
+    </section>
+  );
+}
+
+function PrItem({ e, name, added }: { e: PrEvent; name: string; added: boolean }) {
+  const gain = e.value - e.previous;
+  const fmtSet = (s: Parameters<typeof fmtLiftSet>[0]) => fmtLiftSet(s, added ? "added5" : "e1rm");
+  return (
+    <li className={`rec-pr ${e.kind}`}>
+      <Link to={`/session/${e.sessionId}`}>
+        <i className={`rec-pr-dot ${e.confidence === "estimated" ? "est" : ""}`} aria-hidden="true" />
+        <span className="k-row-main">
+          <span>{name}</span>
+          <span>{e.kind === "e1rm" ? <>e1RM <b className="k-num">{fmtNum(e.value, 0)}</b> · {fmtSet(e.set)}</> : <><b className="k-num">{fmtSet(e.set)}</b> · {e.reps}+ reps</>}</span>
+        </span>
+        <span className="rec-pr-side">
+          <span className="k-delta up">▲ {fmtNum(gain, 1)}</span>
+          <span className="k-muted">{e.confidence === "estimated" ? `${fmtMonthYear(e.date)} est.` : fmtShortDate(e.date)}</span>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+// ------------------------------------------------------------------ all exercises
+
+function AllExercises({ idx }: { idx: TrainingIndex }) {
+  const [query, setQuery] = useState("");
+  const [all, setAll] = useState(false);
+  const pullupId = idx.ids.get("weighted_pullup");
+  const rows = useMemo(() => idx.exercises.filter((e) => !e.archived).map((e) => {
+    const sets = idx.byExercise.get(e.id) ?? [];
+    const metric = metricFor(sets, e.id === pullupId);
+    const best = sessionBests(sets, metric).reduce<number | null>((m, b) => (m == null || b.value > m ? b.value : m), null);
+    return { e, metric, best, last: sets.at(-1) ?? null };
+  }).sort((a, b) => (b.last?.date ?? "").localeCompare(a.last?.date ?? "") || a.e.name.localeCompare(b.e.name)), [idx, pullupId]);
+
+  const q = query.trim().toLowerCase();
+  const found = q ? rows.filter((r) => `${r.e.name} ${r.e.aliases.join(" ")} ${r.e.muscle_direct ?? ""}`.toLowerCase().includes(q)) : rows;
+  const shown = all || q ? found : found.slice(0, 10);
+
+  return (
+    <section>
+      <Label action={!all && !q && found.length > 10 ? <button type="button" onClick={() => setAll(true)}>Show all {found.length}</button> : undefined}>
+        All exercises
+      </Label>
+      <Card pad={false} className="rec-list">
+        <label className="field rec-search">
+          <span className="sr-only">Search exercises</span>
+          <input placeholder="Search" value={query} onChange={(ev) => setQuery(ev.target.value)} />
+        </label>
+        <div className="k-rows">
+          {shown.map(({ e, metric, best, last }) => (
+            <Link key={e.id} to={`/exercise/${e.id}`} className="k-row rec-row">
+              <span className="k-row-main">
+                <span>{e.name}</span>
+                <span>{last ? fmtWhen(last.date, last.confidence) : "Not logged"}</span>
+              </span>
+              <span className="rec-row-side">
+                {best != null && <span className="k-num">{fmtMetric(best, metric)}{metric === "added5" && best === 0 ? "" : <small> kg</small>}</span>}
+                <ChevronRight />
+              </span>
+            </Link>
+          ))}
+          {!shown.length && <div className="k-row k-muted">No match</div>}
+        </div>
+      </Card>
+    </section>
+  );
 }

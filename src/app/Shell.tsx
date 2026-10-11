@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { useEffect } from "react";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useSyncState } from "../data/store";
 import { supabase } from "../data/supabase";
 import { ThemeSwitch } from "../ui/theme";
@@ -13,6 +14,9 @@ const TABS = [
 ];
 
 export function Shell({ email }: { email: string }) {
+  const { pathname } = useLocation();
+  // A new page starts at the top (the router keeps the old scroll position otherwise).
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   return (
     <div className="shell">
       <nav className="sidebar" aria-label="Main">

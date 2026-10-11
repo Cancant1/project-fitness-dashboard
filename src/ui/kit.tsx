@@ -89,15 +89,23 @@ export interface Pt { x: number; y: number }
 
 /** Smooth path through points (Catmull–Rom → cubic Bézier). */
 export function smoothPath(pts: Pt[]): string {
+  // Monotone cubic (Fritsch–Carlson): smooth, but never loops back in x or overshoots a data point.
   if (!pts.length) return "";
-  if (pts.length < 3) return pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  let d = `M${pts[0]!.x.toFixed(1)},${pts[0]!.y.toFixed(1)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i]!, p1 = pts[i]!, p2 = pts[i + 1]!, p3 = pts[i + 2] ?? p2;
-    const t = 0.18;
-    const c1 = { x: p1.x + (p2.x - p0.x) * t, y: p1.y + (p2.y - p0.y) * t };
-    const c2 = { x: p2.x - (p3.x - p1.x) * t, y: p2.y - (p3.y - p1.y) * t };
-    d += ` C${c1.x.toFixed(1)},${c1.y.toFixed(1)} ${c2.x.toFixed(1)},${c2.y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  const f = (p: Pt) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+  if (pts.length < 3) return pts.map((p, i) => `${i ? "L" : "M"}${f(p)}`).join(" ");
+  const n = pts.length;
+  const dx = pts.slice(1).map((p, i) => p.x - pts[i]!.x);
+  const s = pts.slice(1).map((p, i) => (dx[i] ? (p.y - pts[i]!.y) / dx[i]! : 0));
+  const m = pts.map((_, i) => (i === 0 ? s[0]! : i === n - 1 ? s[n - 2]! : s[i - 1]! * s[i]! <= 0 ? 0 : (s[i - 1]! + s[i]!) / 2));
+  for (let i = 0; i < n - 1; i++) {
+    if (!s[i]) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i]! / s[i]!, b = m[i + 1]! / s[i]!, h = a * a + b * b;
+    if (h > 9) { const t = 3 / Math.sqrt(h); m[i] = t * a * s[i]!; m[i + 1] = t * b * s[i]!; }
+  }
+  let d = `M${f(pts[0]!)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p1 = pts[i]!, p2 = pts[i + 1]!, h = dx[i]! / 3;
+    d += ` C${f({ x: p1.x + h, y: p1.y + m[i]! * h })} ${f({ x: p2.x - h, y: p2.y - m[i + 1]! * h })} ${f(p2)}`;
   }
   return d;
 }
@@ -127,10 +135,15 @@ export interface Series { points: Pt[]; color?: string; area?: boolean; dashed?:
  * Smooth area chart, drawn at its real width so text stays crisp, with a hover/tap crosshair.
  * x is numeric (e.g. a day index); `formatX` turns it into a label.
  */
-export function AreaChart({ series, height = 240, formatX, formatY = (v) => String(Math.round(v)), yLines, bands = [], refs = [], markers = [], label }: {
+export function AreaChart({ series, height = 240, formatX, formatY = (v) => String(Math.round(v)), yLines, bands = [], yBands = [], refs = [], markers = [], onPick, label }: {
   series: Series[]; height?: number; formatX: (x: number) => string; formatY?: (y: number) => string;
-  yLines?: number; bands?: { from: number; to: number; label?: string }[]; refs?: { y: number; label: string; color?: string }[];
-  markers?: { x: number; y: number; color?: string; label: string }[]; label: string;
+  yLines?: number; bands?: { from: number; to: number; label?: string }[];
+  /** Horizontal value ranges, e.g. a 76–78 kg goal band. */
+  yBands?: { from: number; to: number; label?: string; color?: string }[];
+  refs?: { y: number; label: string; color?: string }[];
+  markers?: { x: number; y: number; color?: string; label: string }[];
+  /** Tap/click: the nearest point of the first series. */
+  onPick?: (p: Pt) => void; label: string;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [w, setW] = useState(640);
@@ -139,7 +152,7 @@ export function AreaChart({ series, height = 240, formatX, formatY = (v) => Stri
   useResize(wrap, setW);
 
   const all = series.flatMap((s) => s.points).concat(markers);
-  const xs = all.map((p) => p.x), ys = all.map((p) => p.y).concat(refs.map((r) => r.y));
+  const xs = all.map((p) => p.x), ys = all.map((p) => p.y).concat(refs.map((r) => r.y), yBands.flatMap((b) => [b.from, b.to]));
   if (!all.length) return <div className="k-empty" style={{ height }}>No data yet</div>;
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   let y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -155,9 +168,17 @@ export function AreaChart({ series, height = 240, formatX, formatY = (v) => Stri
   const nearest = hover == null ? null : main.points.reduce((b, p) => (Math.abs(p.x - hover) < Math.abs(b.x - hover) ? p : b), main.points[0]!);
 
   return (
-    <div ref={wrap} className="k-chart" style={{ height }}
+    <div ref={wrap} className="k-chart"
       onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); setHover(x0 + ((e.clientX - r.left - L) / (w - L - R)) * (x1 - x0)); }}
-      onPointerLeave={() => setHover(null)} role="img" aria-label={label}>
+      onPointerLeave={() => setHover(null)}
+      onClick={(e) => {
+        if (!onPick) return;
+        const r = e.currentTarget.getBoundingClientRect();
+        const x = x0 + ((e.clientX - r.left - L) / (w - L - R)) * (x1 - x0);
+        const p = main.points.reduce((b, q) => (Math.abs(q.x - x) < Math.abs(b.x - x) ? q : b), main.points[0]!);
+        if (p) onPick(p);
+      }}
+      style={{ height, cursor: onPick ? "pointer" : undefined }} role="img" aria-label={label}>
       <svg width={w} height={height} aria-hidden="true">
         <defs>
           {series.map((s, i) => (
@@ -170,6 +191,12 @@ export function AreaChart({ series, height = 240, formatX, formatY = (v) => Stri
         {bands.map((b, i) => (
           <g key={i}>
             <rect x={sx(b.from)} y={T} width={Math.max(1, sx(b.to) - sx(b.from))} height={height - T - B} fill="var(--fg)" opacity="0.035" rx="4" />
+          </g>
+        ))}
+        {yBands.map((b, i) => (
+          <g key={`yb${i}`}>
+            <rect x={L} width={w - L - R} y={sy(b.to)} height={Math.max(1, sy(b.from) - sy(b.to))} fill={b.color ?? "var(--warm)"} opacity="0.09" rx="4" />
+            {b.label && <text x={w - R - 4} y={sy(b.to) + 13} textAnchor="end" className="k-axis k-axis-strong">{b.label}</text>}
           </g>
         ))}
         {ticks.map((t) => (
@@ -282,6 +309,7 @@ function useResize(ref: React.RefObject<HTMLElement | null>, set: (w: number) =>
     const el = ref.current;
     if (!el) return;
     set(Math.max(240, Math.round(el.clientWidth)));
+    if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver((e) => set(Math.max(240, Math.round(e[0]!.contentRect.width))));
     ro.observe(el);
     return () => ro.disconnect();

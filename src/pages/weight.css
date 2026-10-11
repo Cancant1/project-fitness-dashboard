@@ -1,0 +1,36 @@
+/* Weight page. Tokens only. */
+.w-hero { display: flex; flex-direction: column; gap: 22px; padding: 24px 20px 20px; }
+.w-hero-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.w-hero-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; padding-bottom: 6px; }
+.w-rate { display: inline-flex; align-items: baseline; gap: 6px; }
+.w-rate .k-delta { font-size: 17px; }
+.w-rate small { font-size: 13px; color: var(--fg2); }
+.w-input { display: flex; gap: 8px; align-items: center; }
+.w-input .date-btn { background: var(--field); border-radius: 14px; padding: 0 12px; flex: none; }
+.w-input .btn-icon { border-radius: 14px; flex: none; }
+
+.w-chart, .w-tdee { display: flex; flex-direction: column; gap: 16px; }
+.w-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.w-chart-head .k-label { margin: 0; }
+.w-chart-tap { cursor: pointer; }
+
+.w-how summary { font-size: 13px; color: var(--accent-text); cursor: pointer; list-style: none; min-height: 32px; display: flex; align-items: center; }
+.w-how summary::-webkit-details-marker { display: none; }
+.w-how p { font-size: 13px; color: var(--fg2); margin-top: 4px; }
+
+.w-all-head { width: 100%; min-height: 56px; border: 0; background: transparent; color: var(--fg); padding: 0 16px 0 20px; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; text-align: left; }
+.w-all-head > span:first-child { flex: 1; }
+.w-all-chev { color: var(--fg2); transition: transform 160ms ease; }
+.w-all-head[aria-expanded="true"] .w-all-chev { transform: rotate(180deg); }
+.w-all-rows { padding: 0 16px 4px 20px; border-top: 1px solid var(--sep); }
+.w-all-row { width: 100%; border: 0; border-radius: 0; background: transparent; padding: 0; font-size: 15px; cursor: pointer; text-align: left; }
+.w-all-val { display: inline-flex; align-items: center; gap: 10px; }
+.w-all-val .k-num { min-width: 40px; text-align: right; }
+.w-all-rows > * + * { border-top: 1px solid var(--sep); }
+.w-more { width: 100%; justify-content: center; border: 0; border-top: 1px solid var(--sep); background: transparent; color: var(--accent-text); font-size: 15px; font-weight: 600; cursor: pointer; }
+
+.w-sheet { display: flex; gap: 8px; align-items: center; }
+.w-sheet .date-btn { background: var(--surface); box-shadow: var(--elev); flex: none; }
+.w-sheet-field { flex: 1; height: 52px; }
+.w-sheet-field input { font-size: 26px; font-weight: 700; text-align: right; }
