@@ -14,10 +14,18 @@
   --accent: #0A67D6;
   --accent-text: #0A5CC0;
   --accent-tint: rgba(10, 103, 214, 0.10);
-  --warm: #B94C05;
-  --warm-text: #A13F00;
-  --warm-tint: rgba(196, 82, 8, 0.10);
-  --warm-ring: rgba(196, 82, 8, 0.38);
+  /* Pompeian red — the app icon's colour; used for rep-outs, PRs and highlights. */
+  --warm: #A9473B;
+  --warm-text: #933B30;
+  --warm-tint: rgba(169, 71, 59, 0.10);
+  --warm-ring: rgba(169, 71, 59, 0.35);
+  --plaster: #F2E0D8;
+  --hero-1: #B8574A;
+  --hero-2: #7E3129;
+  --chart-1: #0A67D6;
+  --chart-2: #A9473B;
+  --chart-3: #8E8E93;
+  --elev: 0 1px 2px rgba(16, 22, 34, 0.04), 0 8px 24px rgba(16, 22, 34, 0.06);
   --good: #1F7A3A;
   --good-tint: rgba(31, 122, 58, 0.12);
   --bad: #C0262D;
@@ -46,7 +54,9 @@
     --bg: #0D0E11; --surface: #1A1B1F; --field: #26272C; --glass: rgba(34, 35, 40, 0.62);
     --fg: #F2F2F5; --fg2: #A2A2AA; --sep: rgba(255, 255, 255, 0.08); --grid: rgba(255, 255, 255, 0.06);
     --accent: #2A72DE; --accent-text: #7DB2FF; --accent-tint: rgba(70, 140, 255, 0.16);
-    --warm: #B5500C; --warm-text: #FFA766; --warm-tint: rgba(255, 140, 60, 0.14); --warm-ring: rgba(255, 150, 80, 0.45);
+    --warm: #B4564A; --warm-text: #F0A193; --warm-tint: rgba(232, 128, 112, 0.15); --warm-ring: rgba(232, 128, 112, 0.42);
+    --plaster: #2A1D1A; --hero-1: #9E4A3F; --hero-2: #4A1E19; --chart-1: #4C8DF0; --chart-2: #E07F70; --chart-3: #8E8E93;
+    --elev: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.35);
     --good: #4FC27E; --good-tint: rgba(79, 194, 126, 0.16); --bad: #FF6B6B; --track: #2C2D33;
     --seg: rgba(118, 118, 128, 0.24); --seg-on: #3A3B41; --ink: #F2F2F5; --ink-fg: #111114; --ink-fg2: #55555C;
     --shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
@@ -58,7 +68,9 @@
   --bg: #0D0E11; --surface: #1A1B1F; --field: #26272C; --glass: rgba(34, 35, 40, 0.62);
   --fg: #F2F2F5; --fg2: #A2A2AA; --sep: rgba(255, 255, 255, 0.08); --grid: rgba(255, 255, 255, 0.06);
   --accent: #2A72DE; --accent-text: #7DB2FF; --accent-tint: rgba(70, 140, 255, 0.16);
-  --warm: #B5500C; --warm-text: #FFA766; --warm-tint: rgba(255, 140, 60, 0.14); --warm-ring: rgba(255, 150, 80, 0.45);
+  --warm: #B4564A; --warm-text: #F0A193; --warm-tint: rgba(232, 128, 112, 0.15); --warm-ring: rgba(232, 128, 112, 0.42);
+    --plaster: #2A1D1A; --hero-1: #9E4A3F; --hero-2: #4A1E19; --chart-1: #4C8DF0; --chart-2: #E07F70; --chart-3: #8E8E93;
+    --elev: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.35);
   --good: #4FC27E; --good-tint: rgba(79, 194, 126, 0.16); --bad: #FF6B6B; --track: #2C2D33;
   --seg: rgba(118, 118, 128, 0.24); --seg-on: #3A3B41; --ink: #F2F2F5; --ink-fg: #111114; --ink-fg2: #55555C;
   --shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);

@@ -1,0 +1,53 @@
+.today .k-dash { margin-top: 4px; }
+
+.today-hero { padding: 22px; display: flex; flex-direction: column; gap: 14px; min-height: 260px; }
+.today-hero::after {
+  /* the app icon's sleeve as a quiet watermark */
+  content: ""; position: absolute; right: -30px; bottom: -40px; width: 220px; height: 220px; opacity: 0.12; pointer-events: none;
+  background:
+    linear-gradient(#fff, #fff) 6% 50% / 92% 6% no-repeat,
+    linear-gradient(#fff, #fff) 20% 50% / 11% 72% no-repeat,
+    linear-gradient(#fff, #fff) 34% 50% / 10% 72% no-repeat,
+    linear-gradient(#fff, #fff) 47% 50% / 9% 72% no-repeat,
+    linear-gradient(#fff, #fff) 59% 50% / 8% 72% no-repeat,
+    linear-gradient(#fff, #fff) 69% 50% / 6% 42% no-repeat;
+  border-radius: 12px;
+}
+.today-hero-top { display: flex; gap: 8px; }
+.today-hero-title { margin: 0; font-size: 40px; line-height: 44px; font-weight: 750; letter-spacing: -0.03em; }
+.today-hero-main { display: flex; flex-direction: column; gap: 2px; }
+.today-hero-main .k-muted { color: rgba(255, 255, 255, 0.78); font-size: 15px; }
+.today-hero-load { font-family: var(--num); font-size: 64px; line-height: 1; font-weight: 750; letter-spacing: -0.04em; }
+.today-hero-load small { font-size: 22px; font-weight: 600; opacity: 0.75; margin-left: 4px; letter-spacing: 0; }
+.today-hero-facts { display: flex; gap: 18px; font-size: 14px; color: rgba(255, 255, 255, 0.8); }
+.today-hero-facts b { font-family: var(--num); font-size: 17px; color: #fff; margin-right: 3px; }
+.today-hero-btn { align-self: stretch; margin-top: auto; height: 54px; border-radius: 27px; background: #FFFFFF; color: #7E3129; font-weight: 700; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18); }
+.today-hero-btn:disabled { opacity: 0.7; }
+@media (min-width: 900px) { .today-hero-btn { align-self: flex-start; padding: 0 28px; } }
+
+.today-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.today-day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.today-day-letter { font-size: 11px; font-weight: 600; color: var(--fg2); }
+.today-day-dot {
+  width: 42px; height: 42px; border-radius: 21px; display: grid; place-items: center;
+  font-family: var(--num); font-weight: 600; font-size: 15px; color: var(--fg2);
+  background: transparent; box-shadow: inset 0 0 0 1.5px var(--sep);
+}
+.today-day.lift .today-day-dot { background: var(--surface); color: var(--fg); box-shadow: var(--elev); }
+.today-day.done .today-day-dot { background: var(--good-tint); color: var(--good); box-shadow: none; }
+.today-day.now .today-day-dot { background: var(--warm); color: #fff; box-shadow: 0 6px 14px rgba(169, 71, 59, 0.35); }
+.today-day-name { font-size: 11px; color: var(--fg2); }
+.today-day.lift .today-day-name { color: var(--fg); }
+
+.today-list { padding: 0 18px; }
+.today-row { min-height: 50px; }
+
+.today-rings { display: flex; justify-content: space-around; gap: 12px; padding: 22px 16px; }
+.today-ring-v { font-size: 26px; line-height: 1; }
+.today-ring-l { font-size: 12px; margin-top: 3px; }
+
+.today-weigh { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
+.today-weigh-top { display: flex; align-items: flex-end; gap: 16px; }
+.today-weigh-input { display: flex; gap: 8px; }
+
+.today-goal { display: flex; align-items: center; gap: 16px; color: var(--fg); }
