@@ -3,6 +3,9 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [main]
+    # The new app (v3) is published as prebuilt files in next/ by the branch build; don't rebuild the old app for it.
+    paths-ignore:
+      - "next/**"
   workflow_dispatch:
 
 permissions:
