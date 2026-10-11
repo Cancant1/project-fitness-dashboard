@@ -257,3 +257,13 @@ describe("ingest tokens", () => {
     expect(ingestEndpoint(undefined)).toBeNull();
   });
 });
+
+describe("Dutch decimal comma lost by Shortcuts (Number field)", () => {
+  it("recovers 4492491282952166 as 44.9 ms with a warning", async () => {
+    const { buildIngest, unlocalise } = await import("../../supabase/functions/health-ingest/parse");
+    expect(unlocalise(4492491282952166, 5, 300)).toBeCloseTo(44.92491282952166, 10);
+    const r = buildIngest({ resting_hr: 65, hrv_sdnn_ms: 4492491282952166 });
+    expect(r.patch.hrv_sdnn_ms).toBe(44.9);
+    expect(r.warnings.join(" ")).toContain("decimal comma lost");
+  });
+});

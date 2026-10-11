@@ -343,6 +343,20 @@ export function aggregateSleep(samples: SleepSample[], tz = TZ): SleepSummary | 
 // ------------------------------------------------------------------ numbers
 
 /** First number in a value: 52, "52", "52,5", "52 count/min", ["52"], {value: 52}. Dutch decimal comma allowed. */
+/**
+ * Shortcuts on a Dutch iPhone turns "44,92491282952166" into the integer 4492491282952166 when the JSON field type
+ * is Number (the decimal comma is dropped). Recover it: the first power-of-ten shift that lands in [lo, hi].
+ */
+export function unlocalise(n: number, lo: number, hi: number): number | null {
+  if (!Number.isFinite(n) || n <= hi || !Number.isInteger(n)) return null;
+  for (let k = 1; k <= 20; k++) {
+    const v = n / 10 ** k;
+    if (v >= lo && v <= hi) return v;
+    if (v < lo) break;
+  }
+  return null;
+}
+
 export function parseNumber(v: unknown): number | null {
   if (v == null) return null;
   if (typeof v === "number") return Number.isFinite(v) ? v : null;
@@ -400,8 +414,11 @@ export function buildIngest(input: unknown, now = Date.now(), tz = TZ): Ingest {
   const hrvRaw = parseNumber(body.hrv_sdnn_ms ?? body.hrv ?? body.hrv_ms);
   let hrv_sdnn_ms: number | null = null;
   if (hrvRaw != null) {
-    if (hrvRaw > 0 && hrvRaw <= 500) hrv_sdnn_ms = Math.round(hrvRaw * 10) / 10;
-    else warnings.push(`hrv_sdnn_ms ${hrvRaw} is outside 1–500, ignored`);
+    const hrv = hrvRaw > 500 ? unlocalise(hrvRaw, 5, 300) : hrvRaw;
+    if (hrv != null && hrv > 0 && hrv <= 500) {
+      hrv_sdnn_ms = Math.round(hrv * 10) / 10;
+      if (hrv !== hrvRaw) warnings.push(`hrv_sdnn_ms ${hrvRaw} read as ${hrv_sdnn_ms} (decimal comma lost; set the field type to Text)`);
+    } else warnings.push(`hrv_sdnn_ms ${hrvRaw} is outside 1–500, ignored`);
   }
 
   // Date.
