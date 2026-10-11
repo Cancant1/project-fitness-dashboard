@@ -41,3 +41,6 @@
 .w-sheet .date-btn { background: var(--surface); box-shadow: var(--elev); flex: none; }
 .w-sheet-field { flex: 1; height: 52px; }
 .w-sheet-field input { font-size: 26px; font-weight: 700; text-align: right; }
+
+/* The small Apple Watch link under the weigh-in row (sleep can come from the Watch). */
+.w-watch-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-end; margin-top: -10px; font-size: 13px; font-weight: 600; color: var(--accent-text); min-height: 32px; }

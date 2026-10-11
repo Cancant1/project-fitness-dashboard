@@ -20,7 +20,9 @@ export const RecordsIcon = (p: P) => <Svg {...p}><path d="M12 3.5l2.5 5.2 5.7.7-
 export const WeightIcon = (p: P) => <Svg {...p}><path d="M5 20h14l-1.6-10H6.6z" /><path d="M9.5 10a2.5 2.5 0 015 0" /></Svg>;
 export const CheckinIcon = (p: P) => <Svg {...p}><rect x="4.5" y="4.5" width="15" height="16" rx="4" /><path d="M9.5 3h5a1 1 0 011 1v1.5h-7V4a1 1 0 011-1z" /><path d="M8.8 13.2l2.3 2.3 4.2-4.6" /></Svg>;
 export const HistoryIcon = (p: P) => <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Svg>;
-export const ChevronRight = (p: P) => <Svg size={14} {...p}><path d="M9 5l7 7-7 7" /></Svg>;
+export const WatchIcon = (p: P) => <Svg {...p}><rect x="6.5" y="6" width="11" height="12" rx="3.5" /><path d="M9 6l.6-3h4.8l.6 3M9 18l.6 3h4.8l.6-3M12 9.5V12l1.6 1.2" /></Svg>;
+export const CopyIcon = (p: P) => <Svg size={16} {...p}><rect x="8.5" y="8.5" width="11" height="11" rx="3" /><path d="M15.5 8.5V7a2.5 2.5 0 00-2.5-2.5H7A2.5 2.5 0 004.5 7v6A2.5 2.5 0 007 15.5h1.5" /></Svg>;
+export const ChevronRight =(p: P) => <Svg size={14} {...p}><path d="M9 5l7 7-7 7" /></Svg>;
 export const ChevronLeft = (p: P) => <Svg size={18} {...p}><path d="M15 5l-7 7 7 7" /></Svg>;
 export const ChevronDown = (p: P) => <Svg size={18} {...p}><path d="M5 9l7 7 7-7" /></Svg>;
 export const CheckIcon = (p: P) => <Svg size={16} strokeWidth={2.4} {...p}><path d="M5 12.5l4.5 4.5L19 7.5" /></Svg>;

@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal, todayIso } from "../lib/format";
 import { adaptiveTdee, type Weigh } from "../lib/energy";
 import { saveSleep, saveWaist } from "../coach";
 import { AreaChart, Card, Delta, Label, PageHead, Pill, Segmented, Stat } from "../ui/kit";
 import { Sheet } from "../ui/Sheet";
-import { CheckIcon, ChevronDown, ChevronRight } from "../ui/icons";
+import { CheckIcon, ChevronDown, ChevronRight, WatchIcon } from "../ui/icons";
 import { DateButton, useToast } from "./food/ui";
 import "./weight.css";
 
@@ -97,6 +98,7 @@ export function WeightPage() {
               if (sleep != null) await saveSleep(local, d, sleep);
               if (kg == null && sleep != null) toast.show(`Sleep saved · ${fmtShortDate(d)}`);
             }} />
+            <Link to="/settings/watch" className="w-watch-link"><WatchIcon size={16} />Sleep from Apple Watch</Link>
           </Card>
 
           <Card className="w-chart">

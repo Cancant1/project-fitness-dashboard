@@ -1,0 +1,35 @@
+/* Settings → Apple Watch. Tokens only. */
+.watch-card { display: flex; flex-direction: column; gap: 14px; }
+.watch-card > .k-label { margin-bottom: 0; }
+.watch-signin { display: flex; flex-direction: column; gap: 10px; }
+.watch-signin p { font-size: 15px; }
+
+.watch-code {
+  display: block; padding: 12px 14px; border-radius: 14px; background: var(--field); color: var(--fg);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 14px; line-height: 1.45;
+  word-break: break-all; user-select: all; -webkit-user-select: all;
+}
+.watch-copy { align-self: flex-start; min-height: 44px; }
+
+.watch-fresh { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 18px; background: var(--warm-tint); }
+.watch-fresh-head { font-size: 13px; font-weight: 600; color: var(--warm-text); }
+.watch-fresh .watch-code { background: var(--surface); }
+.watch-note { font-size: 13px; color: var(--fg2); }
+.watch-fresh .watch-note { color: var(--warm-text); font-weight: 500; }
+.watch-done { align-self: flex-start; padding: 0; }
+
+.watch-create { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.watch-create-btn { height: 44px; }
+.watch-error { font-size: 13px; color: var(--bad); }
+.watch-empty { font-size: 15px; }
+
+.watch-token .k-row-main > :last-child { white-space: normal; }
+.watch-token.is-revoked .k-row-main > :first-child { color: var(--fg2); }
+.watch-confirm { display: inline-flex; gap: 4px; flex: none; }
+.watch-revoke { color: var(--bad); flex: none; }
+
+.watch-nights { display: flex; flex-direction: column; }
+.watch-night { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; min-height: 40px; font-size: 15px; }
+.watch-night > :not(:first-child) { text-align: right; }
+.watch-night + .watch-night { border-top: 1px solid var(--sep); }
+.watch-night-head { min-height: 28px; font-size: 13px; font-weight: 600; color: var(--fg2); }
