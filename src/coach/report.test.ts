@@ -68,7 +68,7 @@ describe("weeklyReport", () => {
   it("watch: two watch signals; actions list acts first, then watches, by priority", () => {
     const r = weeklyReport(goodWeek2({ bw: 74.2, days: ["lower_a", "upper_a", "lower_b"] }).data(), 2, sunday(2));
     expect(r.verdict).toBe("watch");
-    expect(r.actions.map((x) => x.id)).toEqual(["consistency.sessions", "muscle.volume", "body.path"]);
+    expect(r.actions.map((x) => x.id)).toEqual(["consistency.sessions", "muscle.volume"]);
     expect(r.headline).toBe("3 of 4 sessions. Mostly on plan. Keep an eye on one session missed.");
   });
 

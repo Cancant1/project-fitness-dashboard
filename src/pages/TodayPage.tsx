@@ -4,13 +4,13 @@ import { useRows, useStore } from "../data/store";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, parseDecimal, todayIso } from "../lib/format";
 import { bodyweight7d, dayTotals, targetFor } from "../lib/nutrition";
 import { countsForStrength, e1rm } from "../lib/analysis";
-import { dayForDate, prescribeDay } from "../plan/engine";
+import { dayForDate, prescribeDay, prescribeMinimum } from "../plan/engine";
 import { PLAN, PLAN_KEY, activeProgram, ensurePlanExercises, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../plan/bridge";
 import { startWorkout } from "../plan/workout";
-import type { PrescribedDay } from "../plan/types";
+import type { PlanState, PrescribedDay } from "../plan/types";
 import { Card, Label, Pill, Ring, Sparkline, Stat } from "../ui/kit";
 import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
-import { answerPainCheck, currentWeekNo, dailyCues, ensurePlanProteinPerKg, saveSleep, weeklyReport, type DailyCue, type WeeklyReport } from "../coach";
+import { answerPainCheck, currentWeekNo, dailyCues, ensurePlanProteinPerKg, saveElbowMonthly, savePhotosDone, saveSleep, weeklyReport, type DailyCue, type WeeklyReport } from "../coach";
 import { useCoachData } from "../coach/hooks";
 import { ConditioningCard } from "./ConditioningCard";
 import { SetMaxes } from "./SetMaxes";
@@ -37,6 +37,7 @@ export function TodayPage() {
   const targets = useRows("nutrition_targets");
   const conditioning = useRows("conditioning");
   const health = useRows("health_daily");
+  const painChecks = useRows("pain_checks");
   const [busy, setBusy] = useState(false);
   const toast = useToast();
 
@@ -56,15 +57,18 @@ export function TodayPage() {
   const dayLabel = planDate === today ? "Today" : planDate === addDays(today, 1) ? "Tomorrow" : fmtShortDate(planDate);
   const doneToday = sessions.some((s) => s.date === today && s.status === "completed" && s.program_id === program?.id);
 
-  const prescription = useMemo((): { day: PrescribedDay | null; error: string | null } => {
-    if (!slot) return { day: null, error: null };
+  const prescription = useMemo((): { day: PrescribedDay | null; state: PlanState | null; error: string | null } => {
+    if (!slot) return { day: null, state: null, error: null };
     try {
-      const state = program ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan }) : { trainingMaxes: {}, currentLoads: {} };
-      return { day: prescribeDay(plan, slot.week.weekNo, slot.day.key, state, equipment), error: null };
+      // painChecks and today switch on the elbow/bad-day stop signs, the wrist-ladder holds, the pain hold and the restart cap.
+      const state: PlanState = program
+        ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan, painChecks, today })
+        : { trainingMaxes: {}, currentLoads: {} };
+      return { day: prescribeDay(plan, slot.week.weekNo, slot.day.key, state, equipment), state, error: null };
     } catch (e) {
-      return { day: null, error: e instanceof Error ? e.message : String(e) };
+      return { day: null, state: null, error: e instanceof Error ? e.message : String(e) };
     }
-  }, [program, slot, ids, maxes, sessions, sets, equipment, conditioning, plan]);
+  }, [program, slot, ids, maxes, sessions, sets, equipment, conditioning, plan, painChecks, today]);
 
   const bw = bodyweight7d(weights, today);
   const target = targetFor(today, targets, bw);
@@ -105,11 +109,12 @@ export function TodayPage() {
     setBusy(false);
   }
 
-  async function start(day: PrescribedDay) {
+  async function start(day: PrescribedDay, minimum = false) {
     if (!program) return;
     setBusy(true);
     const all = await ensurePlanExercises(local);
-    const id = await startWorkout(local, program, day, all, today);
+    const run = minimum && prescription.state ? prescribeMinimum(plan, day.weekNo, day.dayKey, prescription.state, equipment) : day;
+    const id = await startWorkout(local, program, run, all, today, { minimum });
     setBusy(false);
     navigate(`/workout/${id}`);
   }
@@ -165,7 +170,12 @@ export function TodayPage() {
                 {day.minutes && <span><b>{day.minutes}</b> min</span>}
               </div>
               {program ? (
-                !doneToday && <button className="btn today-hero-btn" disabled={busy} onClick={() => void start(day)}><PlayIcon /> {planDate === today ? "Start workout" : "Start early"}</button>
+                !doneToday && (
+                  <div className="today-hero-starts">
+                    <button className="btn today-hero-btn" disabled={busy} onClick={() => void start(day)}><PlayIcon /> {planDate === today ? "Start workout" : "Start early"}</button>
+                    <button className="btn today-hero-min" disabled={busy} onClick={() => void start(day, true)}>Minimum session · 30 min</button>
+                  </div>
+                )
               ) : (
                 <button className="btn today-hero-btn" disabled={busy} onClick={() => void startPlan()}>Start the plan</button>
               )}
@@ -174,7 +184,8 @@ export function TodayPage() {
             <Card><Stat label="Rest day" value="Recover" size="md" /></Card>
           )}
 
-          <CoachCard cues={cues} report={report} today={today} onDone={toast.show} />
+          <CoachCard cues={cues} report={report} today={today} onDone={toast.show}
+            onMinimum={program && day?.kind === "lifting" && planDate === today && !doneToday && !inProgress ? () => void start(day, true) : undefined} />
 
           {slot && (
             <section>
@@ -182,7 +193,7 @@ export function TodayPage() {
               <div className="today-week">
                 {PLAN.days.slice().sort((a, b) => a.weekday - b.weekday).map((d) => {
                   const date = addDays(slot.week.startDate, d.weekday - 1);
-                  const done = sessions.some((s) => s.date === date && s.status === "completed") || conditioning.some((c) => c.date === date && c.done);
+                  const done = sessions.some((s) => s.date === date && s.status === "completed") || conditioning.some((c) => c.date === date && c.done && c.kind !== "other");
                   const cls = [d.kind === "lifting" ? "lift" : "cardio", date === planDate ? "now" : "", done ? "done" : ""].join(" ");
                   return (
                     <div key={d.key} className={`today-day ${cls}`}>
@@ -257,11 +268,13 @@ export function TodayPage() {
 }
 
 /** Today's coach notes (at most 3) and this week's check-in verdict. With no cues it is just the check-in row. */
-function CoachCard({ cues, report, today, onDone }: { cues: DailyCue[]; report: WeeklyReport | null; today: string; onDone: (m: string) => void }) {
+function CoachCard({ cues, report, today, onDone, onMinimum }: {
+  cues: DailyCue[]; report: WeeklyReport | null; today: string; onDone: (m: string) => void; onMinimum?: () => void;
+}) {
   if (!cues.length && !report) return null;
   return (
     <Card pad={false} className="t-coach k-rows" aria-label="Coach">
-      {cues.map((c) => <CueRow key={c.id} cue={c} today={today} onDone={onDone} />)}
+      {cues.map((c) => <CueRow key={c.id} cue={c} today={today} onDone={onDone} onMinimum={onMinimum} />)}
       {report && (
         <Link to="/checkin" className="t-checkin">
           <Dot tone={VERDICT_TONE[report.verdict]} />
@@ -277,7 +290,7 @@ function CoachCard({ cues, report, today, onDone }: { cues: DailyCue[]; report: 
   );
 }
 
-function CueRow({ cue, today, onDone }: { cue: DailyCue; today: string; onDone: (m: string) => void }) {
+function CueRow({ cue, today, onDone, onMinimum }: { cue: DailyCue; today: string; onDone: (m: string) => void; onMinimum?: () => void }) {
   const { local } = useStore();
   const [busy, setBusy] = useState(false);
   const line = (
@@ -292,9 +305,10 @@ function CueRow({ cue, today, onDone }: { cue: DailyCue; today: string; onDone: 
     <div className="t-cue">
       {cue.to ? <Link to={cue.to} className="t-cue-line">{line}</Link> : <div className="t-cue-line">{line}</div>}
       {prompt && (
-        <div className="t-cue-btns" role="group" aria-label="How is it this morning?">
+        <div className="t-scale" role="group" aria-label="How is it this morning, 0 to 10?">
           {prompt.options.map((o) => (
-            <button key={o} type="button" className="btn btn-tinted ci-btn" disabled={busy} onClick={async () => {
+            // Scores at the site's usual level + 2 or more are tinted: those suggest a swap.
+            <button key={o} type="button" data-high={o >= prompt.baseline + 2 || undefined} disabled={busy} onClick={async () => {
               setBusy(true);
               const r = await answerPainCheck(local, prompt.painCheckId, o);
               setBusy(false);
@@ -303,9 +317,54 @@ function CueRow({ cue, today, onDone }: { cue: DailyCue; today: string; onDone: 
           ))}
         </div>
       )}
+      {cue.input === "photos" && (
+        <div className="t-cue-act">
+          <button type="button" className="btn btn-tinted ci-btn" disabled={busy} onClick={async () => {
+            setBusy(true);
+            await savePhotosDone(local, today);
+            setBusy(false);
+            onDone("Photos marked done.");
+          }}><CheckIcon /> Done</button>
+        </div>
+      )}
+      {cue.input === "elbow_monthly" && <ElbowMonthlyInput today={today} onDone={onDone} />}
+      {cue.startMinimum && onMinimum && (
+        <div className="t-cue-act"><button type="button" className="btn btn-tinted ci-btn" onClick={onMinimum}><PlayIcon /> Start the minimum</button></div>
+      )}
       {cue.action && cue.signalId && (
         <div className="t-cue-act"><ApplyButton action={cue.action} signalId={cue.signalId} today={today} onDone={onDone} /></div>
       )}
+    </div>
+  );
+}
+
+const ELBOW_QUESTIONS = [
+  { key: "worst", label: "Worst pain this week" },
+  { key: "grip", label: "Pain gripping" },
+  { key: "daily", label: "Daily tasks" },
+] as const;
+
+/** The monthly elbow check: 3 sliders, 0–10 each, saved as one elbow_monthly row (saveElbowMonthly). */
+function ElbowMonthlyInput({ today, onDone }: { today: string; onDone: (m: string) => void }) {
+  const { local } = useStore();
+  const [v, setV] = useState({ worst: 0, grip: 0, daily: 0 });
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="t-elbow">
+      {ELBOW_QUESTIONS.map((q) => (
+        <label key={q.key} className="t-elbow-q">
+          <span className="t-elbow-label">{q.label}</span>
+          <span className="t-elbow-v k-num">{v[q.key]}</span>
+          <input type="range" min={0} max={10} step={1} value={v[q.key]} aria-label={`${q.label}, 0 to 10`}
+            onChange={(e) => setV({ ...v, [q.key]: Number(e.target.value) })} />
+        </label>
+      ))}
+      <button type="button" className="btn btn-tinted ci-btn" disabled={busy} onClick={async () => {
+        setBusy(true);
+        await saveElbowMonthly(local, today, v);
+        setBusy(false);
+        onDone("Elbow check saved.");
+      }}>Save</button>
     </div>
   );
 }

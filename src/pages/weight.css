@@ -12,9 +12,6 @@
 .w-input .btn-icon { border-radius: 14px; flex: none; }
 .w-input-waist { grid-template-columns: auto minmax(0, 1fr) 44px; }
 
-.w-waist { display: flex; flex-direction: column; gap: 16px; }
-.w-waist-date { font-size: 13px; }
-.w-waist-top { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 
 .w-chart, .w-tdee { display: flex; flex-direction: column; gap: 16px; }
 .w-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -44,3 +41,11 @@
 
 /* The small Apple Watch link under the weigh-in row (sleep can come from the Watch). */
 .w-watch-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-end; margin-top: -10px; font-size: 13px; font-weight: 600; color: var(--accent-text); min-height: 32px; }
+
+/* Quiet extras: progress-photo status and the optional waist (collapsed to one row). */
+.w-extras { padding: 0 16px 0 20px; }
+.w-waist { display: flex; flex-direction: column; }
+.w-waist-row { width: 100%; border: 0; border-radius: 0; background: transparent; padding: 0; font: inherit; text-align: left; cursor: pointer; }
+.w-waist-val { display: inline-flex; align-items: center; gap: 8px; }
+.w-waist-row[aria-expanded="true"] .w-all-chev { transform: rotate(180deg); }
+.w-waist .w-input { padding: 4px 0 16px; }

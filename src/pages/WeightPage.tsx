@@ -2,11 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal, todayIso } from "../lib/format";
-import { adaptiveTdee, type Weigh } from "../lib/energy";
-import { saveSleep, saveWaist } from "../coach";
+import { KCAL_PER_KG_LEAN_BULK, adaptiveTdee, type Weigh } from "../lib/energy";
+import { TDEE_MIN_DAYS, photoStatus, saveSleep, saveWaist } from "../coach";
+import { useCoachData } from "../coach/hooks";
 import { AreaChart, Card, Delta, Label, PageHead, Pill, Segmented, Stat } from "../ui/kit";
 import { Sheet } from "../ui/Sheet";
-import { CheckIcon, ChevronDown, ChevronRight, WatchIcon } from "../ui/icons";
+import { CheckIcon, ChevronDown, ChevronRight, PlusIcon, WatchIcon } from "../ui/icons";
 import { DateButton, useToast } from "./food/ui";
 import "./weight.css";
 
@@ -127,7 +128,7 @@ export function WeightPage() {
         </div>
 
         <div className="k-col">
-          <WaistCard today={today} />
+          <BodyExtras today={today} />
           <TdeeCard weights={weights.map((w) => ({ date: w.date, kg: w.value }))} />
           <AllWeighIns weights={weights} onOpen={setOpen} />
         </div>
@@ -180,16 +181,22 @@ function WeighInput({ weights, today, onSave }: { weights: WeighIn[]; today: str
   );
 }
 
-/** Waist at the navel every 2 weeks: the last value, its change, and a date + cm entry. */
-function WaistCard({ today }: { today: string }) {
+/**
+ * Quiet body extras: the progress-photo status (E20, every 4 weeks) and the waist, which is optional (R1-27):
+ * collapsed to one row with "Add waist (optional)"; the entry opens on tap.
+ */
+function BodyExtras({ today }: { today: string }) {
   const { local } = useStore();
   const rows = useRows("body_measurements");
+  const coach = useCoachData();
+  const [open, setOpen] = useState(false);
   const [date, setDate] = useState(today);
   const [text, setText] = useState("");
   const waists = useMemo(
     () => rows.filter((r) => r.kind === "waist").map((r) => ({ date: r.date, cm: r.unit === "in" ? Number(r.value) * 2.54 : Number(r.value) })).sort((a, b) => a.date.localeCompare(b.date)),
     [rows]
   );
+  const photos = useMemo(() => (today >= coach.start && today <= coach.end ? photoStatus(coach, today) : null), [coach, today]);
   const last = waists[waists.length - 1];
   const prev = waists[waists.length - 2];
   const onDate = waists.find((w) => w.date === date);
@@ -200,27 +207,38 @@ function WaistCard({ today }: { today: string }) {
     setText("");
   }
   return (
-    <Card className="w-waist">
-      <div className="w-chart-head">
-        <Label>Waist</Label>
-        {last && <span className="k-muted w-waist-date">{fmtShortDate(last.date)}</span>}
-      </div>
-      <div className="w-waist-top">
-        <Stat size="md" value={last ? fmtNum(last.cm, 1) : "—"} unit="cm" />
-        {last && prev && (
-          // Neutral on purpose: a rising waist is not "good" the way a rising lift is.
-          <span className="w-rate"><span className="k-delta">{signedCm(last.cm - prev.cm)}</span><small>since {fmtShortDate(prev.date)}</small></span>
+    <Card pad={false} className="w-extras k-rows">
+      {photos && (
+        <div className="k-row">
+          <span className="k-row-main"><span>Progress photos</span>{!photos.photoWeek && photos.next && <span>Next photo week</span>}</span>
+          {photos.photoWeek && photos.done ? <Pill tone="good"><CheckIcon /> Done</Pill>
+            : photos.photoWeek && photos.next ? <Pill tone="warm">Due Thu {fmtShortDate(photos.next)}</Pill>
+              : photos.next ? <span className="k-num">Thu {fmtShortDate(photos.next)}</span> : <span className="k-muted">—</span>}
+        </div>
+      )}
+      <div className="w-waist">
+        <button type="button" className="k-row w-waist-row" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <span className="k-row-main">
+            <span>{last ? "Waist" : "Add waist (optional)"}</span>
+            {last && <span>{fmtShortDate(last.date)}{prev ? ` · ${signedCm(last.cm - prev.cm)}` : ""}</span>}
+          </span>
+          <span className="w-waist-val">
+            {last ? <span className="k-num">{fmtNum(last.cm, 1)} cm</span> : <PlusIcon style={{ color: "var(--accent-text)" }} />}
+            {last && <ChevronDown className="w-all-chev" />}
+          </span>
+        </button>
+        {open && (
+          <div className="w-input w-input-waist">
+            <DateButton value={date} max={today} onChange={setDate} label="Waist date">{date === today ? "Today" : fmtShortDate(date)}<ChevronDown size={14} /></DateButton>
+            <label className="field">
+              <span className="sr-only">Waist at the navel in cm</span>
+              <input inputMode="decimal" className="num" placeholder={onDate ? fmtNum(onDate.cm, 1).replace(".", ",") : "At the navel"}
+                value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
+              <span className="field-suffix">cm</span>
+            </label>
+            <button className="btn btn-tinted btn-icon" aria-label="Save waist" onClick={() => void save()}><CheckIcon /></button>
+          </div>
         )}
-      </div>
-      <div className="w-input w-input-waist">
-        <DateButton value={date} max={today} onChange={setDate} label="Waist date">{date === today ? "Today" : fmtShortDate(date)}<ChevronDown size={14} /></DateButton>
-        <label className="field">
-          <span className="sr-only">Waist at the navel in cm</span>
-          <input inputMode="decimal" className="num" placeholder={onDate ? fmtNum(onDate.cm, 1).replace(".", ",") : "At the navel"}
-            value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
-          <span className="field-suffix">cm</span>
-        </label>
-        <button className="btn btn-tinted btn-icon" aria-label="Save waist" onClick={() => void save()}><CheckIcon /></button>
       </div>
     </Card>
   );
@@ -289,7 +307,7 @@ const signedCm = (d: number) => `${d > 0.04 ? "+" : d < -0.04 ? "−" : "±"}${f
 
 const WINDOWS = [14, 28, 42, 56] as const;
 
-/** Maintenance estimated from what you logged and how your weight moved. */
+/** Maintenance (as logged): estimated from what you logged and how your weight moved (N-TDEE). */
 function TdeeCard({ weights }: { weights: Weigh[] }) {
   const entries = useRows("food_entries");
   const days = useRows("nutrition_days");
@@ -306,12 +324,14 @@ function TdeeCard({ weights }: { weights: Weigh[] }) {
   const lastIntake = intake.reduce((d, x) => (x.date > d ? x.date : d), "");
   const lastWeigh = weights.reduce((d, x) => (x.date > d ? x.date : d), "");
   const asOf = lastIntake && lastWeigh ? (lastIntake < lastWeigh ? lastIntake : lastWeigh) : "";
-  const result = asOf ? adaptiveTdee(intake, weights, asOf, Number(win)) : null;
+  // N-TDEE (R1-22): 6,000 kcal per kg on a lean bulk; at least 24 of 28 logged days (scaled to the window).
+  const minDays = Math.ceil((Number(win) * TDEE_MIN_DAYS) / 28);
+  const result = asOf ? adaptiveTdee(intake, weights, asOf, Number(win), { kcalPerKg: KCAL_PER_KG_LEAN_BULK, minIntakeDays: minDays }) : null;
 
   return (
     <Card className="w-tdee">
       <div className="w-chart-head">
-        <Label>Maintenance</Label>
+        <Label>Maintenance (as logged)</Label>
         <Segmented label="Window" value={win} onChange={setWin} options={WINDOWS.map((w) => ({ value: `${w}` as const, label: `${w} d` }))} />
       </div>
       {result ? (
@@ -323,7 +343,7 @@ function TdeeCard({ weights }: { weights: Weigh[] }) {
           </div>
           <details className="w-how">
             <summary>How it works</summary>
-            <p>Average intake on {result.intakeDays} logged days, minus the weight trend ({result.weighIns} weigh-ins) × 7,700 kcal per kg, per day.</p>
+            <p>Average intake on {result.intakeDays} logged days, minus the weight trend ({result.weighIns} weigh-ins) × 6,000 kcal per kg, per day. Needs {minDays} of {win} days logged.</p>
           </details>
         </>
       ) : (

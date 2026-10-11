@@ -4,8 +4,8 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { useRows } from "../../data/store";
 import type { Program, Session } from "../../data/types";
-import { addDays as addDaysIso, fmtNum } from "../../lib/format";
-import { addDays, dayForDate, prescribeDay, prescribeWeek, trainingMaxFromSet, weekForDate } from "../../plan/engine";
+import { addDays as addDaysIso, fmtNum, todayIso } from "../../lib/format";
+import { addDays, dayForDate, prescribeDay, prescribeMinimum, prescribeWeek, trainingMaxFromSet, weekForDate } from "../../plan/engine";
 import { PLAN, activeProgram, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../../plan/bridge";
 import type {
   DayKey, EquipmentProfile, LiftingDayKey, LoadBasis, MainLiftKey, PlanState, PrescribedDay, PrescribedExercise, PrescribedSet,
@@ -38,6 +38,8 @@ export function usePlanContext(): PlanContext {
   const exercises = useRows("exercises");
   const profiles = useRows("profiles");
   const conditioning = useRows("conditioning");
+  const painChecks = useRows("pain_checks");
+  const today = todayIso();
   const ids = usePlanIds(exercises);
   const program = activeProgram(programs);
   const profile = profiles[0];
@@ -47,7 +49,7 @@ export function usePlanContext(): PlanContext {
     const equipment = equipmentFrom(profile);
     const latest = latestMaxes(maxes, ids);
     const state: PlanState = program
-      ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan })
+      ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan, painChecks, today })
       : {
         trainingMaxes: {
           ...(latest.squat != null ? { squat: latest.squat } : {}),
@@ -64,7 +66,7 @@ export function usePlanContext(): PlanContext {
       trainingMaxes: { squat: state.trainingMaxes.squat ?? EXAMPLE_TMS.squat, deadlift: state.trainingMaxes.deadlift ?? EXAMPLE_TMS.deadlift }
     };
     return { plan, program, ids, equipment, latest, state, preview, example };
-  }, [plan, program, ids, maxes, sessions, sets, profile, conditioning]);
+  }, [plan, program, ids, maxes, sessions, sets, profile, conditioning, painChecks, today]);
 }
 
 export function weekDays(weekNo: number, ctx: PlanContext): { days: PrescribedDay[]; error: string | null } {
@@ -79,6 +81,15 @@ export function weekDays(weekNo: number, ctx: PlanContext): { days: PrescribedDa
 export function tryDay(weekNo: number, dayKey: DayKey, state: PlanState, equipment: EquipmentProfile, plan: ProgramDefinition = PLAN): PrescribedDay | null {
   try {
     return prescribeDay(plan, weekNo, dayKey, state, equipment);
+  } catch {
+    return null;
+  }
+}
+
+/** prescribeMinimum (E2, the ~30 min minimum session) that returns null instead of throwing. */
+export function tryMinimum(weekNo: number, dayKey: DayKey, state: PlanState, equipment: EquipmentProfile, plan: ProgramDefinition = PLAN): PrescribedDay | null {
+  try {
+    return prescribeMinimum(plan, weekNo, dayKey, state, equipment);
   } catch {
     return null;
   }
@@ -200,7 +211,7 @@ const rangeText = (r: [number, number]) => (r[0] === r[1] ? String(r[0]) : `${r[
 export function rowSummary(ex: PrescribedExercise): { sets: number; scheme: string; load: string; repOut: boolean } {
   const work = ex.sets.filter((s) => s.kind !== "warmup");
   const first = work[0];
-  const reps = first?.repRange ? rangeText(first.repRange) : first?.reps != null ? String(first.reps) : "max";
+  const reps = first?.durationSec != null ? `${first.durationSec} s` : first?.repRange ? rangeText(first.repRange) : first?.reps != null ? String(first.reps) : "max";
   return {
     sets: work.length,
     scheme: `${work.length} × ${reps}`,

@@ -189,6 +189,23 @@ export async function saveGassed(local: LocalStore, date: string, rating: 1 | 2 
 }
 
 /**
+ * A home task on a conditioning day done or not (E13: the Wednesday wrist ladder at home): a conditioning row of
+ * kind "other" with note = the task id ("wrist_ladder"), done true. One per task and day: an existing row is updated.
+ */
+export async function saveHomeTask(local: LocalStore, date: string, taskId: string, done: boolean): Promise<void> {
+  const existing = local.all("conditioning").find((c) => c.kind === "other" && c.date === date && c.note === taskId);
+  if (existing) {
+    await local.save("conditioning", { id: existing.id, done });
+    return;
+  }
+  if (!done) return;
+  await local.save("conditioning", {
+    date, kind: "other", minutes: null, loop_time_s: null, rounds: null, first_round_count: null, last_round_count: null,
+    rating: null, done: true, note: taskId
+  });
+}
+
+/**
  * Progress photos taken (E20, M-MEASURE): a body_measurements row of kind "other", value 1, note "photos".
  * One "other" row per day (unique per user, date, kind): an existing one that day is updated.
  */

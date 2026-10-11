@@ -1,19 +1,32 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
-import type { Exercise, SetRow } from "../data/types";
+import type { Exercise, PainCheck, SetRow } from "../data/types";
 import { fmtNum, parseDecimal, toKg } from "../lib/format";
-import { platesPerSide, trainingMaxAfterRepOut } from "../plan/engine";
+import { STEP_RULES, incrementAfterRepOut, platesPerSide, trainingMaxAfterRepOut } from "../plan/engine";
 import { STACK_LABEL, STACK_OF, pinLabel, weightsFor } from "../plan/equipment";
-import { activeProgram, equipmentFrom, latestMaxes, usePlan, usePlanIds } from "../plan/bridge";
-import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef } from "../plan/workout";
-import { saveSessionEnergy } from "../coach";
+import { PLAN, activeProgram, equipmentFrom, latestMaxes, usePlan, usePlanIds } from "../plan/bridge";
+import { EFFORT_SHORT, EFFORT_TONE, effortLabel, loggedEffort } from "../plan/effort";
+import { duringScore, painAction, type PainAction } from "../plan/pain";
+import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef, type PlanSetRef } from "../plan/workout";
+import type { Effort, EquipmentProfile, StepLiftKey } from "../plan/types";
+import { saveSessionEnergy, savePainCheck } from "../coach";
+import { Segmented } from "../ui/kit";
 import { Sheet } from "../ui/Sheet";
-import { CheckIcon, ChevronDown, ChevronLeft, ChevronRight, MinusIcon, PlusIcon } from "../ui/icons";
+import { CheckIcon, ChevronDown, ChevronLeft, ChevronRight, MinusIcon, PlayIcon, PlusIcon } from "../ui/icons";
 import "../ui/kit.css";
 import "./workout.css";
 
-interface Block { position: number; exerciseId: string; name: string; sets: SetRow[] }
+interface Block {
+  position: number; exerciseId: string; name: string; sets: SetRow[];
+  /** Plan ref of the first working set (or the first set); undefined in a free workout. */
+  ref?: PlanSetRef;
+  /** How hard the exercise goes (E1); null for exercises outside the plan. */
+  effort: Effort | null;
+}
+
+/** "warm" | "plain" | "accent" | "muted" for an effort. */
+const toneOf = (e: Effort) => EFFORT_TONE[e];
 
 export function WorkoutPage() {
   const { sessionId = "" } = useParams();
@@ -25,6 +38,7 @@ export function WorkoutPage() {
   const maxes = useRows("training_maxes");
   const programs = useRows("programs");
   const profiles = useRows("profiles");
+  const painChecks = useRows("pain_checks");
   const session = sessions.find((s) => s.id === sessionId);
   const ids = usePlanIds(exercises);
   const equipment = equipmentFrom(profiles[0]);
@@ -37,7 +51,12 @@ export function WorkoutPage() {
     for (const s of mine) {
       const last = out[out.length - 1];
       if (last && last.position === s.exercise_position) last.sets.push(s);
-      else out.push({ position: s.exercise_position, exerciseId: s.exercise_id, name: s.exercise_as_logged ?? exercises.find((e) => e.id === s.exercise_id)?.name ?? "Exercise", sets: [s] });
+      else out.push({ position: s.exercise_position, exerciseId: s.exercise_id, name: s.exercise_as_logged ?? exercises.find((e) => e.id === s.exercise_id)?.name ?? "Exercise", sets: [s], effort: null });
+    }
+    for (const b of out) {
+      const first = b.sets.find((s) => s.kind !== "warmup") ?? b.sets[0]!;
+      b.ref = planRef(first) ?? b.sets.map(planRef).find(Boolean);
+      b.effort = b.ref ? loggedEffort(first.kind, planRef(first) ?? b.ref) : null;
     }
     return out;
   }, [allSets, sessionId, exercises]);
@@ -55,8 +74,11 @@ export function WorkoutPage() {
   if (!session) return <main className="page"><p className="muted">This workout isn't on this device.</p></main>;
 
   const elapsed = session.started_at ? Math.max(0, Math.floor((now - Date.parse(session.started_at)) / 1000)) : 0;
-  const calibration = (session.legacy_ref as { plan?: { weekType?: string } }).plan?.weekType === "calibration";
+  const planInfo = (session.legacy_ref as { plan?: { weekType?: string; dayKey?: string } }).plan;
+  const calibration = planInfo?.weekType === "calibration";
   const latest = latestMaxes(maxes, ids);
+  const sessionPain = painChecks.filter((p) => p.session_id === session.id && !p.deleted_at);
+  const painNow = block ? painFor(sessionPain, block.exerciseId) : null;
 
   async function update(s: SetRow, patch: Partial<SetRow>) {
     const next = { ...s, ...patch };
@@ -83,6 +105,8 @@ export function WorkoutPage() {
     });
   }
 
+  const finishUpdates = () => maxUpdates(session, blocks.flatMap((b) => b.sets), ids, maxes, equipment, { painChecks });
+
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <header className="workout-top">
@@ -97,16 +121,18 @@ export function WorkoutPage() {
         {block ? (
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "0 4px" }}>
-              <div className="progress-dots" aria-label={`Exercise ${i + 1} of ${blocks.length}`}>
-                {blocks.map((b, n) => <span key={b.position} className={n === i ? "on" : b.sets.every((s) => s.completed) ? "done" : ""} />)}
-              </div>
+              <ProgressDots blocks={blocks} i={i} />
+              <PairStrip blocks={blocks} i={i} onSelect={setIndex} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 8, marginTop: 4 }}>
                 <h1 className="large-title" style={{ minWidth: 0 }}>{block.name}</h1>
                 <span className="row-sub" style={{ flex: "none", paddingBottom: 6 }}>{i + 1} of {blocks.length}</span>
               </div>
-              <ExerciseSubtitle block={block} />
+              <ExerciseSubtitle block={block} dayKey={planInfo?.dayKey} />
+              <EffortLine block={block} />
               <SwapNote block={block} />
             </div>
+
+            {painNow && <PainBanner pain={painNow} />}
 
             <BlockSets block={block} calibration={calibration} latest={latest} equipment={equipment} onUpdate={update} onToggle={toggle} />
 
@@ -135,7 +161,7 @@ export function WorkoutPage() {
 
       <div className="workout-actions">
         <button className="btn btn-glass" style={{ padding: "0 20px", fontSize: 15 }} onClick={() => setPain(true)}>Pain check</button>
-        {block && <PrimaryAction block={block} onToggle={toggle} onNext={() => i < blocks.length - 1 ? setIndex(i + 1) : setFinishing(true)} />}
+        {block && <PrimaryAction block={block} stopped={painNow?.action === "stop"} onToggle={toggle} onNext={() => i < blocks.length - 1 ? setIndex(i + 1) : setFinishing(true)} />}
       </div>
 
       {adding && (
@@ -152,13 +178,13 @@ export function WorkoutPage() {
       {finishing && (
         <FinishSheet
           blocks={blocks}
-          updates={maxUpdates(session, blocks.flatMap((b) => b.sets), ids, maxes, equipment)}
+          updates={finishUpdates()}
           onClose={() => setFinishing(false)}
           onFinish={async (notes, energy) => {
             const sets = blocks.flatMap((b) => b.sets);
             if (notes) await local.save("sessions", { id: session.id, notes });
             if (energy) await saveSessionEnergy(local, session.id, energy);
-            await finishWorkout(local, session, sets, maxUpdates(session, sets, ids, maxes, equipment), ids, program);
+            await finishWorkout(local, session, sets, finishUpdates(), ids, program);
             navigate(`/session/${session.id}`, { replace: true });
           }}
           onDiscard={async () => {
@@ -196,20 +222,107 @@ function unitLabel(u: string) {
   return u === "bodyweight" ? "+kg" : u;
 }
 
-function ExerciseSubtitle({ block }: { block: Block }) {
+// ------------------------------------------------------------------ header pieces
+
+/** One dot per exercise; the members of a pair sit together as one joined group. */
+function ProgressDots({ blocks, i }: { blocks: Block[]; i: number }) {
+  const groups: { pair?: string; items: { b: Block; n: number }[] }[] = [];
+  blocks.forEach((b, n) => {
+    const last = groups[groups.length - 1];
+    const pair = b.ref?.pair;
+    if (pair && last?.pair === pair) last.items.push({ b, n });
+    else groups.push({ pair, items: [{ b, n }] });
+  });
+  const dot = ({ b, n }: { b: Block; n: number }) => <span key={b.position} className={n === i ? "on" : b.sets.every((s) => s.completed) ? "done" : ""} />;
+  return (
+    <div className="progress-dots" aria-label={`Exercise ${i + 1} of ${blocks.length}`}>
+      {groups.map((g, k) => (g.items.length > 1 ? <span key={`pair-${k}`} className="wk-dot-pair">{g.items.map(dot)}</span> : dot(g.items[0]!)))}
+    </div>
+  );
+}
+
+/** P-TIMESAVE: the A/B(/C) members of this exercise's pair, the short rest between them and the rest after. */
+function PairStrip({ blocks, i, onSelect }: { blocks: Block[]; i: number; onSelect: (n: number) => void }) {
+  const id = blocks[i]?.ref?.pair;
+  if (!id) return null;
+  const members = blocks.flatMap((b, n) => (b.ref?.pair === id ? [{ b, n }] : []));
+  if (members.length < 2) return null;
+  const between = members[0]!.b.ref?.restSec;
+  const after = members[members.length - 1]!.b.ref?.restSec;
+  return (
+    <div className="wk-pair" role="group" aria-label="Pair: alternate the sets">
+      {members.map(({ b, n }, k) => (
+        <Fragment key={b.position}>
+          {k > 0 && between != null && <span className="wk-pair-rest" aria-label={`${between} seconds between`}>{between} s</span>}
+          <button type="button" className="wk-pair-btn" aria-pressed={n === i} onClick={() => onSelect(n)}>
+            <b>{b.ref?.pairLabel ?? String.fromCharCode(65 + k)}</b><span>{b.name.split(",")[0]}</span>
+          </button>
+        </Fragment>
+      ))}
+      {after != null && <span className="wk-pair-after">{after} s after</span>}
+    </div>
+  );
+}
+
+function ExerciseSubtitle({ block, dayKey }: { block: Block; dayKey?: string }) {
   const work = block.sets.filter((s) => s.kind !== "warmup");
-  const rep = work.find((s) => s.kind === "rep_out");
-  const ref = planRef(block.sets[0]!);
+  const ref = block.ref;
+  if (!work.length) return null;
   let text = "";
-  if (rep && ref?.mainLift) text = `Rep-out at ${fmtNum(rep.load)} ${unitLabel(rep.unit)}. Count clean reps only.`;
-  else if (work.length && !ref && work[0]!.target_reps == null) text = work[0]!.kind === "timed" ? "Timed · minutes" : `${work.length} ${work.length === 1 ? "set" : "sets"} · ${unitLabel(work[0]!.unit)}`;
-  else if (work.length) text = `${work.length} × ${work[0]!.target_reps ?? ""} · ${fmtNum(work[0]!.load)} ${unitLabel(work[0]!.unit)}${work.some((s) => s.kind === "failure") ? " · to failure" : ""}${work.some((s) => s.kind === "rep_out") ? " · last set rep-out" : ""}`;
+  if (!ref) {
+    text = work[0]!.target_reps == null
+      ? (work[0]!.kind === "timed" ? "Timed · minutes" : `${work.length} ${work.length === 1 ? "set" : "sets"} · ${unitLabel(work[0]!.unit)}`)
+      : `${work.length} × ${work[0]!.target_reps} · ${fmtNum(work[0]!.load)} ${unitLabel(work[0]!.unit)}`;
+  } else {
+    const timed = work.filter((s) => s.kind === "timed");
+    const normal = work.filter((s) => s.kind === "working" || s.kind === "top" || s.kind === "failure");
+    const repOut = work.find((s) => s.kind === "rep_out");
+    const backoff = work.filter((s) => s.kind === "backoff");
+    const light = ref.mainLift === "squat" && !repOut && dayKey != null && dayKey === PLAN.mainLiftFallbacks?.squat.dayKey;
+    const parts: string[] = [];
+    if (light) parts.push("Light squat ·");
+    if (timed.length) parts.push(`${timed.length} × ${planRef(timed[0]!)?.durationSec ?? ""} s hold`);
+    else if (normal.length) parts.push(`${normal.length} × ${normal[0]!.target_reps ?? normal[0]!.reps ?? ""}`);
+    if (repOut) parts.push(normal.length ? "+ rep-out" : ref.mainLift === "deadlift" ? "Top set" : "Rep-out");
+    if (backoff.length) parts.push(`+ ${backoff.length} back-off`);
+    const head = (repOut ?? normal[0] ?? timed[0] ?? work[0])!;
+    if (head.load != null && !(head.unit === "bodyweight" && !head.load)) parts.push(`· ${fmtNum(head.load)} ${unitLabel(head.unit)}`);
+    text = parts.join(" ");
+  }
   return <p style={{ fontSize: 15, lineHeight: "20px", color: "var(--fg2)" }}>{text}</p>;
 }
 
-/** A coach swap running for this exercise (pain rule): "Swap: … until 3 Nov", always visible. */
+/** How hard this exercise goes (E1): a short pill and a one-line explanation, always visible. */
+function EffortLine({ block }: { block: Block }) {
+  if (!block.effort) return null;
+  const work = block.sets.filter((s) => s.kind !== "warmup");
+  const first = work[0];
+  const ref = first ? planRef(first) : block.ref;
+  const reps = first?.reps ?? (ref?.repRange ? ref.repRange[1] : null);
+  // A set that goes differently from the rest (an accessory's last-set rep-out); the main-lift rep-out card and
+  // the back-off group carry their own.
+  const other = work.filter((s) => s.kind !== "backoff" && !(s.kind === "rep_out" && planRef(s)?.mainLift))
+    .map((s) => loggedEffort(s.kind, planRef(s))).find((e) => e !== block.effort);
+  return (
+    <>
+      <EffortTag effort={block.effort} text={effortLabel(block.effort, reps, ref?.capReps)} />
+      {other && <EffortTag effort={other} text={`Last set · ${effortLabel(other)}`} />}
+    </>
+  );
+}
+
+function EffortTag({ effort, text }: { effort: Effort; text?: string }) {
+  return (
+    <div className="wk-effort">
+      <span className="wk-eff" data-tone={toneOf(effort)}>{EFFORT_SHORT[effort]}</span>
+      {text && <span className="wk-eff-text">{text}</span>}
+    </div>
+  );
+}
+
+/** A coach swap running for this exercise (pain rule): "Swap: … until 3 Nov. Start at 25 kg; …", always visible. */
 function SwapNote({ block }: { block: Block }) {
-  const key = planRef(block.sets[0]!)?.exerciseKey;
+  const key = block.ref?.exerciseKey;
   const plan = usePlan();
   const note = key ? plan.days.flatMap((d) => d.slots).find((s) => s.exerciseKey === key)?.notes.find((n) => n.startsWith("Swap:")) : undefined;
   return note ? <span className="k-pill k-pill-warm k-pill-wrap wk-swap">{note}</span> : null;
@@ -217,7 +330,7 @@ function SwapNote({ block }: { block: Block }) {
 
 function ExerciseNotes({ block }: { block: Block }) {
   const [open, setOpen] = useState(false);
-  const key = planRef(block.sets[0]!)?.exerciseKey;
+  const key = block.ref?.exerciseKey;
   const plan = usePlan();
   const notes = plan.days.flatMap((d) => d.slots).find((s) => s.exerciseKey === key)?.notes ?? [];
   if (!notes.length) return null;
@@ -235,15 +348,49 @@ function ExerciseNotes({ block }: { block: Block }) {
   );
 }
 
+// ------------------------------------------------------------------ pain in this session
+
+interface PainNow { action: Exclude<PainAction, "go">; score: number | null; sharp: boolean }
+
+/** The worst pain check logged on this exercise in this session: stop (≥ 6 or sharp) or hold (4–5); null otherwise. */
+function painFor(checks: readonly PainCheck[], exerciseId: string): PainNow | null {
+  let out: PainNow | null = null;
+  for (const p of checks) {
+    if (p.exercise_id !== exerciseId) continue;
+    const score = duringScore(p);
+    const sharp = p.during_set === "sharp";
+    const action = painAction(score, sharp);
+    if (action === "go") continue;
+    if (!out || (action === "stop" && out.action !== "stop") || (action === out.action && (score ?? 0) > (out.score ?? 0))) out = { action, score, sharp };
+  }
+  return out;
+}
+
+function PainBanner({ pain }: { pain: PainNow }) {
+  if (pain.action === "stop") {
+    return (
+      <section className="wk-stop" role="alert">
+        <strong>Stop this exercise today</strong>
+        <span>{pain.sharp ? "Sharp pain" : `Pain ${pain.score}/10`}</span>
+      </section>
+    );
+  }
+  return <span className="k-pill k-pill-accent wk-hold">Hold the load next time · pain {pain.score}/10</span>;
+}
+
+// ------------------------------------------------------------------ sets
+
 function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }: {
-  block: Block; calibration: boolean; latest: Partial<Record<string, number>>; equipment: ReturnType<typeof equipmentFrom>;
+  block: Block; calibration: boolean; latest: Partial<Record<string, number>>; equipment: EquipmentProfile;
   onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void>;
 }) {
   const warmups = block.sets.filter((s) => s.kind === "warmup");
   const work = block.sets.filter((s) => s.kind !== "warmup");
   const repOut = work.find((s) => s.kind === "rep_out" && planRef(s)?.mainLift);
-  const normal = work.filter((s) => s !== repOut);
-  const isBarbell = ["squat", "deadlift", "romanian_deadlift", "barbell_row"].includes(planRef(block.sets[0]!)?.exerciseKey ?? "");
+  const normal = work.filter((s) => s !== repOut && s.kind !== "backoff");
+  const backoff = work.filter((s) => s.kind === "backoff");
+  const isBarbell = ["squat", "deadlift", "romanian_deadlift", "barbell_row"].includes(block.ref?.exerciseKey ?? "");
+  const effortOf = (s: SetRow) => (block.effort ? loggedEffort(s.kind, planRef(s)) : null);
 
   return (
     <>
@@ -262,11 +409,25 @@ function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }
 
       {normal.length > 0 && (
         <section className="list" aria-label="Working sets">
-          {normal.map((s) => <SetLine key={s.id} s={s} onUpdate={onUpdate} onToggle={onToggle} />)}
+          {normal.map((s) => s.kind === "timed" && planRef(s)
+            ? <TimedLine key={s.id} s={s} onUpdate={onUpdate} onToggle={onToggle} />
+            : <SetLine key={s.id} s={s} effort={effortOf(s)} onUpdate={onUpdate} onToggle={onToggle} />)}
         </section>
       )}
 
-      {repOut && <RepOutCard s={repOut} calibration={calibration} latest={latest} onUpdate={onUpdate} onToggle={onToggle} />}
+      {repOut && <RepOutCard s={repOut} calibration={calibration} latest={latest} equipment={equipment} onUpdate={onUpdate} onToggle={onToggle} />}
+
+      {backoff.length > 0 && (
+        <section className="wk-group" aria-label="Back-off sets">
+          <div className="wk-group-head">
+            <span className="wk-group-title">Back-off</span>
+            <EffortTag effort={effortOf(backoff[0]!) ?? "controlled"} text={backoff.length > 1 ? "2nd set optional" : undefined} />
+          </div>
+          <div className="list">
+            {backoff.map((s) => <SetLine key={s.id} s={s} effort={effortOf(s)} onUpdate={onUpdate} onToggle={onToggle} />)}
+          </div>
+        </section>
+      )}
 
       <PinPicker block={block} onUpdate={onUpdate} />
 
@@ -277,21 +438,31 @@ function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }
   );
 }
 
-function plates(total: number, eq: ReturnType<typeof equipmentFrom>) {
+function plates(total: number, eq: EquipmentProfile) {
   const p = platesPerSide(total, eq.barKg, eq.platesKg);
   if (p.belowBar) return `Below the ${eq.barKg} kg bar`;
   return `Per side: ${p.perSide.length ? p.perSide.join(" + ") : "nothing"} · bar ${eq.barKg} kg${p.shortfallKg > 0 ? ` · ${fmtNum(p.shortfallKg)} kg short` : ""}`;
 }
 
-function SetLine({ s, onUpdate, onToggle }: { s: SetRow; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void> }) {
+const setLabel = (s: SetRow) => (s.kind === "failure" ? "F" : s.kind === "rep_out" ? "R" : s.kind === "top" ? "T" : s.kind === "backoff" ? "B" : s.kind === "timed" ? "H" : String(s.set_no));
+
+/** The set number as a small badge, tinted by how hard the set goes (E1). */
+function SetBadge({ s, effort }: { s: SetRow; effort: Effort | null }) {
+  return (
+    <span className="wk-setno" data-tone={effort ? toneOf(effort) : "plain"} title={effort ? EFFORT_SHORT[effort] : s.kind}
+      aria-label={`Set ${setLabel(s)}${effort ? `, ${EFFORT_SHORT[effort]}` : ""}`}>{setLabel(s)}</span>
+  );
+}
+
+function SetLine({ s, effort, onUpdate, onToggle }: { s: SetRow; effort: Effort | null; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void> }) {
   const [load, setLoad] = useState(s.load == null ? "" : String(s.load).replace(".", ","));
   const [reps, setReps] = useState(s.reps == null ? "" : String(s.reps));
   useEffect(() => setLoad(s.load == null ? "" : String(s.load).replace(".", ",")), [s.load]);
   useEffect(() => setReps(s.reps == null ? "" : String(s.reps)), [s.reps]);
-  const label = s.kind === "failure" ? "F" : s.kind === "rep_out" ? "R" : s.kind === "top" ? "T" : s.kind === "backoff" ? "B" : String(s.set_no);
+  const label = setLabel(s);
   return (
     <div className="set-grid">
-      <span className="set-no" style={{ color: s.kind === "rep_out" || s.kind === "failure" ? "var(--warm-text)" : undefined }} title={s.kind}>{label}</span>
+      <SetBadge s={s} effort={effort} />
       <label className="mini-field">
         <span className="sr-only">Load</span>
         <input inputMode="decimal" value={load} onChange={(e) => setLoad(e.target.value)} onBlur={() => void onUpdate(s, { load: parseDecimal(load) })} />
@@ -313,24 +484,66 @@ function SetLine({ s, onUpdate, onToggle }: { s: SetRow; onUpdate: (s: SetRow, p
   );
 }
 
-function RepOutCard({ s, calibration, latest, onUpdate, onToggle }: {
-  s: SetRow; calibration: boolean; latest: Partial<Record<string, number>>;
+/** An isometric hold (wrist-ladder flare-up step): the hold in seconds with a countdown, or tick it off. */
+function TimedLine({ s, onUpdate, onToggle }: { s: SetRow; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void> }) {
+  const ref = planRef(s);
+  const sec = ref?.durationSec ?? s.duration_s ?? 30;
+  const [until, setUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (until == null) return;
+    const t = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(t);
+  }, [until]);
+  const left = until == null ? sec : Math.max(0, Math.ceil((until - now) / 1000));
+  useEffect(() => {
+    if (until == null || left > 0) return;
+    setUntil(null);
+    void (async () => {
+      await onUpdate(s, { duration_s: sec });
+      if (!s.completed) await onToggle(s);
+    })();
+  }, [until, left, sec, s, onUpdate, onToggle]);
+  const running = until != null;
+  return (
+    <div className="set-grid wk-timed">
+      <SetBadge s={s} effort={loggedEffort(s.kind, ref)} />
+      <span className="wk-timed-load num">{s.load ? `${fmtNum(s.load)} ${unitLabel(s.unit)}` : "Hold"}</span>
+      <button type="button" className={`btn ${running ? "btn-primary" : "btn-tinted"} wk-timer-btn`} aria-label={running ? `${left} seconds left, tap to stop` : `Start a ${sec} second hold`}
+        onClick={() => { if (running) setUntil(null); else { setNow(Date.now()); setUntil(Date.now() + sec * 1000); } }}>
+        {!running && <PlayIcon size={12} />}<span>{left} s</span>
+      </button>
+      <button className="check" aria-pressed={s.completed} aria-label={`Hold ${s.set_no} done`}
+        onClick={async () => { if (!s.completed) await onUpdate(s, { duration_s: sec }); await onToggle(s); }}>{s.completed && <CheckIcon />}</button>
+    </div>
+  );
+}
+
+function RepOutCard({ s, calibration, latest, equipment, onUpdate, onToggle }: {
+  s: SetRow; calibration: boolean; latest: Partial<Record<string, number>>; equipment: EquipmentProfile;
   onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void>;
 }) {
   const ref = planRef(s)!;
+  const cap = ref.capReps;
   const [reps, setReps] = useState<number>(s.reps ?? ref.target ?? 5);
   const [stops, setStops] = useState(false);
   const lift = ref.mainLift!;
   const tmLift = lift === "squat" || lift === "deadlift";
   const tm = tmLift
-    ? trainingMaxAfterRepOut(Number(s.load), reps, { previous: latest[lift], target: ref.target, calibration }).tm
+    ? trainingMaxAfterRepOut(Number(s.load), reps, { previous: latest[lift], target: ref.target, calibration: calibration || ref.calibration === true, oldBest: PLAN.oldBestE1rm?.[lift] }).tm
     : null;
+  const nextLoad = !tmLift ? incrementAfterRepOut(lift as StepLiftKey, Number(s.load), reps, equipment, PLAN.mainLifts[lift as StepLiftKey] ?? STEP_RULES[lift as StepLiftKey]).load : null;
+  const effort = loggedEffort(s.kind, ref);
   return (
     <section className="repout-card" aria-label="Rep-out set">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span className="chip chip-warm" style={{ fontSize: 12, letterSpacing: 0.6 }}>REP-OUT{ref.target ? ` · TARGET ${ref.target}` : ""}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <div className="wk-ro-tags">
+          <span className="wk-eff" data-tone={toneOf(effort)}>{EFFORT_SHORT[effort]}{ref.target ? ` · target ${ref.target}` : ""}</span>
+          {cap != null && <span className="k-pill k-pill-warm">Stop at {cap}</span>}
+        </div>
         <button className="btn btn-plain btn-sm" onClick={() => setStops(!stops)}>Stop signs</button>
       </div>
+      <p className="wk-eff-text">{effortLabel(effort, null, cap)}</p>
       {stops && (
         <ul style={{ margin: 0, paddingLeft: 20, fontSize: 15, color: "var(--fg2)", display: "flex", flexDirection: "column", gap: 4 }}>
           <li>A rep takes about twice as long as rep 1</li>
@@ -347,16 +560,16 @@ function RepOutCard({ s, calibration, latest, onUpdate, onToggle }: {
           <button aria-label="One rep fewer" onClick={() => setReps(Math.max(0, reps - 1))}><MinusIcon /></button>
           <label className="stepper-value">
             <span className="sr-only">Clean reps</span>
-            <input inputMode="numeric" value={reps} onChange={(e) => setReps(Number(e.target.value.replace(/\D/g, "")) || 0)} />
+            <input inputMode="numeric" value={reps} onChange={(e) => { const v = Number(e.target.value.replace(/\D/g, "")) || 0; setReps(cap != null ? Math.min(cap, v) : v); }} />
             <span style={{ fontSize: 11, color: "var(--fg2)" }}>reps</span>
           </label>
-          <button aria-label="One rep more" onClick={() => setReps(reps + 1)}><PlusIcon /></button>
+          <button aria-label="One rep more" disabled={cap != null && reps >= cap} onClick={() => setReps(cap != null ? Math.min(cap, reps + 1) : reps + 1)}><PlusIcon /></button>
         </div>
       </div>
       <div className="row" style={{ borderTop: "1px solid var(--sep)", minHeight: 48 }}>
         <span className="muted">{tmLift ? "New training max" : "Next load"}</span>
         <span className="num" style={{ fontWeight: 700, fontSize: 17 }}>
-          {tm != null ? `${fmtNum(tm)} kg` : reps >= 10 ? "one step up" : reps <= 5 ? "one step down" : "same"}
+          {tm != null ? `${fmtNum(tm)} kg` : nextLoad != null ? `${lift === "weighted_pullup" ? "+" : ""}${fmtNum(nextLoad)} kg` : "same"}
         </span>
       </div>
       <button className={`btn ${s.completed ? "btn-glass" : "btn-warm"} btn-block`} style={{ marginBottom: 12 }}
@@ -367,14 +580,18 @@ function RepOutCard({ s, calibration, latest, onUpdate, onToggle }: {
   );
 }
 
-function PrimaryAction({ block, onToggle, onNext }: { block: Block; onToggle: (s: SetRow) => Promise<void>; onNext: () => void }) {
-  const next = block.sets.find((s) => !s.completed && !(s.kind === "rep_out" && planRef(s)?.mainLift));
-  const allDone = block.sets.every((s) => s.completed);
-  if (allDone) return <button className="btn btn-primary" style={{ flex: 1 }} onClick={onNext}>Next exercise</button>;
-  if (!next) return <button className="btn btn-glass" style={{ flex: 1 }} disabled>Log the rep-out above</button>;
+function PrimaryAction({ block, stopped, onToggle, onNext }: { block: Block; stopped: boolean; onToggle: (s: SetRow) => Promise<void>; onNext: () => void }) {
+  const next = block.sets.find((s) => !s.completed);
+  if (!next || stopped) return <button className="btn btn-primary" style={{ flex: 1 }} onClick={onNext}>Next exercise</button>;
+  if (next.kind === "rep_out" && planRef(next)?.mainLift) return <button className="btn btn-glass" style={{ flex: 1 }} disabled>Log the rep-out above</button>;
+  const sec = planRef(next)?.durationSec;
+  const what = next.kind === "warmup" ? "warm-up" : next.kind === "timed" ? `hold ${next.set_no}` : next.kind === "backoff" ? "back-off" : `set ${next.set_no}`;
+  const detail = next.kind === "timed"
+    ? (sec != null ? ` · ${sec} s` : "")
+    : `${next.load != null ? ` · ${fmtNum(next.load)} ${unitLabel(next.unit)}` : ""} × ${next.reps ?? next.target_reps ?? "?"}`;
   return (
     <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => void onToggle(next)}>
-      Done: {next.kind === "warmup" ? "warm-up" : `set ${next.set_no}`}{next.load != null ? ` · ${fmtNum(next.load)} ${unitLabel(next.unit)}` : ""}{next.kind === "timed" ? "" : ` × ${next.reps ?? next.target_reps ?? "?"}`}
+      Done: {what}{detail}
     </button>
   );
 }
@@ -399,32 +616,35 @@ function RestTimer({ rest, now, onAdd, onSkip }: { rest: { until: number; total:
   );
 }
 
+// ------------------------------------------------------------------ pain sheet
+
+const SITES = [{ value: "right_elbow", label: "Elbow" }, { value: "right_shoulder", label: "Shoulder" }, { value: "other", label: "Other" }] as const;
+type Site = (typeof SITES)[number]["value"];
+const VERDICT: Record<PainAction, string> = { go: "Keep going", hold: "Hold the load next time", stop: "Stop this exercise today" };
+
+/** J-PAINRULE 0–10 (E14): where, how much (slider), sharp? The verdict updates as you slide. */
 function PainSheet({ sessionId, exerciseId, date, onClose }: { sessionId: string; exerciseId: string | null; date: string; onClose: () => void }) {
   const { local } = useStore();
-  const [site, setSite] = useState("right_elbow");
-  const [during, setDuring] = useState<"none" | "ache" | "sharp">("none");
+  const [site, setSite] = useState<Site>("right_elbow");
+  const [score, setScore] = useState(0);
+  const [sharp, setSharp] = useState(false);
   const [worse, setWorse] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
+  const action = painAction(score, sharp);
   return (
     <Sheet title="Pain check" onClose={onClose}>
-      <div className="segmented" role="group" aria-label="Where">
-        {[["right_elbow", "Right elbow"], ["right_shoulder", "Right shoulder"], ["other", "Other"]].map(([k, l]) => (
-          <button key={k} aria-pressed={site === k} onClick={() => setSite(k!)}>{l}</button>
-        ))}
-      </div>
-      <div className="segmented" role="group" aria-label="During the set">
-        {([["none", "Nothing"], ["ache", "Some ache"], ["sharp", "Sharp / form changes"]] as const).map(([k, l]) => (
-          <button key={k} aria-pressed={during === k} onClick={() => setDuring(k)}>{l}</button>
-        ))}
-      </div>
-      <p style={{ fontSize: 15 }}>
-        {during === "sharp"
-          ? "Stop this exercise for today. If it's still sore tomorrow morning, or worse next session, drop one step down the swap list for 2 weeks."
-          : during === "ache"
-            ? "Some ache is fine. Check tomorrow morning: back to normal means the load was fine."
-            : "Good. Keep going."}
-      </p>
-      {during !== "none" && (
+      <div className="wk-seg44"><Segmented label="Where" value={site} onChange={setSite} options={SITES.map((s) => ({ value: s.value, label: s.label }))} /></div>
+      <section className="wk-pain" aria-label="Pain during the set, 0 to 10">
+        <div className="wk-pain-top">
+          <span className="wk-pain-v" data-action={action}>{score}<small>/10</small></span>
+          <button type="button" className="wk-sharp" aria-pressed={sharp} onClick={() => setSharp(!sharp)}>Sharp</button>
+        </div>
+        <input type="range" className="wk-range" min={0} max={10} step={1} value={score} aria-label="Pain, 0 to 10"
+          onChange={(e) => setScore(Number(e.target.value))} />
+        <div className="wk-pain-ends" aria-hidden="true"><span>None</span><span>Worst</span></div>
+      </section>
+      <p className="wk-verdict" data-action={action} role="status">{VERDICT[action]}</p>
+      {(score >= 1 || sharp) && (
         <div className="wk-worse">
           <span>Worse than last time?</span>
           <div className="wk-yn" role="group" aria-label="Worse than last time?">
@@ -434,16 +654,15 @@ function PainSheet({ sessionId, exerciseId, date, onClose }: { sessionId: string
         </div>
       )}
       <button className="btn btn-primary" disabled={saved} onClick={async () => {
-        await local.save("pain_checks", {
-          date, site, exercise_id: exerciseId, session_id: sessionId, during_set: during, next_morning: null,
-          worse_than_last: during === "none" ? null : worse, note: null
-        });
+        await savePainCheck(local, { date, site, exerciseId, sessionId, score, sharp, worseThanLast: worse });
         setSaved(true);
         window.setTimeout(onClose, 500);
       }}>{saved ? "Saved" : "Save"}</button>
     </Sheet>
   );
 }
+
+// ------------------------------------------------------------------ finish
 
 type Energy = 1 | 2 | 3 | 4 | 5;
 
@@ -461,11 +680,17 @@ function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
         <div className="row"><span>Working sets done</span><span className="num" style={{ fontWeight: 600 }}>{done} of {sets.length}</span></div>
         {updates.map((u) => (
           <div className="wk-update" key={u.lift}>
-            <div className="row"><span>{u.label}</span><span className="num" style={{ fontWeight: 600 }}>{u.from != null ? `${fmtNum(u.from)} → ` : ""}{fmtNum(u.to)} kg</span></div>
-            {u.provisional && (
+            <div className="row"><span>{u.label}</span><span className="num" style={{ fontWeight: 600 }}>{u.from != null && u.from !== u.to ? `${fmtNum(u.from)} → ` : ""}{fmtNum(u.to)} kg</span></div>
+            {(u.provisional || u.held || u.capped) && (
               <div className="wk-prov">
-                <span className="k-pill k-pill-warm">{u.note ?? "provisional (>12 reps)"}</span>
-                <p className="row-sub">Over 12 reps the estimate is rough; the next rep-outs correct it.</p>
+                {u.held && <span className="k-pill k-pill-accent">Held · pain 4/10 or more</span>}
+                {u.capped && <span className="k-pill k-pill-plain">Capped past your old best</span>}
+                {u.provisional && (
+                  <>
+                    <span className="k-pill k-pill-warm">{u.note && !u.held ? u.note : "provisional (>12 reps)"}</span>
+                    <p className="row-sub">Over 12 reps the estimate is rough; the next rep-outs correct it.</p>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -532,7 +757,7 @@ function AddExerciseSheet({ onClose, onPick }: { onClose: () => void; onPick: (e
 
 /** Cable exercises: the real pins on that machine's stack around the current load. Tap one to load every open set. */
 function PinPicker({ block, onUpdate }: { block: Block; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void> }) {
-  const key = planRef(block.sets[0]!)?.exerciseKey ?? "";
+  const key = block.ref?.exerciseKey ?? "";
   const weights = weightsFor(key);
   const open = block.sets.filter((s) => s.kind !== "warmup" && !s.completed);
   const current = Number((open[0] ?? block.sets[block.sets.length - 1])?.load ?? 0);

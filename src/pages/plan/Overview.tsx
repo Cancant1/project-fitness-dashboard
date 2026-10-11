@@ -28,7 +28,7 @@ const TOPICS: Topic[] = [
   { key: "bad", title: "Bad weeks", glyph: "↺", line: "Missed or busy weeks", Body: BadWeeks },
   { key: "cp", title: "Checkpoints", glyph: <Flag />, line: `End of weeks ${cps.map((c) => c.weekNo).join(" and ")}`, warm: true, Body: Checkpoints },
   { key: "deload", title: "Deload & taper", glyph: "↓", line: `Weeks ${weeksOf((t) => t === "deload" || t === "taper").join(", ")}`, Body: Deloads },
-  { key: "food", title: "Food", glyph: "kcal", line: `${PLAN.nutrition.kcal.toLocaleString("en-GB")} kcal, ${PLAN.nutrition.proteinG} g protein`, Body: Food },
+  { key: "food", title: "Food", glyph: "kcal", line: `${PLAN.nutrition.kcal.toLocaleString("en-GB")} kcal, protein 2 g/kg`, Body: Food },
   { key: "cardio", title: "Conditioning", glyph: "♡", line: "Ride, boxing, rounds", Body: Conditioning },
 ];
 
@@ -303,7 +303,7 @@ function Checkpoints() {
         </table>
       </div>
       <p>Behind? Check sessions done and bodyweight first. If both are on target and you're still behind, add one normal set to each main lift (deadlift: one set of 5 at 85% of that day's top load).</p>
-      <p className="k-muted">Checkpoint 1 met: in weeks 8–9, +1 set for your two most lagging muscles.</p>
+      <p className="k-muted">Checkpoint 1 met: +1 set on each curl and triceps exercise on Tue and Sat, every training week through week 17.</p>
     </>
   );
 }
@@ -337,10 +337,10 @@ function Food() {
         <table className="data">
           <tbody>
             <tr><td>Calories</td><td className="n">{n.kcal.toLocaleString("en-GB")} kcal</td><td>Every day, same on rest and training days</td></tr>
-            <tr><td>Protein</td><td className="n">{n.proteinG} g</td><td>4 meals of 35–40 g</td></tr>
+            <tr><td>Protein</td><td className="n">2 g/kg</td><td>Of your 7-day average weight (≈150 g now; the fixed day gives ≈180 g); 4+ meals</td></tr>
             <tr><td>Fat</td><td className="n">≈ {n.fatG} g</td><td>About 1 g/kg</td></tr>
             <tr><td>Carbs</td><td className="n">≈ {n.carbsG} g</td><td>The rest; a good share 2–3 h before sessions</td></tr>
-            <tr><td>Creatine</td><td className="n">3–5 g</td><td>Every day</td></tr>
+            <tr><td>Creatine</td><td className="n">5 g</td><td>Every day (since 11 Oct)</td></tr>
           </tbody>
         </table>
       </div>

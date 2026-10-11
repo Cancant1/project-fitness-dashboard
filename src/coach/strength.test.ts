@@ -152,7 +152,7 @@ describe("strength.checkpoint (week 6)", () => {
         ]
       }
     });
-    expect(s?.message.startsWith("Checkpoint 1 met: squat 145/145, deadlift 210/210, bodyweight 74.6/74.5. Extra arm work from week 8: +1 set on each curl and triceps exercise on Tue and Sat (+2 biceps and +2 triceps sets a week)")).toBe(true);
+    expect(s?.message.startsWith("Checkpoint 1 met: squat 145/145, deadlift 210/210, bodyweight 74.6/74.5. Extra arm work from week 8 through week 17: +1 set on each curl and triceps exercise on Tue and Sat (+2 biceps and +2 triceps sets a week)")).toBe(true);
     expect(s?.why).toEqual(expect.arrayContaining(["P-EXTRASETS", "P-TIMESAVE"]));
     const w = new World();
     for (const n of [1, 2, 3, 4, 5, 6]) w.week(n);

@@ -36,3 +36,18 @@ export function effortLabel(effort: Effort, reps?: number | null, capReps?: numb
   if (effort === 'controlled') return reps != null ? EFFORT_LABEL.controlled.replace('{n}', String(reps)) : 'Stop at the prescribed reps, even if more are there';
   return EFFORT_LABEL[effort];
 }
+
+/**
+ * The effort of a logged set: its plan ref's `effort` (stored since R1), else inferred from the set kind for
+ * older rows: warm-ups and timed holds easy, rep-outs max, failure sets failure, the shoulder block easy, the
+ * wrist ladder care, everything else controlled.
+ */
+export function loggedEffort(kind: string, ref?: { effort?: Effort; role?: string; group?: string; exerciseKey?: string } | null): Effort {
+  if (ref?.effort) return ref.effort;
+  if (kind === 'warmup' || kind === 'timed') return 'easy';
+  if (kind === 'rep_out') return 'max';
+  if (kind === 'failure') return 'failure';
+  if (ref?.role === 'shoulder' || ref?.group === 'shoulder_care') return 'easy';
+  if (ref?.exerciseKey === 'wrist_extension') return 'care';
+  return 'controlled';
+}

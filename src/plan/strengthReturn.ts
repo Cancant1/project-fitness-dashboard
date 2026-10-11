@@ -247,8 +247,14 @@ const WEEK_TYPE_LABELS: Record<WeekType, string> = {
 
 /** E24 / P-VARIETY: at the deloads (weeks 7 and 10). Equivalents are each slot's `alternatives`. */
 export const VARIETY_NOTE = 'You may swap up to 2 accessories for a listed equivalent this week (same muscle).';
-/** R1-08: the extra sets after checkpoint 1 are fixed (arms), with an optional rear delt set. */
+/**
+ * R1-08: the extra sets after checkpoint 1 are fixed (arms), with an optional rear delt set. They run in every
+ * A–D week after checkpoint 1 up to and including week 17 (DECISIONS: Mario wants size); never in the deload,
+ * taper or test weeks.
+ */
 const EXTRA_SETS_NOTE = 'If checkpoint 1 was met: +1 set on each curl and triceps exercise on Tue and Sat (optional +1 rear delt fly on Tue).';
+const EXTRA: Partial<ProgramWeek> = { extraSetsEligible: true };
+const ISO_FEWER = 'One set fewer per isolation exercise.';
 
 const CALENDAR: Array<[string, WeekType, string[], Partial<ProgramWeek>?]> = [
   ['2026-10-12', 'calibration', ['One rep-out at a known load per main lift sets the training maxes.',
@@ -260,17 +266,17 @@ const CALENDAR: Array<[string, WeekType, string[], Partial<ProgramWeek>?]> = [
   ['2026-11-16', 'B', []],
   ['2026-11-23', 'C', ['Checkpoint 1 at the end of this week (29 Nov).'], { checkpoint: CHECKPOINT_1 }],
   ['2026-11-30', 'deload', ['1 set per accessory, not to failure; half the Sunday rounds.', VARIETY_NOTE]],
-  ['2026-12-07', 'A', [EXTRA_SETS_NOTE], { extraSetsEligible: true }],
-  ['2026-12-14', 'B', [EXTRA_SETS_NOTE], { extraSetsEligible: true }],
+  ['2026-12-07', 'A', [EXTRA_SETS_NOTE], EXTRA],
+  ['2026-12-14', 'B', [EXTRA_SETS_NOTE], EXTRA],
   ['2026-12-21', 'deload', ['England 20–27 Dec. Hotel or local gym: do the deload sessions. No gym: rest and walk a lot.',
     'Eat roughly as usual; keep protein up.', VARIETY_NOTE]],
-  ['2026-12-28', 'C', []],
-  ['2027-01-04', 'A', []],
-  ['2027-01-11', 'B', []],
-  ['2027-01-18', 'C', ['Checkpoint 2 at the end of this week (24 Jan).'], { checkpoint: CHECKPOINT_2 }],
-  ['2027-01-25', 'B', ['One set fewer per isolation exercise.'], { isolationSetDelta: -1 }],
-  ['2027-02-01', 'C', ['One set fewer per isolation exercise.'], { isolationSetDelta: -1 }],
-  ['2027-02-08', 'D', ['One set fewer per isolation exercise.'], { isolationSetDelta: -1 }],
+  ['2026-12-28', 'C', [EXTRA_SETS_NOTE], EXTRA],
+  ['2027-01-04', 'A', [EXTRA_SETS_NOTE], EXTRA],
+  ['2027-01-11', 'B', [EXTRA_SETS_NOTE], EXTRA],
+  ['2027-01-18', 'C', ['Checkpoint 2 at the end of this week (24 Jan).', EXTRA_SETS_NOTE], { checkpoint: CHECKPOINT_2, ...EXTRA }],
+  ['2027-01-25', 'B', [ISO_FEWER, EXTRA_SETS_NOTE], { isolationSetDelta: -1, ...EXTRA }],
+  ['2027-02-01', 'C', [ISO_FEWER, EXTRA_SETS_NOTE], { isolationSetDelta: -1, ...EXTRA }],
+  ['2027-02-08', 'D', [ISO_FEWER, EXTRA_SETS_NOTE], { isolationSetDelta: -1, ...EXTRA }],
   ['2027-02-15', 'taper', ['Squat 2 × 2 at 85% TM, deadlift one single at 90%, no rep-outs. 1 set per accessory.']],
   ['2027-02-22', 'test', ['Rep-outs at 145 kg squat, 205 kg deadlift, 37.5 kg DBs and +20 kg pull-up. No accessories.',
     'Skip Sunday rounds.']],

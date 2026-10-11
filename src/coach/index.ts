@@ -6,7 +6,7 @@ export {
 } from "./report";
 export {
   applyCoachAction, removeAdjustment, ensurePlanProteinPerKg, answerPainCheck, savePainCheck, saveElbowMonthly, saveGassed,
-  savePhotosDone, saveSessionEnergy, saveWaist, saveSleep, type ApplyResult
+  savePhotosDone, saveHomeTask, saveSessionEnergy, saveWaist, saveSleep, type ApplyResult
 } from "./apply";
 export { applyAdjustments, adjustmentState, adjustmentsOf, swapNote } from "../plan/adjustments";
 export { nextSwap, swapLabel, swapStartLoad, SWAP_CHAINS, type SwapStartLoad, type SwapHistory } from "../plan/swaps";

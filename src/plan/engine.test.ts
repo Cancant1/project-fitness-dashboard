@@ -373,13 +373,16 @@ describe('extra sets and checkpoint fallbacks', () => {
     ]);
   });
 
-  it('applies extra sets only in weeks 8–9', () => {
+  it('applies extra sets in the A–D weeks 8–17, never in deload, taper or test weeks', () => {
     const s: PlanState = { ...STATE, extraSetsMuscles: ['triceps', 'rear_delts'] };
     expect(ex(8, 'lower_a', 'cross_body_triceps_extension', s).sets).toHaveLength(3);
     expect(ex(9, 'upper_b', 'cable_rear_delt_fly', s).sets).toHaveLength(3);
     expect(weekTotal(8, s)).toBe(74);
-    expect(weekTotal(11, s)).toBe(72);
+    expect(weekTotal(11, s)).toBe(74);
+    for (const w of [12, 13, 14, 15, 16, 17]) expect(weekTotal(w, s) - weekTotal(w)).toBe(2);
+    expect(weekTotal(6, s)).toBe(72);
     expect(weekTotal(7, s)).toBe(37);
+    for (const w of [10, 18, 19]) expect(weekTotal(w, s)).toBe(weekTotal(w));
   });
 
   it('R1-07 fallbacks: Friday light squat 2 × 3 at 75% before the BSS; deadlift 2 back-offs × 3–5 at 80%; +1 normal set on incline', () => {

@@ -306,6 +306,7 @@ function checkpointSignals(ctx: WeekCtx): Signal[] {
 
   if (st.met) {
     const fromWeek = plan.weeks.find((w) => w.weekNo > weekNo && w.extraSetsEligible)?.weekNo ?? weekNo + 2;
+    const toWeek = plan.weeks.filter((w) => w.extraSetsEligible).at(-1)?.weekNo;
     const head = `${cp.name} met: squat ${s}/${fmtLoad(cp.squatTm)}, deadlift ${d}/${fmtLoad(cp.deadliftTm)}, bodyweight ${b}/${fmtBw(cp.bodyweight7d)}.`;
     const pkg = plan.extraSets;
     if (index !== 1) return [sig("strength.checkpoint", "strength", "good", `${cp.name} met`, head, why, { metric })];
@@ -318,7 +319,7 @@ function checkpointSignals(ctx: WeekCtx): Signal[] {
     // R1-08: fixed arm package (+2 biceps, +2 triceps a week) and the optional rear delt set as a second action.
     return [
       sig("strength.checkpoint", "strength", "good", `${cp.name} met`,
-        `${head} Extra arm work from week ${fromWeek}: +1 set on each curl and triceps exercise on Tue and Sat (+2 biceps and +2 triceps sets a week), inside the pairs. Arms gain most from extra sets, and the pairs keep it to ~2.5 min a session.`,
+        `${head} Extra arm work from week ${fromWeek}${toWeek != null && toWeek > fromWeek ? ` through week ${toWeek}` : ""}: +1 set on each curl and triceps exercise on Tue and Sat (+2 biceps and +2 triceps sets a week), inside the pairs, in every training week (not the deloads). Arms gain most from extra sets, and the pairs keep it to ~2.5 min a session.`,
         [...why, "P-EXTRASETS", "P-TIMESAVE"],
         { metric, action: { kind: "extra_sets", muscles: [...pkg.arms.muscles], fromWeek, targets: pkg.arms.targets.map((t) => ({ ...t })) } }),
       sig("strength.checkpoint.rear_delt", "strength", "info", "Optional rear delt set",

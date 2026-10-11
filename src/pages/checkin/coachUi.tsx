@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { useRows, useStore } from "../../data/store";
 import { fmtShortDate } from "../../lib/format";
-import { activeProgram } from "../../plan/bridge";
+import { PLAN, activeProgram } from "../../plan/bridge";
 import { adjustmentsOf, applyCoachAction, removeAdjustment, swapLabel } from "../../coach";
 import type { CoachAction, Signal, Status, Verdict } from "../../coach";
 import "./checkin.css";
@@ -33,19 +33,35 @@ const sign = (n: number) => (n > 0 ? `+${n}` : `−${Math.abs(n)}`);
 const MUSCLE: Record<string, string> = { side_delts: "side delts", rear_delts: "rear delts", front_delts: "front delts", rotator_cuff: "rotator cuff" };
 const LIFT: Record<string, string> = { squat: "squat", deadlift: "deadlift", incline_db_press: "incline DB", weighted_pullup: "pull-up" };
 
+const DAY: Record<string, string> = { lower_a: "Mon", upper_a: "Tue", lower_b: "Fri", upper_b: "Sat" };
+
+/** An exercise's short name: the swap list's label, else the plan's name before the comma. */
+export function exerciseLabel(key: string): string {
+  const s = swapLabel(key);
+  return s !== key.replace(/_/g, " ") ? s : (PLAN.exercises[key]?.name.split(",")[0] ?? s);
+}
+
+const fraction = (f: number) => (Math.abs(f - 1 / 3) < 0.01 ? "⅓" : Math.abs(f - 0.5) < 0.01 ? "½" : `${Math.round(f * 100)}%`);
+const loadText = (load: number, unit?: string) => (unit === "bodyweight" ? (load ? `+${load} kg` : "bodyweight") : `${load} ${unit ?? "kg"}`);
+
 /** What an action changes, in a few words (shown in the confirm step). */
 export function actionLabel(a: CoachAction): string {
   switch (a.kind) {
     case "kcal": return `${sign(a.delta)} kcal from ${fmtShortDate(a.from)}`;
     case "deload_now": return `Week ${a.weekNo} becomes a deload`;
-    case "extra_sets": return `+1 set: ${a.muscles.map((m) => MUSCLE[m] ?? m).join(", ")}`;
+    case "extra_sets": {
+      if (!a.targets?.length) return `+1 set: ${a.muscles.map((m) => MUSCLE[m] ?? m).join(", ")}`;
+      const names = [...new Set(a.targets.map((t) => exerciseLabel(t.exerciseKey)))];
+      const days = [...new Set(a.targets.map((t) => DAY[t.dayKey] ?? t.dayKey))];
+      return `+1 set each: ${names.join(", ")} (${days.join(", ")}) from week ${a.fromWeek}`;
+    }
     case "main_lift_set": return `+1 set: ${a.lifts.map((l) => LIFT[l] ?? l).join(", ")}`;
     case "repeat_week": return `Repeat week ${a.missedWeekNo}`;
-    case "skip_deload": return `Week ${a.weekNo} becomes a training week`;
+    case "skip_deload": return `Train through week ${a.weekNo}: no deload`;
     case "tm_reduce": return `Both training maxes −${a.percent}%`;
-    case "recalibrate": return "Calibration rep-outs at 75% of your last TM";
-    case "swap": return `Swap to ${swapLabel(a.to)} until ${fmtShortDate(a.until)}`;
-    case "cut_sets": return `${swapLabel(a.exerciseKey)}: sets −${Math.round(a.fraction * 100)}% until ${fmtShortDate(a.until)}`;
+    case "recalibrate": return "Recalibrate: rep-outs at 75% of your last TM";
+    case "swap": return `Swap to ${swapLabel(a.to)} until ${fmtShortDate(a.until)}${a.startLoad != null ? ` · start ${loadText(a.startLoad, a.unit)}` : ""}`;
+    case "cut_sets": return `${exerciseLabel(a.exerciseKey)}: sets −${fraction(a.fraction)} until ${fmtShortDate(a.until)}`;
   }
 }
 

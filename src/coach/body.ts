@@ -133,7 +133,12 @@ export function bodyRules(ctx: WeekCtx): AreaResult {
     const range = `${fmtBw(lo)}–${fmtBw(hi)}`;
     const metric = { label: "7-day average", value: fmtBw(avg), target: range };
     const why: Signal["why"] = ["N-RATE", "M-STRENGTH-BW"];
-    if (avg < Math.round(lo * 10) / 10 - 1e-9) {
+    // Weeks 0–2: glycogen and creatine water move the scale; the path is shown, never judged (N-RATE).
+    const early = ctx.weekNo <= 2;
+    if (early) {
+      const where = avg < lo ? "below" : avg > hi ? "above" : "inside";
+      out.push(sig("body.path", "body", "info", "Bodyweight settling", `7-day average ${fmtBw(avg)} kg (${where} the plan range ${range}). Weeks 0–2 aren't judged: water and creatine still settling.`, why, { metric }));
+    } else if (avg < Math.round(lo * 10) / 10 - 1e-9) {
       out.push(sig("body.path", "body", "watch", "Bodyweight below the path", `7-day average ${fmtBw(avg)} kg, below the plan range ${range}.`, why, { metric }));
     } else if (avg > Math.round(hi * 10) / 10 + 1e-9) {
       out.push(sig("body.path", "body", "watch", "Bodyweight above the path", `7-day average ${fmtBw(avg)} kg, above the plan range ${range}.`, why, { metric }));

@@ -1,0 +1,39 @@
+/* Conditioning card on Today (Wed ride, Thu boxing, Sun rounds). Tokens only. */
+
+.cd { display: flex; flex-direction: column; gap: 14px; padding: 22px; }
+.cd-top { display: flex; flex-wrap: wrap; gap: 8px; }
+.cd-title { margin: 0; font-size: 34px; line-height: 38px; font-weight: 750; letter-spacing: -0.03em; }
+.cd-big { display: flex; align-items: baseline; gap: 6px; }
+.cd-big .k-num { font-size: 56px; line-height: 1; font-weight: 750; letter-spacing: -0.04em; color: var(--warm-text); }
+.cd-big small { font-size: 17px; font-weight: 600; color: var(--fg2); }
+.cd-line { font-size: 15px; line-height: 20px; color: var(--fg2); text-wrap: pretty; }
+.cd-note { font-size: 13px; color: var(--fg2); margin-top: -6px; }
+.cd-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.cd-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cd-fields-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cd-num { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cd-num > span:first-child { font-size: 12px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cd-save { height: 50px; }
+
+/* Thursday: Gassed? 1–5 and the round he faded. */
+.cd-gassed { display: flex; flex-direction: column; gap: 8px; }
+.cd-q { font-size: 15px; font-weight: 650; }
+.cd-scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.cd-scale button {
+  height: 48px; border: 0; border-radius: 16px; background: var(--field); cursor: pointer;
+  font-family: var(--num); font-size: 20px; font-weight: 700; color: var(--fg);
+}
+.cd-scale button[aria-pressed="true"] { background: var(--warm); color: #FFFFFF; }
+.cd-ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--fg2); margin: 0 2px; }
+.cd-fade { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 15px; margin-top: 4px; }
+.cd-fade .field { width: 88px; flex: none; }
+.cd-fade input { text-align: center; font-weight: 600; }
+
+/* Wednesday: the wrist ladder at home. */
+.cd-home { display: flex; align-items: center; gap: 12px; padding-top: 14px; border-top: 1px solid var(--sep); }
+.cd-home-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cd-home-title { font-size: 15px; font-weight: 600; }
+.cd-home-sub { font-size: 13px; color: var(--fg2); }
+.cd-home-dose { font-size: 17px; }
+.cd-check { width: 44px; height: 44px; border-radius: 22px; }

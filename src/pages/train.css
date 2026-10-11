@@ -65,3 +65,12 @@
   .tr-hero-load { font-size: 44px; }
   .tr-hero-load small { font-size: 16px; }
 }
+
+/* Start options in the hero: the minimum session as a quiet white-on-red second button. */
+.tr-hero-action .pl-start-opts { width: 100%; gap: 4px; }
+.tr-hero-action .btn.pl-start-min { background: transparent; color: #FFFFFF; box-shadow: none; height: 44px; font-size: 15px; font-weight: 600; }
+@media (min-width: 900px) { .tr-hero-action .pl-start-opts { flex-direction: row; align-items: center; gap: 8px; } }
+
+/* Day sheet: full session or the minimum session. */
+.tr-sheet-mode .k-seg { display: flex; }
+.tr-sheet-mode .k-seg button { flex: 1; height: 44px; font-size: 14px; }

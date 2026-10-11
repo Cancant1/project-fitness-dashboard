@@ -6,7 +6,7 @@ import { LocalStore } from "../data/local";
 import type { PainCheck, Program, Session, SetRow, TrainingMax } from "../data/types";
 import { applyAdjustments, type Adjustment } from "./adjustments";
 import { PLAN, ensurePlanExercises, planState } from "./bridge";
-import { EFFORT_LABEL, effortLabel, setEffort } from "./effort";
+import { EFFORT_LABEL, effortLabel, loggedEffort, setEffort } from "./effort";
 import {
   DEFAULT_EQUIPMENT, apreNextLoad, arrangePairs, incrementAfterRepOut, prescribeDay, prescribeMinimum, prescribeWeek, stuckNormalReps,
   systemMassE1rm, trainingMaxAfterRepOut, validatePairs, wristLadderDose
@@ -60,6 +60,17 @@ describe("E1 effort per exercise and set", () => {
     expect(effortLabel("max", null, 12)).toBe("Max set: go until a stop sign; count clean reps. Stop at 12 even if more are there");
     expect(effortLabel("care")).toBe("Slow, 3 s up / 3 s down, last 1–2 reps hard but clean");
     expect(effortLabel("stop_sign")).toBe("Hard, but stop at the first stop sign");
+  });
+  it("logged sets: the plan ref's effort, else inferred from the kind (rows from before R1)", () => {
+    expect(loggedEffort("working", { effort: "stop_sign" })).toBe("stop_sign");
+    expect(loggedEffort("warmup")).toBe("easy");
+    expect(loggedEffort("timed")).toBe("easy");
+    expect(loggedEffort("rep_out", { exerciseKey: "squat" })).toBe("max");
+    expect(loggedEffort("failure", { exerciseKey: "cable_lateral_raise" })).toBe("failure");
+    expect(loggedEffort("working", { exerciseKey: "face_pull", role: "shoulder" })).toBe("easy");
+    expect(loggedEffort("working", { exerciseKey: "wrist_extension" })).toBe("care");
+    expect(loggedEffort("backoff", { exerciseKey: "deadlift" })).toBe("controlled");
+    expect(loggedEffort("working", null)).toBe("controlled");
   });
   it("startWorkout writes the resolved effort, pair and cap into each set's plan ref", async () => {
     const local = new LocalStore(`r1-${Date.now()}-a`);
@@ -224,7 +235,7 @@ describe("E6 APRE taper once back at the last logged working load", () => {
 });
 
 describe("E8 extra sets at checkpoint 1 (R1-08)", () => {
-  it("+1 set on each arm exercise on Tue and Sat in weeks 8–9 (+2 biceps, +2 triceps); the Tuesday rear delt set only on request", () => {
+  it("+1 set on each arm exercise on Tue and Sat in the A–D weeks 8–17 (+2 biceps, +2 triceps); the Tuesday rear delt set only on request", () => {
     const arms: PlanState = { ...STATE, extraSetTargets: PLAN.extraSets!.arms.targets };
     expect(ex(8, "upper_a", "bayesian_curl", arms).sets).toHaveLength(3);
     expect(ex(8, "upper_a", "overhead_cable_triceps_extension", arms).sets).toHaveLength(3);
@@ -232,7 +243,9 @@ describe("E8 extra sets at checkpoint 1 (R1-08)", () => {
     expect(ex(9, "upper_b", "reverse_grip_pushdown", arms).sets).toHaveLength(3);
     const total = (s: PlanState, n: number) => prescribeWeek(PLAN, n, s).reduce((k, d) => k + d.workingSetCount, 0);
     expect(total(arms, 8)).toBe(76);
-    expect(total(arms, 11)).toBe(72);
+    expect(total(arms, 11)).toBe(76);
+    expect(total(arms, 17) - total(STATE, 17)).toBe(4);
+    for (const w of [6, 7, 10, 18, 19]) expect(total(arms, w)).toBe(total(STATE, w));
     expect(day(8, "upper_a", arms).exercises.map((e) => e.exerciseKey)).not.toContain("cable_rear_delt_fly");
     const both: PlanState = { ...arms, extraSetTargets: [...PLAN.extraSets!.arms.targets, ...PLAN.extraSets!.rearDelt.targets] };
     const tue = day(8, "upper_a", both).exercises;

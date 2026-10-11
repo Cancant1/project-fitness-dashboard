@@ -201,3 +201,28 @@
   .pl-rib-no { min-width: 17px; height: 18px; padding: 0 2px; font-size: 10px; }
   .pl-day { padding: 16px; }
 }
+
+/* Start options (E2): Start, then the minimum session as a quiet second line. */
+.pl-start-opts { display: flex; flex-direction: column; gap: 2px; margin-top: auto; }
+.pl-start-opts .pl-start { margin-top: 0; }
+.pl-start-min { height: 44px; font-size: 15px; font-weight: 600; }
+
+/* Effort badge on a row (E1): max warm, failure / stop sign accent, care / easy muted; controlled is unmarked. */
+.pl-eff { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 9px; font-family: var(--sans); font-size: 11px; font-weight: 650; }
+.pl-eff[data-tone="warm"] { background: var(--warm); color: #FFFFFF; }
+.pl-eff[data-tone="accent"] { background: var(--accent-tint); color: var(--accent-text); }
+.pl-eff[data-tone="plain"] { background: var(--seg); color: var(--fg); }
+.pl-eff[data-tone="muted"] { background: transparent; color: var(--fg2); padding: 0 2px; }
+
+/* Pairs (P-TIMESAVE): members grouped on a thin rail, A/B tags, the short rest under them. */
+.pl-pair { position: relative; padding-left: 12px; }
+.pl-pair::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 26px; width: 3px; border-radius: 2px; background: color-mix(in srgb, var(--chart-1) 55%, transparent); }
+.pl-rows > .pl-pair + .pl-row, .pl-rows > .pl-row + .pl-pair, .pl-rows > .pl-pair + .pl-pair { border-top: 1px solid var(--sep); }
+.pl-pair-tag {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 6px; border-radius: 9px; vertical-align: 1px;
+  background: var(--seg); font-family: var(--num); font-size: 11px; font-weight: 700; color: var(--fg);
+}
+.pl-pair-rest { display: block; padding: 0 0 8px; font-family: var(--num); font-size: 12px; color: var(--fg2); }
+.pl-variety { display: flex; }
+
+.pl-chip-sub { font-size: 12px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

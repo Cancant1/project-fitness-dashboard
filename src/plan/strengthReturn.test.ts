@@ -48,9 +48,9 @@ describe('calendar', () => {
     cps.forEach((cp) => expect(addDays(P.weeks[cp.weekNo]!.startDate, 6)).toBe(cp.date));
   });
 
-  it('flags the reduced and extra-set weeks', () => {
+  it('flags the reduced and extra-set weeks (every A–D week after checkpoint 1 through week 17)', () => {
     expect(P.weeks.filter((w) => w.isolationSetDelta === -1).map((w) => w.weekNo)).toEqual([15, 16, 17]);
-    expect(P.weeks.filter((w) => w.extraSetsEligible).map((w) => w.weekNo)).toEqual([8, 9]);
+    expect(P.weeks.filter((w) => w.extraSetsEligible).map((w) => w.weekNo)).toEqual([8, 9, 11, 12, 13, 14, 15, 16, 17]);
   });
 });
 

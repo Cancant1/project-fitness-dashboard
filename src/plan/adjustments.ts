@@ -13,7 +13,7 @@ export type CoachAction =
   /** That week becomes a deload (rep-outs missed, or joint aches rising two weeks running). */
   | { kind: 'deload_now'; weekNo: number }
   /**
-   * After checkpoint 1 is met, in the extra-set weeks (8–9). With `targets` (R1-08): +1 set on each listed
+   * After checkpoint 1 is met, in the extra-set weeks (every A–D week 8–17). With `targets` (R1-08): +1 set on each listed
    * (day, exercise): the arm package or the optional Tuesday rear delt set. Without (older rows): +1 set for each
    * muscle's first isolation slot.
    */

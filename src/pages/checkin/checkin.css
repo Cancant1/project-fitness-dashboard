@@ -113,3 +113,16 @@
 .ci-muscle { display: grid; grid-template-columns: 84px minmax(0, 1fr) 76px; align-items: center; gap: 12px; font-size: 14px; }
 .ci-muscle .k-num { text-align: right; font-size: 14px; }
 .ci-muscle .k-num small { color: var(--fg2); font-weight: 500; }
+
+/* ---------------------------------------------------------------- habit meter, rate ± and small info */
+
+.ci-se { font-size: 13px; font-weight: 600; color: var(--fg2); }
+.ci-habit { display: flex; flex-direction: column; gap: 12px; }
+.ci-habit-n { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; }
+.ci-habit-n small { font-size: 13px; font-weight: 600; color: var(--fg2); letter-spacing: 0; }
+.ci-meter { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.ci-meter i { height: 10px; border-radius: 5px; background: var(--track); }
+.ci-meter i.on { background: linear-gradient(90deg, var(--chart-1), var(--warm)); }
+.ci-habit-lines { display: flex; flex-direction: column; gap: 6px; padding-top: 4px; border-top: 1px solid var(--sep); }
+.ci-habit-line { display: flex; align-items: center; gap: 10px; min-height: 32px; font-size: 15px; font-weight: 500; }
+.ci-info { padding: 0 20px; }

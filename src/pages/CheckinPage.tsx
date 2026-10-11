@@ -86,6 +86,8 @@ export function CheckinPage() {
             </Card>
           </section>
 
+          <HabitCard report={report} />
+
           <section className="ci-areas" aria-label="Areas">
             <Label>By area</Label>
             <div className="ci-grid">
@@ -96,6 +98,7 @@ export function CheckinPage() {
 
         <div className="k-col">
           <BodyCard report={report} data={data} today={today} />
+          <InfoCard report={report} />
           <StrengthCard report={report} data={data} today={today} />
         </div>
       </div>
@@ -331,7 +334,13 @@ function BodyCard({ report, data, today }: { report: WeeklyReport; data: CoachDa
       </div>
       <div className="ci-chart-stat">
         <span className="ci-big">{bw.avg7d != null ? fmtNum(bw.avg7d, 1) : "—"}<small>kg</small></span>
-        {bw.rate != null ? <span className="ci-rate"><Delta value={bw.rate} unit=" kg" digits={2} /><small>per week</small></span>
+        {bw.rate != null ? (
+          <span className="ci-rate">
+            <Delta value={bw.rate} unit=" kg" digits={2} />
+            {bw.rateSe != null && <span className="ci-se k-num">± {fmtNum(bw.rateSe, 2)}</span>}
+            <small>per week</small>
+          </span>
+        ) : bw.rateSkipped ? <Pill tone="plain">Rate skipped · {bw.rateSkipped}</Pill>
           : <span className="k-muted ci-cap">7-day average</span>}
       </div>
       <AreaChart
@@ -390,6 +399,72 @@ function StrengthCard({ report, data, today }: { report: WeeklyReport; data: Coa
       ) : (
         <div className="k-empty ci-chart-empty">Set in week 0</div>
       )}
+    </Card>
+  );
+}
+
+// ------------------------------------------------------------------ habit and small info
+
+/** P-HABITS: weeks in a row at 4+ sessions (n/6), with the missed-twice and comeback lines. */
+function HabitCard({ report }: { report: WeeklyReport }) {
+  const h = report.numbers.habit;
+  if (!h) return null;
+  const missed = report.signals.find((s) => s.id === "consistency.missed_twice");
+  const comeback = report.signals.find((s) => s.id === "consistency.comeback");
+  return (
+    <Card className="ci-habit" aria-label={`Habit: ${h.weeks} of ${h.target} weeks at 4+ sessions`}>
+      <div className="ci-chart-head">
+        <Label>Habit</Label>
+        <span className="ci-habit-n k-num">{h.weeks}<small> / {h.target} weeks</small></span>
+      </div>
+      <div className="ci-meter" role="img" aria-label={`${h.weeks} of ${h.target}`}>
+        {Array.from({ length: h.target }, (_, i) => <i key={i} className={i < h.weeks ? "on" : ""} />)}
+      </div>
+      <span className="ci-cap">{h.weeks >= h.target ? "Habit threshold reached" : "Weeks at 4+ sessions"}</span>
+      {(missed || comeback) && (
+        <div className="ci-habit-lines">
+          {missed && <span className="ci-habit-line"><Dot tone="watch" />{missed.title}</span>}
+          {comeback && <span className="ci-habit-line"><Dot tone="good" />{comeback.title}</span>}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** Small facts for the week: progress photos, sleep before lifting days, resting HR and HRV (info only). */
+function InfoCard({ report }: { report: WeeklyReport }) {
+  const n = report.numbers;
+  const rows: { label: string; value: ReactNode; sub?: string }[] = [];
+  const ph = n.photos;
+  if (ph) {
+    rows.push({
+      label: "Progress photos",
+      value: ph.photoWeek && ph.done ? <Pill tone="good"><CheckIcon /> Done</Pill>
+        : ph.photoWeek && ph.next ? <Pill tone="warm">Due Thu {fmtShortDate(ph.next)}</Pill>
+          : ph.next ? <span className="k-num">Thu {fmtShortDate(ph.next)}</span> : <span className="k-muted">—</span>,
+      ...(ph.photoWeek ? {} : ph.next ? { sub: "Next photos" } : {})
+    });
+  }
+  const bl = n.sleep.beforeLifting;
+  if (bl && bl.avgHours != null) {
+    rows.push({ label: "Sleep before lifting", value: <span className="k-num">{fmtNum(bl.avgHours, 1)} h</span>, sub: `${bl.nights} ${bl.nights === 1 ? "night" : "nights"} · target 7.5 h` });
+  }
+  const hr = n.heart;
+  if (hr?.restingHr7d != null) {
+    rows.push({ label: "Resting HR", value: <span className="k-num">{fmtNum(hr.restingHr7d, 0)} bpm</span>, ...(hr.restingHr60d != null ? { sub: `60-day ${fmtNum(hr.restingHr60d, 0)}` } : {}) });
+  }
+  if (hr?.hrv7d != null) {
+    rows.push({ label: "HRV", value: <span className="k-num">{fmtNum(hr.hrv7d, 0)} ms</span>, ...(hr.hrv60d != null ? { sub: `60-day ${fmtNum(hr.hrv60d, 0)}` } : {}) });
+  }
+  if (!rows.length) return null;
+  return (
+    <Card pad={false} className="ci-info k-rows" aria-label="This week's small numbers">
+      {rows.map((r) => (
+        <div key={r.label} className="k-row">
+          <span className="k-row-main"><span>{r.label}</span>{r.sub && <span>{r.sub}</span>}</span>
+          {r.value}
+        </div>
+      ))}
     </Card>
   );
 }

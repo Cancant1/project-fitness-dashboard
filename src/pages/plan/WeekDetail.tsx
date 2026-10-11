@@ -3,13 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { useRows, useStore } from "../../data/store";
 import { fmtNum, fmtShortDate, todayIso } from "../../lib/format";
 import { getWeek } from "../../plan/engine";
-import { ensurePlanExercises } from "../../plan/bridge";
+import { PLAN, ensurePlanExercises } from "../../plan/bridge";
+import { EFFORT_SHORT, EFFORT_TONE, effortLabel } from "../../plan/effort";
+import { VARIETY_NOTE } from "../../plan/strengthReturn";
+import { swapLabel } from "../../plan/swaps";
 import { startWorkout } from "../../plan/workout";
-import type { DayKey, PrescribedDay, PrescribedExercise, WeekType } from "../../plan/types";
+import type { DayKey, Effort, PrescribedDay, PrescribedExercise, WeekType } from "../../plan/types";
 import { Card, Label, Pill } from "../../ui/kit";
 import { CheckIcon, ChevronDown, PlayIcon } from "../../ui/icons";
 import {
-  DAY_SHORT, dayDef, doneSlots, fmtLoadShort, fmtPct, fmtRest, mainSummary, rowSummary, shortName, tryDay, weekDays,
+  DAY_SHORT, dayDef, doneSlots, fmtLoadShort, fmtPct, fmtRest, mainSummary, rowSummary, shortName, tryDay, tryMinimum, weekDays,
   type PlanContext
 } from "./planView";
 
@@ -64,37 +67,53 @@ function DayCard({ day, ctx, isToday, done, onSetMax }: { day: PrescribedDay; ct
       </div>
       {day.kind === "lifting" ? <DayBody day={day} ctx={ctx} /> : <p className="k-muted pl-day-rest">No lifting</p>}
       {day.kind === "lifting" && ctx.program && !done && (
-        <StartDay weekNo={day.weekNo} dayKey={day.dayKey} ctx={ctx} onSetMax={onSetMax} primary={isToday} />
+        <StartOptions weekNo={day.weekNo} dayKey={day.dayKey} ctx={ctx} onSetMax={onSetMax} primary={isToday} />
       )}
     </Card>
   );
 }
 
-/** Main lifts as highlighted blocks, everything else as compact rows, warm-ups and notes behind a disclosure. */
+/** Main lifts as highlighted blocks, everything else as compact rows (pairs grouped), warm-ups and notes behind a disclosure. */
 export function DayBody({ day, ctx }: { day: PrescribedDay; ctx: PlanContext }) {
   const fixed = day.weekType === "calibration" || day.weekType === "test";
   const mains = day.exercises.filter((e) => e.role === "main");
   const shoulder = day.exercises.filter((e) => e.group === "shoulder_care");
   const rows = day.exercises.filter((e) => e.role !== "main" && e.group !== "shoulder_care");
   const notes = [...day.notes, ...mains.flatMap((m) => m.notes)];
+  // P-TIMESAVE: pair members are adjacent; group them so they read as one block.
+  const groups: PrescribedExercise[][] = [];
+  for (const e of rows) {
+    const last = groups[groups.length - 1];
+    if (e.pair && last && last[0]!.pair === e.pair) last.push(e);
+    else groups.push([e]);
+  }
+  // E24 / P-VARIETY: in weeks 7 and 10 up to 2 accessories may be swapped for a listed equivalent.
+  const variety = !!ctx.plan.weeks.find((w) => w.weekNo === day.weekNo)?.notes.includes(VARIETY_NOTE);
+  const alts = variety ? day.exercises.filter((e) => e.role !== "main" && e.alternatives?.length) : [];
 
   return (
     <div className="pl-day-body">
-      {mains.map((m) => <MainBlock key={m.exerciseKey} ex={m} ctx={ctx} weekType={day.weekType} />)}
+      {mains.map((m) => <MainBlock key={m.exerciseKey} ex={m} ctx={ctx} weekType={day.weekType} light={isLightSquat(m, day)} />)}
       {(rows.length > 0 || shoulder.length > 0) && (
         <div className="pl-rows">
           {shoulder.length > 0 && (
             <div className="pl-row">
               <span className="pl-row-name">Shoulder care</span>
-              <span className="pl-row-scheme">{shoulder.length} × 2</span>
+              <span className="pl-row-scheme"><Eff effort="easy" />{shoulder.length} × 2</span>
               <span className="pl-row-load k-muted">first</span>
             </div>
           )}
-          {rows.map((e) => <Row key={e.exerciseKey} ex={e} />)}
+          {groups.map((g) => (g.length > 1 ? (
+            <div key={g[0]!.exerciseKey} className="pl-pair" aria-label={`Pair: ${g.map(shortName).join(" and ")}`}>
+              {g.map((e) => <Row key={e.exerciseKey} ex={e} />)}
+              <span className="pl-pair-rest">Alternate · {g[0]!.restSec} s / {g[g.length - 1]!.restSec} s</span>
+            </div>
+          ) : <Row key={g[0]!.exerciseKey} ex={g[0]!} />))}
         </div>
       )}
+      {alts.length > 0 && <span className="pl-variety"><Pill tone="plain">Swap up to 2 accessories</Pill></span>}
       <details className="pl-more">
-        <summary>Warm-up &amp; notes <ChevronDown style={{ width: 14, height: 14 }} /></summary>
+        <summary>{alts.length ? "Warm-up, notes & swaps" : "Warm-up & notes"} <ChevronDown style={{ width: 14, height: 14 }} /></summary>
         <div className="pl-more-body">
           {mains.map((m) => {
             const s = mainSummary(m, ctx.preview.trainingMaxes, fixed);
@@ -116,6 +135,14 @@ export function DayBody({ day, ctx }: { day: PrescribedDay; ctx: PlanContext }) 
               })}
             </div>
           )}
+          {alts.length > 0 && (
+            <div className="pl-ramp">
+              <span className="pl-ramp-title">Swap options · same muscle</span>
+              {alts.map((e) => (
+                <div key={e.exerciseKey}><span className="k-muted">{shortName(e)}</span><span>{e.alternatives!.map(swapLabel).join(", ")}</span></div>
+              ))}
+            </div>
+          )}
           {notes.length > 0 && <ul className="pl-notes">{notes.map((n) => <li key={n}>{n}</li>)}</ul>}
         </div>
       </details>
@@ -123,15 +150,25 @@ export function DayBody({ day, ctx }: { day: PrescribedDay; ctx: PlanContext }) 
   );
 }
 
-function MainBlock({ ex, ctx, weekType }: { ex: PrescribedExercise; ctx: PlanContext; weekType: WeekType }) {
+/** R1-07: the light Friday squat (a second squat block, no rep-out). */
+const isLightSquat = (ex: PrescribedExercise, day: PrescribedDay) =>
+  ex.mainLift === "squat" && day.dayKey === PLAN.mainLiftFallbacks?.squat.dayKey && !ex.sets.some((s) => s.kind === "rep_out");
+
+/** A small effort badge (E1); controlled, the default, stays unmarked. */
+function Eff({ effort }: { effort: Effort }) {
+  if (effort === "controlled") return null;
+  return <span className="pl-eff" data-tone={EFFORT_TONE[effort]} title={effortLabel(effort)}>{EFFORT_SHORT[effort]}</span>;
+}
+
+function MainBlock({ ex, ctx, weekType, light }: { ex: PrescribedExercise; ctx: PlanContext; weekType: WeekType; light: boolean }) {
   const calibration = weekType === "calibration";
   const s = mainSummary(ex, ctx.preview.trainingMaxes, calibration || weekType === "test");
   return (
     <div className="pl-main">
       <div className="pl-main-l">
-        <span className="pl-main-name">{shortName(ex)}</span>
+        <span className="pl-main-name">{light ? "Light squat" : shortName(ex)}</span>
         <span className="pl-main-scheme">
-          {s.scheme}{s.scheme && s.repOut ? " · " : ""}{s.repOut && <b>{s.repOut}</b>}
+          {s.scheme}{s.scheme && s.repOut ? " · " : ""}{s.repOut && <b>{s.repOut}</b>}{light ? " · no rep-out" : ""}
         </span>
         <SwapPill ex={ex} />
       </div>
@@ -150,15 +187,15 @@ function Row({ ex }: { ex: PrescribedExercise }) {
   const r = rowSummary(ex);
   return (
     <div className="pl-row" title={ex.name}>
-      <span className="pl-row-name">{shortName(ex)}</span>
-      <span className="pl-row-scheme">{r.repOut && <i className="pl-ro-dot" title="Last set is a rep-out" />}{r.scheme}</span>
+      <span className="pl-row-name">{ex.pairLabel && <b className="pl-pair-tag">{ex.pairLabel}</b>}{shortName(ex)}</span>
+      <span className="pl-row-scheme"><Eff effort={ex.effort} />{r.repOut && <i className="pl-ro-dot" title="Last set is a rep-out" />}{r.scheme}</span>
       <span className="pl-row-load">{r.load}</span>
       <SwapPill ex={ex} />
     </div>
   );
 }
 
-/** A running coach swap (pain rule) on this exercise: "Swap: … until 3 Nov". Phase 1 is advisory: the slot stays. */
+/** A running coach swap (pain rule) on this exercise: "Swap: … until 3 Nov. Start at …". Phase 1 is advisory: the slot stays. */
 function SwapPill({ ex }: { ex: PrescribedExercise }) {
   const note = ex.notes.find((n) => n.startsWith("Swap:"));
   return note ? <span className="k-pill k-pill-warm k-pill-wrap pl-swap">{note}</span> : null;
@@ -170,11 +207,18 @@ function CardioChip({ day, isToday }: { day: PrescribedDay; isToday: boolean }) 
     : c.kind === "rounds" ? `${c.rounds} × ${fmtNum((c.workSec ?? 120) / 60)} min`
       : `${c.minutes} min`;
   const name = { easy_ride: "Ride", boxing: "Boxing", rounds: "Rounds" }[day.dayKey as "easy_ride" | "boxing" | "rounds"] ?? day.title;
+  const home = c?.homeTasks?.[0];
+  const sub = c && !c.skipped
+    ? c.kind === "rounds"
+      ? [c.burstRounds ? `${c.burstRounds} burst` : null, c.finishBy ? `by ${c.finishBy}` : null].filter(Boolean).join(" · ")
+      : home ? `+ wrist ${home.sets} × ${home.reps ?? (home.holdSec ? `${home.holdSec[1]} s` : "")}` : ""
+    : "";
   return (
     <div className={`k-card pl-chip${isToday ? " is-today" : ""}`}>
       <span className="pl-chip-day">{isToday && <i className="pl-today-dot" />}{DAY_SHORT[day.weekday - 1]}</span>
       <span className="pl-chip-name">{name}</span>
       <span className="pl-chip-val">{value}</span>
+      {sub && <span className="pl-chip-sub">{sub}</span>}
     </div>
   );
 }
@@ -183,8 +227,10 @@ function CardioChip({ day, isToday }: { day: PrescribedDay; isToday: boolean }) 
  * Starts a plan day from the REAL state (never example training maxes), logged as today.
  * Without a programme it offers to start the plan; without a training max, to set one.
  */
-export function StartDay({ weekNo, dayKey, ctx, onSetMax, onStartPlan, primary = false, label = "Start", onStarted }: {
-  weekNo: number; dayKey: DayKey; ctx: PlanContext; onSetMax?: () => void; onStartPlan?: () => void; primary?: boolean; label?: string; onStarted?: () => void;
+export function StartDay({ weekNo, dayKey, ctx, onSetMax, onStartPlan, primary = false, label = "Start", onStarted, minimum = false }: StartProps & {
+  primary?: boolean; label?: string;
+  /** E2: start the minimum session (~30 min) instead of the full day. */
+  minimum?: boolean;
 }) {
   const { local } = useStore();
   const navigate = useNavigate();
@@ -198,23 +244,46 @@ export function StartDay({ weekNo, dayKey, ctx, onSetMax, onStartPlan, primary =
   if (!ctx.program) {
     return onStartPlan ? <button type="button" className="btn btn-primary pl-start" onClick={onStartPlan}>Start the plan</button> : null;
   }
-  const real = tryDay(weekNo, dayKey, ctx.state, ctx.equipment, ctx.plan);
+  const real = minimum ? tryMinimum(weekNo, dayKey, ctx.state, ctx.equipment, ctx.plan) : tryDay(weekNo, dayKey, ctx.state, ctx.equipment, ctx.plan);
   if (!real) {
     return onSetMax ? <button type="button" className="btn btn-tinted pl-start" onClick={onSetMax}>Set training max</button> : null;
   }
   if (real.kind !== "lifting") return null;
   const program = ctx.program;
   return (
-    <button type="button" className={`btn ${primary ? "btn-primary" : "btn-tinted"} pl-start`} disabled={busy}
+    <button type="button" className={`btn ${primary ? "btn-primary" : minimum ? "btn-plain" : "btn-tinted"} pl-start${minimum ? " pl-start-min" : ""}`} disabled={busy}
       onClick={async () => {
         setBusy(true);
         const ids = await ensurePlanExercises(local);
-        const id = await startWorkout(local, program, real, ids, todayIso());
+        const id = await startWorkout(local, program, real, ids, todayIso(), { minimum });
         setBusy(false);
         onStarted?.();
         navigate(`/workout/${id}`);
       }}>
-      <PlayIcon /> {label}
+      {!minimum && <PlayIcon />} {label}
     </button>
+  );
+}
+
+interface StartProps {
+  weekNo: number; dayKey: DayKey; ctx: PlanContext; onSetMax?: () => void; onStartPlan?: () => void; onStarted?: () => void;
+}
+
+export const MINIMUM_LABEL = "Minimum session · 30 min";
+
+/**
+ * "Start" and "Minimum session · 30 min" (E2) for a planned day. While a workout runs, before the plan starts or
+ * without a training max it is the single StartDay button.
+ */
+export function StartOptions({ label = "Start", primary = false, ...props }: StartProps & { label?: string; primary?: boolean }) {
+  const sessions = useRows("sessions");
+  const inProgress = sessions.some((s) => s.status === "in_progress");
+  const ready = !inProgress && !!props.ctx.program && tryDay(props.weekNo, props.dayKey, props.ctx.state, props.ctx.equipment, props.ctx.plan)?.kind === "lifting";
+  if (!ready) return <StartDay {...props} label={label} primary={primary} />;
+  return (
+    <div className="pl-start-opts">
+      <StartDay {...props} label={label} primary={primary} />
+      <StartDay {...props} label={MINIMUM_LABEL} minimum />
+    </div>
   );
 }

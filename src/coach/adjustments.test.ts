@@ -41,12 +41,13 @@ describe("applyAdjustments", () => {
     expect(out.weeks[7]!.checkpoint).toMatchObject({ weekNo: 7, date: "2026-12-06" });
   });
 
-  it("extra_sets → PlanState.extraSetsMuscles (+1 set in weeks 8–9 only)", () => {
+  it("extra_sets → PlanState.extraSetsMuscles (+1 set in the A–D weeks 8–17)", () => {
     const state = { ...STATE, ...adjustmentState([adj({ kind: "extra_sets", muscles: ["triceps", "biceps"], fromWeek: 8 })]) };
     expect(state.extraSetsMuscles).toEqual(["triceps", "biceps"]);
     expect(total(PLAN, 8, state)).toBe(74);
     expect(total(PLAN, 9, state)).toBe(74);
-    expect(total(PLAN, 11, state)).toBe(72);
+    expect(total(PLAN, 11, state)).toBe(74);
+    expect(total(PLAN, 10, state)).toBe(total(PLAN, 10));
   });
 
   it("main_lift_set → PlanState.addMainLiftSet; the latest extra_sets wins", () => {

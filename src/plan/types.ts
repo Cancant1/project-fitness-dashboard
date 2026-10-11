@@ -55,7 +55,7 @@ export interface ProgramWeek {
   notes: string[];
   /** Weeks 15–17: −1 set on isolation slots (never below 1). */
   isolationSetDelta?: number;
-  /** Weeks 8–9: extra sets for lagging muscles if checkpoint 1 was met. */
+  /** A–D weeks 8–17 (not the deloads): the checkpoint-1 extra sets apply if checkpoint 1 was met. */
   extraSetsEligible?: boolean;
   checkpoint?: Checkpoint;
   /** Set by shiftAfterMissedWeek. */
@@ -306,7 +306,7 @@ export interface PlanState {
   trainingMaxes: Partial<Record<TmLiftKey, number>>;
   /** Last/next working load per exercise key (incline_db_press, weighted_pullup, accessories). */
   currentLoads: Partial<Record<string, number>>;
-  /** After checkpoint 1 is met: muscles that get +1 set in extra-set weeks (8–9). */
+  /** After checkpoint 1 is met: muscles that get +1 set in the extra-set weeks (A–D weeks 8–17). */
   extraSetsMuscles?: readonly Muscle[];
   /** Behind at a checkpoint: add one normal set (deadlift: a back-off set). */
   addMainLiftSet?: Partial<Record<MainLiftKey, boolean>>;

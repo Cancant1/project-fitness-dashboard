@@ -56,7 +56,6 @@
 .t-cue { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
 .t-cue-line { display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--fg); font-size: 15px; line-height: 20px; }
 .t-cue-text { flex: 1; min-width: 0; text-wrap: pretty; }
-.t-cue-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 0 4px 22px; }
 .t-cue-act { padding: 0 0 4px 22px; }
 .t-checkin { display: flex; align-items: center; gap: 12px; min-height: 60px; color: var(--fg); }
 .t-checkin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -68,3 +67,32 @@
 .t-checkin-verdict[data-verdict="too_early"] { color: var(--fg2); }
 
 .today-goal { display: flex; align-items: center; gap: 16px; color: var(--fg); }
+
+/* Hero start options (E2): Start, and the minimum session as a quiet second button. */
+.today-hero-starts { margin-top: auto; display: flex; flex-direction: column; gap: 2px; }
+.today-hero-starts .today-hero-btn { margin-top: 0; }
+.today-hero-min { height: 44px; border-radius: 22px; background: transparent; color: #FFFFFF; font-size: 15px; font-weight: 600; }
+.today-hero-min:disabled { opacity: 0.7; }
+@media (min-width: 900px) {
+  .today-hero-starts { flex-direction: row; align-items: center; gap: 8px; }
+  .today-hero-min { padding: 0 18px; }
+}
+
+/* Morning pain 0–10: one compact row (two rows of six on a phone, 44 px targets). */
+.t-scale { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; padding: 0 0 4px 22px; }
+.t-scale button {
+  height: 44px; min-width: 0; padding: 0; border: 0; border-radius: 12px; cursor: pointer;
+  background: var(--seg); color: var(--fg); font-family: var(--num); font-size: 16px; font-weight: 650;
+}
+.t-scale button[data-high] { background: var(--warm-tint); color: var(--warm-text); }
+.t-scale button:active { transform: scale(0.96); }
+.t-scale button:disabled { opacity: 0.5; }
+@media (max-width: 519px) { .t-scale { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+/* Monthly elbow check: three 0–10 sliders and Save. */
+.t-elbow { display: flex; flex-direction: column; gap: 6px; padding: 0 0 6px 22px; }
+.t-elbow-q { display: grid; grid-template-columns: minmax(0, 1fr) 28px; align-items: center; column-gap: 8px; }
+.t-elbow-label { font-size: 14px; color: var(--fg2); }
+.t-elbow-v { text-align: right; font-size: 17px; }
+.t-elbow-q input { grid-column: 1 / -1; width: 100%; height: 36px; margin: 0; accent-color: var(--warm); }
+.t-elbow .ci-btn { align-self: flex-start; }
