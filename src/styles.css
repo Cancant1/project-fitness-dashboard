@@ -3,18 +3,20 @@
    glass bars, capsule buttons, concentric corners. Light first; dark follows the system setting. */
 
 :root {
-  --bg: #F4F5F7;
+  /* Monochrome Pompeian red (the app icon's colour) on warm plaster neutrals.
+     accent = actions and navigation (deeper), warm = moments that matter (PRs, rep-outs, the hero),
+     chart-1 = data (lighter rose), chart-2 = a second series, chart-3 = comparison grey. */
+  --bg: #F6F3F2;
   --surface: #FFFFFF;
-  --field: #EFF0F3;
+  --field: #F1ECEA;
   --glass: rgba(255, 255, 255, 0.66);
-  --fg: #1C1C1E;
-  --fg2: #64646B;
-  --sep: rgba(60, 60, 67, 0.11);
-  --grid: rgba(60, 60, 67, 0.08);
-  --accent: #0A67D6;
-  --accent-text: #0A5CC0;
-  --accent-tint: rgba(10, 103, 214, 0.10);
-  /* Pompeian red — the app icon's colour; used for rep-outs, PRs and highlights. */
+  --fg: #1F1A19;
+  --fg2: #6B6260;
+  --sep: rgba(70, 50, 46, 0.11);
+  --grid: rgba(70, 50, 46, 0.08);
+  --accent: #8E3A30;
+  --accent-text: #833529;
+  --accent-tint: rgba(142, 58, 48, 0.10);
   --warm: #A9473B;
   --warm-text: #933B30;
   --warm-tint: rgba(169, 71, 59, 0.10);
@@ -22,21 +24,21 @@
   --plaster: #F2E0D8;
   --hero-1: #B8574A;
   --hero-2: #7E3129;
-  --chart-1: #0A67D6;
-  --chart-2: #A9473B;
-  --chart-3: #8E8E93;
-  --elev: 0 1px 2px rgba(16, 22, 34, 0.04), 0 8px 24px rgba(16, 22, 34, 0.06);
-  --good: #1F7A3A;
-  --good-tint: rgba(31, 122, 58, 0.12);
+  --chart-1: #C46E60;
+  --chart-2: #7E3129;
+  --chart-3: #9A918F;
+  --elev: 0 1px 2px rgba(40, 22, 18, 0.04), 0 8px 24px rgba(40, 22, 18, 0.06);
+  --good: #2F7A4A;
+  --good-tint: rgba(47, 122, 74, 0.12);
   --bad: #C0262D;
-  --track: #E6E7EB;
-  --seg: rgba(118, 118, 128, 0.12);
+  --track: #ECE6E4;
+  --seg: rgba(120, 100, 96, 0.12);
   --seg-on: #FFFFFF;
-  --ink: #1C1C1E;
+  --ink: #1F1A19;
   --ink-fg: #FFFFFF;
-  --ink-fg2: #A9A9B0;
-  --shadow: 0 1px 1px rgba(0, 0, 0, 0.03), 0 6px 18px rgba(16, 22, 34, 0.05);
-  --glass-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 10px 30px rgba(16, 22, 34, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --ink-fg2: #ADA4A2;
+  --shadow: 0 1px 1px rgba(0, 0, 0, 0.03), 0 6px 18px rgba(40, 22, 18, 0.05);
+  --glass-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 10px 30px rgba(40, 22, 18, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.75);
 
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", system-ui, sans-serif;
   --num: ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -51,32 +53,35 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0D0E11; --surface: #1A1B1F; --field: #26272C; --glass: rgba(34, 35, 40, 0.62);
-    --fg: #F2F2F5; --fg2: #A2A2AA; --sep: rgba(255, 255, 255, 0.08); --grid: rgba(255, 255, 255, 0.06);
-    --accent: #2A72DE; --accent-text: #7DB2FF; --accent-tint: rgba(70, 140, 255, 0.16);
-    --warm: #B4564A; --warm-text: #F0A193; --warm-tint: rgba(232, 128, 112, 0.15); --warm-ring: rgba(232, 128, 112, 0.42);
-    --plaster: #2A1D1A; --hero-1: #9E4A3F; --hero-2: #4A1E19; --chart-1: #4C8DF0; --chart-2: #E07F70; --chart-3: #8E8E93;
-    --elev: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.35);
-    --good: #4FC27E; --good-tint: rgba(79, 194, 126, 0.16); --bad: #FF6B6B; --track: #2C2D33;
-    --seg: rgba(118, 118, 128, 0.24); --seg-on: #3A3B41; --ink: #F2F2F5; --ink-fg: #111114; --ink-fg2: #55555C;
-    --shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --glass-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    --bg: #0F0D0D; --surface: #1C1918; --field: #292423; --glass: rgba(36, 32, 31, 0.62);
+    --fg: #F4F0EF; --fg2: #A9A09E; --sep: rgba(255, 240, 236, 0.08); --grid: rgba(255, 240, 236, 0.06);
+    --accent: #B85A4C; --accent-text: #EE9E90; --accent-tint: rgba(226, 120, 104, 0.16);
+    --warm: #C4675A; --warm-text: #F2A89A; --warm-tint: rgba(232, 128, 112, 0.15); --warm-ring: rgba(232, 128, 112, 0.42);
+    --plaster: #2C1F1C; --hero-1: #9E4A3F; --hero-2: #4A1E19;
+    --chart-1: #D98676; --chart-2: #F2B4A7; --chart-3: #8E8683;
+    --elev: 0 0 0 1px rgba(255, 240, 236, 0.05), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --good: #6FC28E; --good-tint: rgba(111, 194, 142, 0.16); --bad: #FF6B6B; --track: #302A29;
+    --seg: rgba(140, 120, 116, 0.22); --seg-on: #3E3735; --ink: #F4F0EF; --ink-fg: #141111; --ink-fg2: #5C5452;
+    --shadow: 0 0 0 1px rgba(255, 240, 236, 0.05);
+    --glass-shadow: 0 0 0 1px rgba(255, 240, 236, 0.08), 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0D0E11; --surface: #1A1B1F; --field: #26272C; --glass: rgba(34, 35, 40, 0.62);
-  --fg: #F2F2F5; --fg2: #A2A2AA; --sep: rgba(255, 255, 255, 0.08); --grid: rgba(255, 255, 255, 0.06);
-  --accent: #2A72DE; --accent-text: #7DB2FF; --accent-tint: rgba(70, 140, 255, 0.16);
-  --warm: #B4564A; --warm-text: #F0A193; --warm-tint: rgba(232, 128, 112, 0.15); --warm-ring: rgba(232, 128, 112, 0.42);
-    --plaster: #2A1D1A; --hero-1: #9E4A3F; --hero-2: #4A1E19; --chart-1: #4C8DF0; --chart-2: #E07F70; --chart-3: #8E8E93;
-    --elev: 0 0 0 1px rgba(255, 255, 255, 0.05), 0 8px 24px rgba(0, 0, 0, 0.35);
-  --good: #4FC27E; --good-tint: rgba(79, 194, 126, 0.16); --bad: #FF6B6B; --track: #2C2D33;
-  --seg: rgba(118, 118, 128, 0.24); --seg-on: #3A3B41; --ink: #F2F2F5; --ink-fg: #111114; --ink-fg2: #55555C;
-  --shadow: 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --glass-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  color-scheme: dark;
+    --bg: #0F0D0D; --surface: #1C1918; --field: #292423; --glass: rgba(36, 32, 31, 0.62);
+    --fg: #F4F0EF; --fg2: #A9A09E; --sep: rgba(255, 240, 236, 0.08); --grid: rgba(255, 240, 236, 0.06);
+    --accent: #B85A4C; --accent-text: #EE9E90; --accent-tint: rgba(226, 120, 104, 0.16);
+    --warm: #C4675A; --warm-text: #F2A89A; --warm-tint: rgba(232, 128, 112, 0.15); --warm-ring: rgba(232, 128, 112, 0.42);
+    --plaster: #2C1F1C; --hero-1: #9E4A3F; --hero-2: #4A1E19;
+    --chart-1: #D98676; --chart-2: #F2B4A7; --chart-3: #8E8683;
+    --elev: 0 0 0 1px rgba(255, 240, 236, 0.05), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --good: #6FC28E; --good-tint: rgba(111, 194, 142, 0.16); --bad: #FF6B6B; --track: #302A29;
+    --seg: rgba(140, 120, 116, 0.22); --seg-on: #3E3735; --ink: #F4F0EF; --ink-fg: #141111; --ink-fg2: #5C5452;
+    --shadow: 0 0 0 1px rgba(255, 240, 236, 0.05);
+    --glass-shadow: 0 0 0 1px rgba(255, 240, 236, 0.08), 0 10px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    color-scheme: dark;
 }
+/* end tokens */
 
 /* ------------------------------------------------------------------ base */
 

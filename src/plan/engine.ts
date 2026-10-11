@@ -208,7 +208,7 @@ export interface WarmupOptions {
 /**
  * Squat and upper mains: empty bar × 8, then ~50% × 5, 70% × 3, 85% × 1 of the working load.
  * Deadlift: 60% × 3, 75% × 2, 90% × 1 of the top set.
- * Dumbbells have no "empty bar" step and round down to the rack; the pull-up starts with a
+ * Barbell warm-ups round to the nearest 10 kg. Dumbbells have no "empty bar" step and round down to the rack; the pull-up starts with a
  * bodyweight set and works on the added load. Steps that round onto the bar, onto an earlier
  * step or up to the working load are dropped.
  */
@@ -228,7 +228,7 @@ export function warmupRamp(lift: MainLiftKey, workingLoadKg: number, barKg = DEF
   const round = (x: number): number | null =>
     lift === 'incline_db_press' ? dumbbellFloor(x, rack)
       : lift === 'weighted_pullup' ? floorTo(x, beltStep)
-        : roundBarbell(x);
+        : Math.round(x / 10) * 10; // barbell warm-ups in 10 kg jumps (20s and 10s), as Mario loads them
 
   const out: PrescribedSet[] = [];
   const add = (load: number, reps: number, note?: string): void => {

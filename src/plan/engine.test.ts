@@ -156,23 +156,23 @@ describe('plates', () => {
 describe('warm-ups', () => {
   const loads = (sets: PrescribedSet[]) => sets.map((s) => [s.load, s.reps]);
 
-  it('squat: bar × 8, 50% × 5, 70% × 3, 85% × 1, floored to 2.5', () => {
-    expect(loads(warmupRamp('squat', 100))).toEqual([[20, 8], [50, 5], [70, 3], [85, 1]]);
-    expect(loads(warmupRamp('squat', 107.5))).toEqual([[20, 8], [52.5, 5], [75, 3], [90, 1]]);
+  it('squat: bar × 8, 50% × 5, 70% × 3, 85% × 1, rounded to 10 kg', () => {
+    expect(loads(warmupRamp('squat', 100))).toEqual([[20, 8], [50, 5], [70, 3], [90, 1]]);
+    expect(loads(warmupRamp('squat', 107.5))).toEqual([[20, 8], [50, 5], [80, 3], [90, 1]]);
   });
 
   it('deadlift: 60% × 3, 75% × 2, 90% × 1 of the top set', () => {
-    expect(loads(warmupRamp('deadlift', 160))).toEqual([[95, 3], [120, 2], [142.5, 1]]);
-    expect(loads(warmupRamp('deadlift', 140))).toEqual([[82.5, 3], [105, 2], [125, 1]]);
+    expect(loads(warmupRamp('deadlift', 160))).toEqual([[100, 3], [120, 2], [140, 1]]);
+    expect(loads(warmupRamp('deadlift', 140))).toEqual([[80, 3], [110, 2], [130, 1]]);
   });
 
   it('test week: singles at 60/75/85% of the goal', () => {
-    expect(loads(warmupRamp('squat', 145, 20, { test: true }))).toEqual([[85, 1], [107.5, 1], [122.5, 1]]);
-    expect(loads(warmupRamp('deadlift', 205, 20, { test: true }))).toEqual([[122.5, 1], [152.5, 1], [172.5, 1]]);
+    expect(loads(warmupRamp('squat', 145, 20, { test: true }))).toEqual([[90, 1], [110, 1], [120, 1]]);
+    expect(loads(warmupRamp('deadlift', 205, 20, { test: true }))).toEqual([[120, 1], [150, 1], [170, 1]]);
   });
 
   it('drops steps that land on the bar or repeat', () => {
-    expect(loads(warmupRamp('squat', 40))).toEqual([[20, 8], [27.5, 3], [32.5, 1]]);
+    expect(loads(warmupRamp('squat', 40))).toEqual([[20, 8], [30, 3]]);
   });
 
   it('incline DB: no bar step, rounded down to the rack', () => {
@@ -236,7 +236,7 @@ describe('squat and deadlift loads per week type (TM 140 / 200)', () => {
   it('A week squat: ramp, 3 × 5, rep-out target 10', () => {
     const sq = ex(1, 'lower_a', 'squat');
     expect(shape(sq.sets)).toEqual([
-      ['warmup', 20, 8], ['warmup', 50, 5], ['warmup', 70, 3], ['warmup', 85, 1],
+      ['warmup', 20, 8], ['warmup', 50, 5], ['warmup', 70, 3], ['warmup', 90, 1],
       ['working', 100, 5], ['working', 100, 5], ['working', 100, 5], ['rep_out', 100, null],
     ]);
     expect(sq.sets.at(-1)).toMatchObject({ target: 10, pctTm: 0.725 });
@@ -251,7 +251,7 @@ describe('squat and deadlift loads per week type (TM 140 / 200)', () => {
 
   it('A week deadlift: 60/75/90% ramp then one top-set rep-out', () => {
     const dl = ex(1, 'lower_b', 'deadlift');
-    expect(shape(dl.sets)).toEqual([['warmup', 95, 3], ['warmup', 120, 2], ['warmup', 142.5, 1], ['rep_out', 160, null]]);
+    expect(shape(dl.sets)).toEqual([['warmup', 100, 3], ['warmup', 120, 2], ['warmup', 140, 1], ['rep_out', 160, null]]);
     expect([dl.restSec, dl.restBeforeRepOutSec]).toEqual([150, 240]);
   });
 
@@ -330,7 +330,7 @@ describe('week shapes', () => {
     const mon = week[0]!;
     expect(mon.exercises.map((e) => e.exerciseKey)).toEqual(['squat']);
     expect(shape(mon.exercises[0]!.sets)).toEqual([
-      ['warmup', 85, 1], ['warmup', 107.5, 1], ['warmup', 122.5, 1], ['rep_out', 145, null],
+      ['warmup', 90, 1], ['warmup', 110, 1], ['warmup', 120, 1], ['rep_out', 145, null],
     ]);
     expect(mon.exercises[0]!.sets.at(-1)?.target).toBe(5);
     const tue = week[1]!;
