@@ -13,6 +13,7 @@ import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
 import { ConditioningCard } from "./ConditioningCard";
 import { SetMaxes } from "./SetMaxes";
 import "./today.css";
+import { ThemeSwitch } from "../ui/theme";
 
 const DAY_LETTER = ["M", "T", "W", "T", "F", "S", "S"];
 const SQUAT_GOAL_E1RM = 145 * (1 + 5 / 30);
@@ -105,7 +106,10 @@ export function TodayPage() {
           <p className="k-eyebrow">{fmtLongDate(today)}</p>
           <h1 className="k-title">Today</h1>
         </div>
-        {slot && <Link to="/plan" className="k-pill k-pill-plain" style={{ height: 32 }}>Week {slot.week.weekNo} · {slot.week.label}</Link>}
+        <div className="k-head-actions">
+          <span className="only-phone"><ThemeSwitch compact /></span>
+          {slot && <Link to="/plan" className="k-pill k-pill-plain" style={{ height: 32 }}>Week {slot.week.weekNo}</Link>}
+        </div>
       </header>
 
       <div className="k-dash">

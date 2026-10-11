@@ -111,3 +111,9 @@
 .k-num { font-family: var(--num); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) { .k-ring circle, .k-bar > span { transition: none; } }
+
+/* Appearance switch */
+.theme-switch button { display: inline-flex; align-items: center; gap: 6px; }
+.theme-switch.compact button { width: 36px; height: 32px; padding: 0; justify-content: center; }
+.only-phone { display: none; }
+@media (max-width: 899px) { .only-phone { display: inline-flex; } }

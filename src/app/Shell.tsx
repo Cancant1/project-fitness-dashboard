@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useSyncState } from "../data/store";
 import { supabase } from "../data/supabase";
+import { ThemeSwitch } from "../ui/theme";
 import { FoodIcon, HistoryIcon, PlanIcon, ProgressIcon, RecordsIcon, TodayIcon, TrainIcon, WeightIcon } from "../ui/icons";
 
 const TABS = [
@@ -34,6 +35,7 @@ export function Shell({ email }: { email: string }) {
         <span className="side-group">Archive</span>
         <SideLink to="/history" Icon={HistoryIcon}>History</SideLink>
         <div className="side-foot">
+          <ThemeSwitch compact />
           <SyncBadge />
           <button className="btn btn-plain btn-sm" style={{ justifyContent: "flex-start", padding: 0 }} onClick={() => void supabase.auth.signOut()}>
             Sign out
