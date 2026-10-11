@@ -1,5 +1,5 @@
-import type { Base, Food, FoodEntry, Meal, NutritionDay, NutritionTarget, SavedMeal } from "../data/types";
-import { parseDecimal } from "./format";
+import type { Base, BodyMeasurement, Food, FoodEntry, Meal, NutritionDay, NutritionTarget, SavedMeal } from "../data/types";
+import { daysBetween, parseDecimal } from "./format";
 
 // Pure food logic: day totals, targets, ranking, and the one-time "set up your food list" proposal.
 // Food entries store totals (macros already multiplied by quantity); foods store one serving.
@@ -29,15 +29,37 @@ export function sumEntries(items: Pick<FoodEntry, "kcal" | "protein" | "carbs" |
 
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
-export interface DayTarget { kcal: number; protein: number; carbs: number | null; fat: number | null; phase: string | null }
+export interface DayTarget {
+  kcal: number; protein: number; carbs: number | null; fat: number | null; phase: string | null;
+  /** Set when protein follows bodyweight: grams per kg and the 7-day average it used. */
+  proteinPerKg: number | null; bodyweightKg: number | null;
+}
 
-/** Target in force on a date (latest effective_from ≤ date), with a per-weekday kcal/protein override if set. */
-export function targetFor(date: string, targets: NutritionTarget[]): DayTarget | null {
+/**
+ * Target in force on a date (latest effective_from ≤ date), with a per-weekday kcal/protein override if set.
+ * With protein_per_kg and a known 7-day average bodyweight, protein = g/kg × bodyweight.
+ */
+export function targetFor(date: string, targets: NutritionTarget[], bodyweightKg: number | null = null): DayTarget | null {
   const t = targets.filter((x) => x.effective_from <= date).sort((a, b) => b.effective_from.localeCompare(a.effective_from))[0];
   if (!t) return null;
   const wd = WEEKDAYS[new Date(date + "T12:00:00").getDay()]!;
   const o = t.per_weekday?.[wd];
-  return { kcal: o?.kcal ?? t.kcal, protein: o?.protein ?? t.protein, carbs: t.carbs || null, fat: t.fat || null, phase: t.phase };
+  const perKg = t.protein_per_kg ? Number(t.protein_per_kg) : null;
+  const protein = perKg && bodyweightKg ? Math.round(perKg * bodyweightKg) : o?.protein ?? t.protein;
+  return {
+    kcal: o?.kcal ?? t.kcal, protein, carbs: t.carbs || null, fat: t.fat || null, phase: t.phase,
+    proteinPerKg: perKg, bodyweightKg: perKg && bodyweightKg ? bodyweightKg : null
+  };
+}
+
+/** Average of the weigh-ins in the 7 days up to `date`; falls back to the latest weigh-in in the 30 days before. */
+export function bodyweight7d(measurements: Pick<BodyMeasurement, "date" | "kind" | "value" | "unit">[], date: string): number | null {
+  const kg = (m: { value: number; unit: string }) => (m.unit === "lb" ? m.value * 0.45359237 : Number(m.value));
+  const w = measurements.filter((m) => m.kind === "weight" && m.date <= date);
+  const recent = w.filter((m) => daysBetween(m.date, date) < 7);
+  if (recent.length) return Math.round((recent.reduce((s, m) => s + kg(m), 0) / recent.length) * 10) / 10;
+  const last = w.filter((m) => daysBetween(m.date, date) <= 30).sort((a, b) => b.date.localeCompare(a.date))[0];
+  return last ? Math.round(kg(last) * 10) / 10 : null;
 }
 
 // ------------------------------------------------------------------ small helpers
@@ -211,7 +233,8 @@ export function hasPlanTarget(targets: NutritionTarget[]): boolean {
 }
 
 export function planTargetRow(): Omit<NutritionTarget, keyof Base> {
-  return { effective_from: PLAN_TARGET_FROM, phase: "lean bulk", kcal: 2800, protein: 180, carbs: 310, fat: 80, per_weekday: null, target_weight: 77, note: "Strength Return Plan" };
+  return { effective_from: PLAN_TARGET_FROM, phase: "lean bulk", kcal: 2800, protein: 150, protein_per_kg: 2.0, carbs: 310, fat: 80, per_weekday: null, target_weight: 77,
+    note: "Strength Return Plan. Protein 2.0 g/kg bodyweight (Morton 2018: benefit levels off ≈1.6, upper bound 2.2 g/kg)." };
 }
 
 /** The plan's usual day (everything but dinner) as one saved meal; uses your foods where they exist. */

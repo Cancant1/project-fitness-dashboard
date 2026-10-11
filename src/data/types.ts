@@ -176,6 +176,8 @@ export interface NutritionTarget extends Base {
   carbs: number | null;
   fat: number | null;
   per_weekday: Record<string, { kcal: number; protein: number }> | null;
+  /** When set, the protein target is this × the 7-day average bodyweight; `protein` is the fallback. */
+  protein_per_kg?: number | null;
   target_weight: number | null;
   note: string | null;
 }

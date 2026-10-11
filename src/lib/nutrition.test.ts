@@ -1,7 +1,7 @@
 import type { Food, FoodEntry, NutritionDay, NutritionTarget } from "../data/types";
 import {
   dayTotals, entryFromFood, foodSetupDone, isDinnerEntry, libraryList, mealForHour, normName, parseFoodForm, pickCanonical,
-  planDaySavedMeal, proposeFoodSetup, rankFoodsForAdd, rescaleEntry, servingText, setupCounts, setupWrites, stepQuantity, targetFor
+  bodyweight7d, planDaySavedMeal, proposeFoodSetup, rankFoodsForAdd, rescaleEntry, servingText, setupCounts, setupWrites, stepQuantity, targetFor
 } from "./nutrition";
 
 const base = { user_id: "u", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", deleted_at: null };
@@ -227,5 +227,27 @@ describe("food setup proposal", () => {
     expect(kcal).toBeGreaterThan(1650);
     expect(kcal).toBeLessThan(1750);
     expect(protein).toBeGreaterThan(140);
+  });
+});
+
+describe("protein that follows bodyweight", () => {
+  const base = { id: "t", user_id: "u", created_at: "", updated_at: "", effective_from: "2026-10-12", phase: "lean bulk", kcal: 2800, protein: 150, carbs: 310, fat: 80, per_weekday: null, target_weight: 77, note: null };
+
+  it("uses g/kg × 7-day average when set", () => {
+    const t = targetFor("2026-10-20", [{ ...base, protein_per_kg: 2.0 }], 74.2)!;
+    expect(t.protein).toBe(148);
+    expect(t.proteinPerKg).toBe(2);
+    expect(t.bodyweightKg).toBe(74.2);
+  });
+
+  it("falls back to the fixed grams without a weigh-in", () => {
+    expect(targetFor("2026-10-20", [{ ...base, protein_per_kg: 2.0 }], null)!.protein).toBe(150);
+  });
+
+  it("averages the last 7 days of weigh-ins", () => {
+    const m = (date: string, value: number) => ({ date, kind: "weight" as const, value, unit: "kg" as const });
+    expect(bodyweight7d([m("2026-10-09", 70), m("2026-10-14", 74), m("2026-10-15", 74.4)], "2026-10-16")).toBe(74.2);
+    expect(bodyweight7d([m("2026-09-30", 73.8)], "2026-10-16")).toBe(73.8);
+    expect(bodyweight7d([m("2026-08-01", 73.8)], "2026-10-16")).toBeNull();
   });
 });

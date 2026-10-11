@@ -91,8 +91,7 @@ const SHOULDER_BLOCK: ProgramSlot[] = [
 ];
 
 const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
-  ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.'],
-  { restSec: 75 });
+  ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.']);
 const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 35, 'lb', 'per_leg',
   ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.']);
 const CALF_RAISE: ProgramSlot = isolation('cable_calf_raise', failure(2, 10, 15), 120, 'kg', 'total',
@@ -113,7 +112,7 @@ const DAYS: ProgramDay[] = [
         ['Bench inclined ~30°, face down, dumbbell between your feet. Unstable: use the seated cable curl.']),
       LEG_EXTENSION(2),
       CALF_RAISE,
-      isolation('kneeling_cable_crunch', failure(2, 10, 15), 40, 'kg', 'total', ['Curl ribs to pelvis; hips stay still.'], { restSec: 75 }),
+      isolation('kneeling_cable_crunch', failure(2, 10, 15), 40, 'kg', 'total', ['Curl ribs to pelvis; hips stay still.']),
       LATERAL(2),
       isolation('cross_body_triceps_extension', failure(2, 10, 15), 40, 'lb', 'per_arm',
         ['Soft lockout.', 'Front of shoulder/collarbone hurts: switch to rope pushdowns.']),
@@ -159,7 +158,7 @@ const DAYS: ProgramDay[] = [
       LEG_EXTENSION(1),
       CALF_RAISE,
       isolation('hanging_knee_raise', failure(2, 10, 15), 0, 'bodyweight', 'total',
-        ['Curl the pelvis up. Dip handles if grip or elbow bothers you.'], { restSec: 75 }),
+        ['Curl the pelvis up. Dip handles if grip or elbow bothers you.']),
       LATERAL(2),
       isolation('preacher_curl', failure(2, 8, 12), 45, 'lb', 'total', ['No bouncing out of the bottom.']),
       isolation('wrist_extension', scheme(2, 15, 15), 4, 'kg', 'per_hand',

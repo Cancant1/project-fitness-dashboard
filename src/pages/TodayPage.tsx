@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, parseDecimal, todayIso } from "../lib/format";
-import { dayTotals, targetFor } from "../lib/nutrition";
+import { bodyweight7d, dayTotals, targetFor } from "../lib/nutrition";
 import { dayForDate, getWeek, prescribeDay } from "../plan/engine";
 import { PLAN, PLAN_KEY, activeProgram, ensurePlanExercises, equipmentFrom, planState, usePlanIds } from "../plan/bridge";
 import { startWorkout } from "../plan/workout";
@@ -56,7 +56,7 @@ export function TodayPage() {
 
   const weightToday = weights.find((w) => w.kind === "weight" && w.date === today);
   const totals = dayTotals(today, entries, days);
-  const target = targetFor(today, targets);
+  const target = targetFor(today, targets, bodyweight7d(weights, today));
 
   async function startPlan() {
     setBusy(true);

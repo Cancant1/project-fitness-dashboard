@@ -4,7 +4,7 @@ import { useRows, useStore } from "../data/store";
 import type { FoodEntry, Meal, SavedMeal } from "../data/types";
 import { addDays, fmtLongDate, fmtNum, todayIso } from "../lib/format";
 import {
-  PLAN_DAY_NAME, dayTotals, foodSetupDone, hasPlanTarget, mealForHour, planDaySavedMeal, planTargetRow, servingText, sumEntries, targetFor,
+  PLAN_DAY_NAME, bodyweight7d, dayTotals, foodSetupDone, hasPlanTarget, mealForHour, planDaySavedMeal, planTargetRow, servingText, sumEntries, targetFor,
   type EntryDraft
 } from "../lib/nutrition";
 import { ChevronLeft, ChevronRight, PlusIcon } from "../ui/icons";
@@ -23,6 +23,7 @@ export function FoodPage() {
   const targets = useRows("nutrition_targets");
   const foods = useRows("foods");
   const saved = useRows("saved_meals");
+  const weights = useRows("body_measurements");
   const today = todayIso();
   const [date, setDate] = useState(today);
   const [adding, setAdding] = useState<Meal | null>(null);
@@ -43,7 +44,7 @@ export function FoodPage() {
   );
   const yesterday = useMemo(() => entries.filter((e) => e.date === addDays(date, -1)), [entries, date]);
   const totals = dayTotals(date, entries, days);
-  const target = targetFor(date, targets);
+  const target = targetFor(date, targets, bodyweight7d(weights, date));
   const setupDone = foodSetupDone(foods);
   const planTarget = hasPlanTarget(targets);
   const planDay = saved.some((s) => s.name === PLAN_DAY_NAME);
@@ -118,6 +119,7 @@ export function FoodPage() {
             Carbs {fmtNum(totals.carbs ?? 0, 0)}{target?.carbs ? ` / ${fmtNum(target.carbs, 0)}` : ""} g
             {" · "}Fat {fmtNum(totals.fat ?? 0, 0)}{target?.fat ? ` / ${fmtNum(target.fat, 0)}` : ""} g
             {target?.phase ? ` · ${target.phase}` : ""}
+            {target?.proteinPerKg && target.bodyweightKg ? ` · protein ${fmtNum(target.proteinPerKg, 1)} g/kg × ${fmtNum(target.bodyweightKg, 1)} kg` : ""}
             {totals.source === "day" && " · day total from your old log"}
           </p>
         </section>
@@ -155,7 +157,7 @@ export function FoodPage() {
             <section className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               <h2 style={{ fontSize: 17, fontWeight: 600 }}>Plan targets</h2>
               <ul className="muted" style={{ fontSize: 15, margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
-                {!planTarget && <li>From Mon 12 Oct 2026: 2,800 kcal and about 180 g protein a day (lean bulk).</li>}
+                {!planTarget && <li>From Mon 12 Oct 2026: 2,800 kcal a day (lean bulk) and 2.0 g protein per kg of your 7-day average weight (about 148 g at 74 kg).</li>}
                 {!planDay && <li>The plan's usual day (everything but dinner) as a saved meal, about 1,700 kcal.</li>}
               </ul>
               <button className="btn btn-tinted food-chip" style={{ alignSelf: "flex-start" }} onClick={() => void addPlanSetup()}>
