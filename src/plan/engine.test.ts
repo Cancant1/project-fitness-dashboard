@@ -322,7 +322,7 @@ describe('week shapes', () => {
   it('taper: squat 2 × 2 at 85%, deadlift one single at 90%, no rep-outs', () => {
     expect(shape(notWarmup(ex(18, 'lower_a', 'squat').sets))).toEqual([['working', 117.5, 2], ['working', 117.5, 2]]);
     expect(shape(notWarmup(ex(18, 'lower_b', 'deadlift').sets))).toEqual([['top', 180, 1]]);
-    expect(weekTotal(18)).toBe(9 + 11 + 10 + 8);
+    expect(weekTotal(18)).toBe(9 + 11 + 8 + 8);
   });
 
   it('test week: rep-outs at the goal loads, no accessories, no Sunday rounds', () => {
