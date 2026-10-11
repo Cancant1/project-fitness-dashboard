@@ -101,9 +101,16 @@ export interface PainCheck extends Base {
   site: string;
   exercise_id: string | null;
   session_id: string | null;
+  /** Kept for old rows; new writes set it from the score (sharp flag → sharp, score ≥ 1 → ache, else none). */
   during_set: "none" | "ache" | "sharp" | null;
+  /** Kept for old rows; the morning answer also writes it (sore = morning score ≥ baseline + 2). */
   next_morning: "normal" | "sore" | null;
   worse_than_last: boolean | null;
+  /** Worst pain at the site during the exercise, 0–10 (E14). Null on old rows. */
+  pain_score?: number | null;
+  /** Next-morning pain at the site, 0–10 (E14). Null on old rows. */
+  morning_score?: number | null;
+  /** Site elbow_monthly: the monthly elbow check as JSON ({ worst, grip, daily, total }). */
   note: string | null;
 }
 
@@ -112,9 +119,12 @@ export interface Conditioning extends Base {
   kind: "ride" | "boxing" | "rounds" | "walk" | "other";
   minutes: number | null;
   loop_time_s: number | null;
+  /** Sunday rounds done; on a boxing row (E22): the round he faded in. */
   rounds: number | null;
   first_round_count: number | null;
   last_round_count: number | null;
+  /** Boxing (E22): how gassed, 1 (fresh) – 5 (fully gassed). Null on old rows. */
+  rating?: number | null;
   done: boolean;
   note: string | null;
 }

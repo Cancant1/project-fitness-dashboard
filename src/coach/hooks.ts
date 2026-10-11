@@ -23,11 +23,12 @@ export function useCoachData(): CoachData {
   const conditioning = useRows("conditioning");
   const health_daily = useRows("health_daily");
   const profiles = useRows("profiles");
+  const today = todayIso();
   return useMemo(() => coachData({
     programs, sessions, sets, exercises, training_maxes, body_measurements, food_entries, nutrition_days,
     nutrition_targets, pain_checks, conditioning, health_daily, profiles
-  }), [programs, sessions, sets, exercises, training_maxes, body_measurements, food_entries, nutrition_days,
-    nutrition_targets, pain_checks, conditioning, health_daily, profiles]);
+  }, { today }), [programs, sessions, sets, exercises, training_maxes, body_measurements, food_entries, nutrition_days,
+    nutrition_targets, pain_checks, conditioning, health_daily, profiles, today]);
 }
 
 /** The report for `weekNo` (default: the current plan week); null outside the plan. */

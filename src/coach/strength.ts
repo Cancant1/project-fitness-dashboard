@@ -2,7 +2,7 @@
 // provisional TMs and the step lifts (incline DB, weighted pull-up).
 
 import type { SetRow, TrainingMax } from "../data/types";
-import { addDays, fmtShortDate } from "../lib/format";
+import { addDays, fmtNum, fmtShortDate } from "../lib/format";
 import {
   PROVISIONAL_REPS, checkpointStatus, dumbbellStep, incrementAfterRepOut, isoWeekday, tmChangePercent, trainingMaxAfterRepOut,
   trainingMaxFromSet, weekForDate
@@ -11,7 +11,7 @@ import type { MainLiftKey, ProgramDefinition, StepLiftKey, TmLiftKey } from "../
 import { planRef } from "../plan/workout";
 import {
   LIFT_NAME, TRAINING_WEEK, bw7, fmtBw, fmtLoad, near25, nextMonday, plural, sessionsIn, sig, tmAt, tmRowAt, tmRows, weekBounds,
-  workSets, type AreaResult, type WeekCtx
+  shortSleepBefore, workSets, type AreaResult, type WeekCtx
 } from "./common";
 import type { CoachData } from "./data";
 import { laggingMuscles } from "./muscle";
@@ -64,9 +64,15 @@ function tmChange(data: CoachData, lift: TmLiftKey, r: RepOutResult): { from: nu
   if (i >= 0) return { from: i > 0 ? Number(rows[i - 1]!.value_kg) : null, to: Number(rows[i]!.value_kg), row: rows[i]! };
   const prev = rows.filter((m) => m.effective_date < r.date).at(-1);
   const from = prev ? Number(prev.value_kg) : null;
-  const calibration = r.weekNo === 0 || from == null;
-  return { from, to: trainingMaxAfterRepOut(r.load, r.reps, { previous: from, target: r.target, calibration }).tm, row: null };
+  const calibration = r.weekNo === 0 || from == null || planRef(r.set)?.calibration === true;
+  return { from, to: trainingMaxAfterRepOut(r.load, r.reps, { previous: from, target: r.target, calibration, oldBest: data.plan.oldBestE1rm?.[lift] }).tm, row: null };
 }
+
+/** R1-03: the TM was at or past the old best, so a hit held it and a beat added at most 2.5 kg. */
+const isCapped = (data: CoachData, lift: TmLiftKey, from: number | null, diff: number) => {
+  const best = data.plan.oldBestE1rm?.[lift];
+  return best != null && from != null && from >= best - 1e-9 && diff >= 0;
+};
 
 const stepFmt = (lift: StepLiftKey, x: number) => (lift === "weighted_pullup" ? `+${fmtLoad(x)} kg` : `${fmtLoad(x)} kg`);
 
@@ -114,7 +120,7 @@ export function strengthRules(ctx: WeekCtx): AreaResult {
       const r: RepOutResult = { set: ro, date: ctx.sessions.find((s) => s.id === ro.session_id)?.date ?? ctx.asOf, weekNo, load: Number(ro.load), reps: ro.reps!, target: planRef(ro)?.target ?? null };
       const change = tmChange(data, lift, r);
       numbers.repOuts.push({ lift, date: r.date, load: r.load, reps: r.reps, target: r.target, tmFrom: change.from, tmTo: change.to, nextLoad: null });
-      if (week.type === "calibration" || r.target == null) {
+      if (week.type === "calibration" || r.target == null || planRef(ro)?.calibration === true) {
         if (r.reps > PROVISIONAL_REPS) {
           out.push(sig(`strength.calibration.${lift}`, "strength", "info", `${name} TM provisional`,
             `${name} ${fmtLoad(r.load)} × ${r.reps}: past 12 reps the formula is rough, so the TM is provisional (${fmtLoad(change.to)}). The next rep-outs correct it.`,
@@ -126,12 +132,22 @@ export function strengthRules(ctx: WeekCtx): AreaResult {
       } else {
         const diff = r.reps - r.target;
         const pct = tmChangePercent(diff);
-        const base = `${name} ${fmtLoad(r.load)} × ${r.reps} (target ${r.target}): TM ${pct > 0 ? "+" : "−"}${Math.abs(pct)}% to ${fmtLoad(change.to)}.`;
+        const head = `${name} ${fmtLoad(r.load)} × ${r.reps} (target ${r.target})`;
+        const capped = isCapped(data, lift, change.from, diff);
+        const base = capped
+          ? `${head}: TM ${change.to === change.from ? `stays ${fmtLoad(change.to)}` : `+${fmtLoad(change.to - change.from!)} kg to ${fmtLoad(change.to)}`} (capped past your old best).`
+          : `${head}: TM ${pct > 0 ? "+" : "−"}${Math.abs(pct)}% to ${fmtLoad(change.to)}.`;
         const metric = { label: `${name} rep-out`, value: String(r.reps), target: String(r.target) };
         const why: Signal["why"] = ["P-PROG-TM", "M-E1RM"];
+        // E18: a miss after a short night is read in context and doesn't count toward the early-deload rule.
+        const short = diff < 0 ? shortSleepBefore(data, r.date) : null;
+        const night = short != null
+          ? ` ${name} missed after a short night (${fmtNum(short, 1)} h); one-off misses after short nights don't count toward the early-deload rule.` : "";
         if (diff >= 0) out.push(sig(`strength.repout.${lift}`, "strength", "good", `${name} rep-out hit`, base, why, { metric }));
-        else if (diff === -1) out.push(sig(`strength.repout.${lift}`, "strength", "watch", `${name} rep-out one short`, base, why, { metric }));
-        else out.push(sig(`strength.repout.${lift}`, "strength", "act", `${name} rep-out missed`, `${base} Note anything off: sleep, food, pain.`, why, { metric }));
+        else if (diff === -1 || short != null) {
+          out.push(sig(`strength.repout.${lift}`, "strength", "watch", diff === -1 ? `${name} rep-out one short` : `${name} missed after short night`,
+            `${base}${night}`, short != null ? [...why, "C-SLEEP"] : why, { metric }));
+        } else out.push(sig(`strength.repout.${lift}`, "strength", "act", `${name} rep-out missed`, `${base} Note anything off: sleep, food, pain.`, why, { metric }));
       }
     }
   }
@@ -213,33 +229,45 @@ export function stepsTo(lift: StepLiftKey, load: number, goal: number, rack: rea
 
 // ---------- strength.misses ----------
 
+/**
+ * R1-06 early-deload trigger for a TM lift: its last 2 consecutive rep-outs both ≥ 2 under target, or its last 3
+ * consecutive rep-outs all ≥ 1 under (consecutive = only light weeks in between). A miss after a short night
+ * (< 6 h, E18) doesn't count: it breaks the run. Returns 2, 3 or null, for the run that fired.
+ */
+export function earlyDeloadRun(data: CoachData, lift: TmLiftKey, asOf: string, from: string): 2 | 3 | null {
+  const h = repOutHistory(data, lift, asOf).filter((r) => r.target != null && r.weekNo != null && planRef(r.set)?.calibration !== true);
+  const latest = h.at(-1);
+  if (!latest || latest.date < from) return null;
+  const deficit = (r: RepOutResult) => (shortSleepBefore(data, r.date) != null ? 0 : r.target! - r.reps);
+  const consecutive = (xs: RepOutResult[]) => xs.every((x, i) => i === 0
+    || !data.plan.weeks.some((w) => w.weekNo > xs[i - 1]!.weekNo! && w.weekNo < x.weekNo! && TRAINING_WEEK.has(w.type)));
+  const two = h.slice(-2);
+  if (two.length === 2 && consecutive(two) && two.every((r) => deficit(r) >= 2)) return 2;
+  const three = h.slice(-3);
+  if (three.length === 3 && consecutive(three) && three.every((r) => deficit(r) >= 1)) return 3;
+  return null;
+}
+
 function missesSignal(ctx: WeekCtx): Signal | null {
   const { data, weekNo } = ctx;
   const plan = data.plan;
-  const missed = TM_LIFTS.filter((lift) => {
-    const h = repOutHistory(data, lift, ctx.asOf).filter((r) => r.target != null && r.weekNo != null);
-    const [a, b] = h.slice(-2);
-    if (!a || !b || b.date < ctx.from) return false;
-    // Consecutive rep-out weeks: nothing but light weeks (deload, taper) in between.
-    const between = plan.weeks.filter((w) => w.weekNo > a.weekNo! && w.weekNo < b.weekNo!);
-    if (between.some((w) => TRAINING_WEEK.has(w.type))) return false;
-    return a.reps < a.target! && b.reps < b.target!;
-  });
-  if (!missed.length) return null;
+  const runs = TM_LIFTS.map((lift) => earlyDeloadRun(data, lift, ctx.asOf, ctx.from)).filter((x): x is 2 | 3 => x != null);
+  if (!runs.length) return null;
   const why: Signal["why"] = ["P-DELOAD", "N-SURPLUS", "C-SLEEP"];
+  const running = runs.includes(2) ? "Rep-outs missed by 2+ reps two weeks running" : "Rep-outs under target three weeks running";
 
   const before = bw7(data, addDays(ctx.asOf, -14));
   const now = bw7(data, ctx.asOf);
   if (before != null && now != null && now < before) {
     return sig("strength.misses", "strength", "act", "Eat more: +100 kcal",
-      "Rep-outs missed two weeks running and bodyweight is dropping. Eat first: +100 kcal.", why,
+      `${running} and bodyweight is dropping. Eat first: +100 kcal.`, why,
       { action: { kind: "kcal", delta: 100, from: nextMonday(ctx.asOf) } });
   }
   const nights = data.health.filter((h) => h.date > addDays(ctx.asOf, -7) && h.date <= ctx.asOf && (h.sleep_total_min ?? 0) > 0);
   const sleepH = nights.length >= 4 ? nights.reduce((s, h) => s + h.sleep_total_min!, 0) / nights.length / 60 : null;
   if (sleepH != null && sleepH < 6) {
     return sig("strength.misses", "strength", "watch", "Rep-outs missed, sleep short",
-      `Rep-outs missed two weeks running. Sleep ${fmtBw(sleepH)} h: fix sleep first.`, why);
+      `${running}. Sleep ${fmtBw(sleepH)} h: fix sleep first.`, why);
   }
   // "Take the deload now": this week if most of it is still ahead (before Thursday), else next week.
   const applied = data.adjustments.find((a) => a.data.kind === "deload_now" && (a.data.weekNo === weekNo || a.data.weekNo === weekNo + 1));
@@ -250,10 +278,10 @@ function missesSignal(ctx: WeekCtx): Signal | null {
   if (!applied && !TRAINING_WEEK.has(tw.type)) {
     if (tw.type !== "deload" && tw.type !== "taper") return null;
     return sig("strength.misses", "strength", "info", `${tw.type === "taper" ? "Taper" : "Deload"} comes next`,
-      `Rep-outs missed two weeks running. The ${tw.type === "taper" ? "taper" : "deload"} is next week anyway.`, why);
+      `${running}. The ${tw.type === "taper" ? "taper" : "deload"} is next week anyway.`, why);
   }
   return sig("strength.misses", "strength", "act", "Take the deload now",
-    "Rep-outs missed two weeks running. Take the deload now; the plan allows it early.", why,
+    `${running}. Take the deload now; the plan allows it early.`, why,
     { action: { kind: "deload_now", weekNo: target } });
 }
 
@@ -278,10 +306,25 @@ function checkpointSignals(ctx: WeekCtx): Signal[] {
 
   if (st.met) {
     const fromWeek = plan.weeks.find((w) => w.weekNo > weekNo && w.extraSetsEligible)?.weekNo ?? weekNo + 2;
-    const muscles = index === 1 ? laggingMuscles(data, 1, weekNo) : [];
-    return [sig("strength.checkpoint", "strength", "good", `${cp.name} met`,
-      `${cp.name} met: squat ${s}/${fmtLoad(cp.squatTm)}, deadlift ${d}/${fmtLoad(cp.deadliftTm)}, bodyweight ${b}/${fmtBw(cp.bodyweight7d)}.`,
-      [...why, "P-EXTRASETS"], { metric, ...(muscles.length ? { action: { kind: "extra_sets", muscles, fromWeek } } : {}) })];
+    const head = `${cp.name} met: squat ${s}/${fmtLoad(cp.squatTm)}, deadlift ${d}/${fmtLoad(cp.deadliftTm)}, bodyweight ${b}/${fmtBw(cp.bodyweight7d)}.`;
+    const pkg = plan.extraSets;
+    if (index !== 1) return [sig("strength.checkpoint", "strength", "good", `${cp.name} met`, head, why, { metric })];
+    if (!pkg) {
+      // A programme without the fixed package: the two most lagging muscles (the original rule).
+      const muscles = laggingMuscles(data, 1, weekNo);
+      return [sig("strength.checkpoint", "strength", "good", `${cp.name} met`, head, [...why, "P-EXTRASETS"],
+        { metric, ...(muscles.length ? { action: { kind: "extra_sets", muscles, fromWeek } } : {}) })];
+    }
+    // R1-08: fixed arm package (+2 biceps, +2 triceps a week) and the optional rear delt set as a second action.
+    return [
+      sig("strength.checkpoint", "strength", "good", `${cp.name} met`,
+        `${head} Extra arm work from week ${fromWeek}: +1 set on each curl and triceps exercise on Tue and Sat (+2 biceps and +2 triceps sets a week), inside the pairs. Arms gain most from extra sets, and the pairs keep it to ~2.5 min a session.`,
+        [...why, "P-EXTRASETS", "P-TIMESAVE"],
+        { metric, action: { kind: "extra_sets", muscles: [...pkg.arms.muscles], fromWeek, targets: pkg.arms.targets.map((t) => ({ ...t })) } }),
+      sig("strength.checkpoint.rear_delt", "strength", "info", "Optional rear delt set",
+        "Optional: +1 rear delt fly set on Tuesday, right after the flye.", ["P-EXTRASETS", "P-TIMESAVE"],
+        { action: { kind: "extra_sets", muscles: [...pkg.rearDelt.muscles], fromWeek, targets: pkg.rearDelt.targets.map((t) => ({ ...t })) } })
+    ];
   }
   if (values.bodyweight7d == null) {
     return [sig("strength.checkpoint", "strength", "act", `${cp.name}: no bodyweight`,
@@ -303,9 +346,17 @@ function checkpointSignals(ctx: WeekCtx): Signal[] {
       `${cp.name} missed on ${lifts}. ${done} of ${planned} sessions since week ${prevCp + 1}: get the sessions in first.`,
       [...why, "P-ADHERENCE"], { metric })];
   }
+  // R1-07: squat → a light Friday squat; deadlift → back-off sets; incline and pull-up → one more normal set.
+  const fb = plan.mainLiftFallbacks;
+  const parts = [
+    ...(st.behind.includes("squat") ? [fb ? `squat: a light Friday squat, ${fb.squat.sets} × ${fb.squat.reps} at ${Math.round(fb.squat.pctTm * 100)}% TM before the split squats` : "squat: one more normal set"] : []),
+    ...(st.behind.includes("deadlift") ? [fb ? `deadlift: 1–${fb.deadlift.sets} back-off sets of ${fb.deadlift.repRange[0]}–${fb.deadlift.repRange[1]} at ${Math.round(fb.deadlift.pctOfTop * 100)}% of the top set` : "deadlift: a back-off set"] : []),
+    "incline and pull-up: one more normal set"
+  ];
+  const text = parts.join("; ");
   return [sig("strength.checkpoint", "strength", "act", `${cp.name} missed: add a set`,
-    `${cp.name} missed on ${lifts}. Add one normal set to each main lift.`, [...why, "P-VOLUME"],
-    { metric, action: { kind: "main_lift_set", lifts: ["squat", "deadlift", "incline_db_press", "weighted_pullup"], fromWeek: weekNo + 1 } })];
+    `${cp.name} missed on ${lifts}. Add work: ${text}.`, [...why, "P-VOLUME", "P-DEADLIFT"],
+    { metric, action: { kind: "main_lift_set", lifts: [...st.behind, "incline_db_press", "weighted_pullup"], fromWeek: weekNo + 1 } })];
 }
 
 // ---------- strength.checkpoint_ahead ----------

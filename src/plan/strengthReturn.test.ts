@@ -67,9 +67,9 @@ describe('days', () => {
     const order = (key: string) => P.days.find((d) => d.key === key)!.slots.map((s) => s.exerciseKey);
     const shoulder = ['cable_external_rotation', 'prone_y_raise', 'cable_serratus_punch', 'face_pull'];
     expect(order('lower_a')).toEqual(['squat', 'romanian_deadlift', 'lying_db_hamstring_curl', 'cable_leg_extension',
-      'cable_calf_raise', 'kneeling_cable_crunch', 'cable_lateral_raise', 'cross_body_triceps_extension']);
+      'cable_calf_raise', 'kneeling_cable_crunch', 'cable_lateral_raise', 'cross_body_triceps_extension', 'wrist_extension']);
     expect(order('upper_a')).toEqual([...shoulder, 'incline_db_press', 'weighted_pullup', 'seated_cable_row',
-      'chest_cable_flye', 'cable_lateral_raise', 'bayesian_curl', 'overhead_cable_triceps_extension']);
+      'chest_cable_flye', 'cable_lateral_raise', 'bayesian_curl', 'overhead_cable_triceps_extension', 'cable_rear_delt_fly']);
     expect(order('lower_b')).toEqual(['deadlift', 'bulgarian_split_squat', 'seated_cable_leg_curl', 'cable_leg_extension',
       'cable_calf_raise', 'hanging_knee_raise', 'cable_lateral_raise', 'preacher_curl', 'wrist_extension']);
     expect(order('upper_b')).toEqual([...shoulder, 'barbell_row', 'db_bench_press', 'lat_pulldown', 'chest_cable_flye',
@@ -118,7 +118,7 @@ describe('days', () => {
     expect(new Set(repOutLast)).toEqual(new Set(['romanian_deadlift', 'seated_cable_row', 'bulgarian_split_squat',
       'barbell_row', 'db_bench_press']));
     const notFailure = P.days.flatMap((d) => d.slots).filter((s) => s.role === 'isolation' && !s.scheme?.toFailure);
-    expect(notFailure.map((s) => s.exerciseKey)).toEqual(['wrist_extension']);
+    expect(notFailure.map((s) => s.exerciseKey)).toEqual(['wrist_extension', 'wrist_extension']);
     P.days.flatMap((d) => d.slots).filter((s) => s.role === 'shoulder')
       .forEach((s) => expect(s.scheme).toMatchObject({ sets: 2, toFailure: false }));
   });

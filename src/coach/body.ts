@@ -2,7 +2,9 @@
 // standard error; science check A3) and the waist.
 
 import { addDays, daysBetween, fmtNum, fmtShortDate } from "../lib/format";
-import { slopeWithSe, type SlopeFit, type Weigh } from "../lib/energy";
+import { slopeWithSe, slopeWithoutOutliers, type Weigh } from "../lib/energy";
+import { PLAN } from "../plan/bridge";
+import { isoWeekday, weekForDate } from "../plan/engine";
 import type { ProgramDefinition, ProgramWeek } from "../plan/types";
 import { bw7, fmtBw, nextMonday, sig, tmAt, weekBounds, type AreaResult, type WeekCtx } from "./common";
 import type { CoachData } from "./data";
@@ -17,54 +19,91 @@ export const BODYWEIGHT_PATH: readonly { date: string; lo: number; hi: number }[
   { date: "2027-02-28", lo: 76.2, hi: 78.4 }
 ];
 
-export function expectedBand(date: string): [number, number] | null {
+/**
+ * E16: creatine water on the scale — 0 at the plan start (week 0), rising linearly to `creatineBandKg` (+0.7 kg)
+ * at the start of week 4, then constant.
+ */
+export function creatineOffset(date: string, plan: ProgramDefinition = PLAN): number {
+  const kg = plan.creatineBandKg ?? 0;
+  if (!kg || !plan.creatineStart) return 0;
+  const f = daysBetween(plan.startDate, date) / 28;
+  return kg * Math.max(0, Math.min(1, f));
+}
+
+/** The expected 7-day average on a date: the plan's path, interpolated, shifted up by the creatine water (E16). */
+export function expectedBand(date: string, plan: ProgramDefinition = PLAN): [number, number] | null {
   const p = BODYWEIGHT_PATH;
   if (date < p[0]!.date) return null;
+  const c = creatineOffset(date, plan);
   for (let i = 1; i < p.length; i++) {
     const a = p[i - 1]!;
     const b = p[i]!;
     if (date <= b.date) {
       const f = daysBetween(a.date, date) / daysBetween(a.date, b.date);
-      return [a.lo + (b.lo - a.lo) * f, a.hi + (b.hi - a.hi) * f];
+      return [a.lo + (b.lo - a.lo) * f + c, a.hi + (b.hi - a.hi) * f + c];
     }
   }
   const last = p[p.length - 1]!;
-  return [last.lo, last.hi];
+  return [last.lo + c, last.hi + c];
 }
 
-/** Rate checks run on weeks 3, 5, 7 … 17 (every 2 weeks from week 3, before the taper). */
+/** Rate checks run every 2 weeks from `fromWeek` (week 5 with creatine: 5, 7 … 17), before the taper. */
 export function isRateWeek(plan: ProgramDefinition, week: ProgramWeek): boolean {
   const from = plan.bodyweightRate.fromWeek;
   return week.weekNo >= from && (week.weekNo - from) % 2 === 0 && week.type !== "taper" && week.type !== "test";
 }
 
 export interface RateFit {
-  /** kg/week and its standard error. */
+  /** kg/week and its standard error (autocorrelation-corrected). */
   rate: number;
   se: number | null;
+  /** Plain least-squares SE (kg/week) and the residual lag-1 autocorrelation used in the correction. */
+  seRaw: number | null;
+  r: number;
   n: number;
   spanDays: number;
   points: Weigh[];
+  /** Readings dropped as more than 1.5 kg off the first-pass fit. */
+  dropped: number;
 }
 
-const MIN_WEIGHINS = 10;
+/** Not enough data to fit; `skipped` names an exclusion window (the holiday) that took the data away. */
+export interface NoRateFit { n: number; spanDays: number; points: Weigh[]; skipped?: string }
+
 const MIN_SPAN_DAYS = 21;
 
 /**
- * Least-squares slope of the weigh-ins in the 28 days up to `asOf`, in kg/week with its SE.
- * Week-0 weigh-ins are left out (glycogen and water; Part 1's own rule never uses week 0 either: at week 3
- * it compares week 3 with week 1). Null below 10 weigh-ins or a span under 21 days (first to last, inclusive).
+ * N-RATE (R1-21, E16): least-squares slope of the weigh-ins in the 28 days up to `asOf`, in kg/week, with an
+ * autocorrelation-corrected SE.
+ * - The window starts no earlier than week `fitFromWeek` (week 3: glycogen, water and the creatine load);
+ * - readings in an exclusion window (England, 20 Dec – 3 Jan) are left out;
+ * - readings more than 1.5 kg off a first-pass fit are dropped;
+ * - needs ≥ 20 weigh-ins spanning ≥ 21 days (first to last, inclusive). When an exclusion window overlaps and the
+ *   rest is too little, the result says skipped (holiday).
  */
-export function rateFit(data: CoachData, asOf: string): RateFit | { n: number; spanDays: number; points: Weigh[] } {
-  const week1 = data.plan.weeks.find((w) => w.weekNo === 1)?.startDate ?? data.start;
-  const windowStart = [addDays(asOf, -27), week1].sort().at(-1)!;
-  const points: Weigh[] = data.measurements
-    .filter((m) => m.kind === "weight" && m.date >= windowStart && m.date <= asOf)
-    .map((m) => ({ date: m.date, kg: m.unit === "lb" ? Number(m.value) * 0.45359237 : Number(m.value) }));
+export function rateFit(data: CoachData, asOf: string): RateFit | NoRateFit {
+  const rule = data.plan.bodyweightRate;
+  const minN = rule.minWeighIns ?? 10;
+  const fitFrom = data.plan.weeks.find((w) => w.weekNo === (rule.fitFromWeek ?? 1))?.startDate ?? data.start;
+  const windowStart = [addDays(asOf, -27), fitFrom].sort().at(-1)!;
+  const exclusions = data.plan.rateExclusions ?? [];
+  const excluded = (d: string) => exclusions.some((e) => d >= e.from && d <= e.to);
+  const overlap = exclusions.find((e) => e.from <= asOf && e.to >= windowStart);
+  const raw: Weigh[] = data.measurements
+    .filter((m) => m.kind === "weight" && m.date >= windowStart && m.date <= asOf && !excluded(m.date))
+    .map((m) => ({ date: m.date, kg: m.unit === "lb" ? Number(m.value) * 0.45359237 : Number(m.value) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const robust = raw.length >= 2 ? slopeWithoutOutliers(raw, windowStart, rule.outlierKg ?? Infinity) : null;
+  const points = robust?.points ?? raw;
   const spanDays = points.length ? daysBetween(points[0]!.date, points[points.length - 1]!.date) + 1 : 0;
-  if (points.length < MIN_WEIGHINS || spanDays < MIN_SPAN_DAYS) return { n: points.length, spanDays, points };
-  const fit = slopeWithSe(points, windowStart) as SlopeFit;
-  return { rate: fit.slope * 7, se: fit.se == null ? null : fit.se * 7, n: fit.n, spanDays, points };
+  if (!robust || points.length < minN || spanDays < MIN_SPAN_DAYS) {
+    return { n: points.length, spanDays, points, ...(overlap ? { skipped: overlap.label } : {}) };
+  }
+  const fit = robust.fit;
+  return {
+    rate: fit.slope * 7, se: fit.se == null ? null : fit.se * 7, seRaw: fit.seRaw == null ? null : fit.seRaw * 7, r: fit.r,
+    n: fit.n, spanDays, points, dropped: robust.dropped
+  };
 }
 
 const isFit = (f: ReturnType<typeof rateFit>): f is RateFit => "rate" in f;
@@ -88,7 +127,7 @@ export function bodyRules(ctx: WeekCtx): AreaResult {
 
   // body.path
   const avg = bw7(data, ctx.asOf);
-  const band = expectedBand(ctx.asOf);
+  const band = expectedBand(ctx.asOf, plan);
   if (avg != null && band) {
     const [lo, hi] = band;
     const range = `${fmtBw(lo)}–${fmtBw(hi)}`;
@@ -104,7 +143,7 @@ export function bodyRules(ctx: WeekCtx): AreaResult {
   }
 
   // body.rate
-  const rateNumbers: Pick<WeekNumbers["bodyweight"], "rate" | "rateSe" | "rateN"> = { rate: null, rateSe: null, rateN: 0 };
+  const rateNumbers: Pick<WeekNumbers["bodyweight"], "rate" | "rateSe" | "rateN" | "rateSkipped"> = { rate: null, rateSe: null, rateN: 0, rateSkipped: null };
   const why: Signal["why"] = ["N-RATE", "N-SURPLUS", "N-CARBS"];
   if (isRateWeek(plan, week)) {
     if (!ctx.complete) {
@@ -112,9 +151,13 @@ export function bodyRules(ctx: WeekCtx): AreaResult {
     } else {
       const f = rateFit(data, ctx.to);
       rateNumbers.rateN = f.n;
-      if (!isFit(f)) {
+      if (!isFit(f) && f.skipped) {
+        rateNumbers.rateSkipped = f.skipped;
+        out.push(sig("body.rate", "body", "info", `Rate check skipped (${f.skipped})`,
+          `Rate check skipped (${f.skipped}): the weigh-ins around it are left out. Same calories; the next check uses the weeks after.`, why));
+      } else if (!isFit(f)) {
         out.push(sig("body.rate", "body", "watch", "Rate check: too few weigh-ins",
-          `Only ${f.n} weigh-ins over ${f.spanDays} days: the rate check needs ${MIN_WEIGHINS} over 3 weeks.`, why));
+          `Only ${f.n} weigh-ins over ${f.spanDays} days: the rate check needs ${plan.bodyweightRate.minWeighIns ?? 10} over 3 weeks.`, why));
       } else {
         rateNumbers.rate = f.rate;
         rateNumbers.rateSe = f.se;
@@ -172,32 +215,85 @@ export function bodyRules(ctx: WeekCtx): AreaResult {
     }
   }
 
+  // body.photos (M-MEASURE, E20)
+  const photos = photoStatus(data, ctx.to < ctx.today ? ctx.to : ctx.today, week);
+  const pWhy: Signal["why"] = ["M-MEASURE"];
+  if (photos.photoWeek) {
+    if (photos.done) out.push(sig("body.photos", "body", "good", "Progress photos taken", "Progress photos taken this week.", pWhy));
+    else out.push(sig("body.photos", "body", ctx.complete ? "watch" : "pending", "Progress photos due",
+      `Progress photos due${photos.next ? ` (Thursday ${fmtShortDate(photos.next)})` : ""}: front, side, back, same spot and light.`, pWhy));
+  } else if (photos.next) {
+    out.push(sig("body.photos", "body", "info", "Next progress photos", `Next progress photos: Thursday ${fmtShortDate(photos.next)}.`, pWhy));
+  }
+
   return {
     signals: out,
     numbers: {
       bodyweight: { avg7d: avg, band, weighIns: k, ...rateNumbers },
-      waist: { latestCm: waist.latest, cmPerMonth: waist.perMonth }
+      waist: { latestCm: waist.latest, cmPerMonth: waist.perMonth },
+      photos
     }
   };
 }
 
-/** Waist entries in cm up to `asOf`; the change per 30 days over the last 6 weeks when they span ≥ 28 days. */
+/** N-WAIST (R1-28): readings needed for a waist slope. */
+export const WAIST_MIN_READINGS = 3;
+
+/**
+ * Waist entries in cm up to `asOf`; the change per 30 days from the slope of the last 6 weeks' readings when there
+ * are ≥ 3 of them spanning ≥ 28 days (R1-28: act on the slope of ≥ 3, never on one reading).
+ */
 export function waistTrend(data: CoachData, asOf: string): { latest: number | null; lastDate: string | null; perMonth: number | null; since: string } {
   const all = data.measurements.filter((m) => m.kind === "waist" && m.date <= asOf)
     .map((m) => ({ date: m.date, kg: m.unit === "in" ? Number(m.value) * 2.54 : Number(m.value) }));
   const last = all.at(-1);
   const recent = all.filter((p) => p.date >= addDays(asOf, -42));
   const since = recent[0]?.date ?? asOf;
-  if (recent.length < 2 || daysBetween(recent[0]!.date, recent[recent.length - 1]!.date) < 28) {
+  if (recent.length < WAIST_MIN_READINGS || daysBetween(recent[0]!.date, recent[recent.length - 1]!.date) < 28) {
     return { latest: last?.kg ?? null, lastDate: last?.date ?? null, perMonth: null, since };
   }
   const fit = slopeWithSe(recent, recent[0]!.date);
   return { latest: last?.kg ?? null, lastDate: last?.date ?? null, perMonth: fit ? fit.slope * 30 : null, since };
 }
 
-/** Waist check due: plan running and no waist entry in the last 14 days. */
+/**
+ * Waist check due (E20: the waist is optional, so no nagging): only while he is logging it — a waist entry in the
+ * last 30 days but none in the last 14.
+ */
 export function waistDueCue(data: CoachData, today: string): DailyCue | null {
   if (!data.program || today < data.start || today > data.end) return null;
-  const recent = data.measurements.some((m) => m.kind === "waist" && m.date > addDays(today, -14) && m.date <= today);
-  return recent ? null : { id: "body.waist", tone: "plain", text: "Waist check due: tape at the navel, morning.", to: "/weight" };
+  const waists = data.measurements.filter((m) => m.kind === "waist" && m.date <= today);
+  const active = waists.some((m) => m.date > addDays(today, -30));
+  const recent = waists.some((m) => m.date > addDays(today, -14));
+  return active && !recent ? { id: "body.waist", tone: "plain", text: "Waist check due: tape at the navel, morning.", to: "/weight" } : null;
+}
+
+/** A body_measurements row that marks progress photos as taken (kind other, value 1, note "photos"). */
+export const isPhotosRow = (m: { kind: string; note: string | null }) => m.kind === "other" && (m.note ?? "").trim().toLowerCase() === "photos";
+
+/** Thursday of a plan week. */
+const thursdayOf = (w: ProgramWeek) => addDays(w.startDate, 3);
+
+/**
+ * E20 / M-MEASURE: progress photos every 4 weeks (plan weeks 0, 4, 8, 12, 16, 19), Thursday morning.
+ * `photoWeek`: the plan week of `date` is one; `done`: a photos row that week; `next`: the Thursday of this photo
+ * week while not done, else of the next photo week (null after the last).
+ */
+export function photoStatus(data: CoachData, date: string, week?: ProgramWeek | null): { photoWeek: boolean; done: boolean; next: string | null } {
+  const weeks = data.plan.photoWeeks ?? [];
+  const w = week ?? weekForDate(data.plan, date);
+  const photoWeek = !!w && weeks.includes(w.weekNo);
+  const { from, to } = w ? weekBounds(w) : { from: date, to: date };
+  const done = photoWeek && data.measurements.some((m) => isPhotosRow(m) && m.date >= from && m.date <= to);
+  const later = data.plan.weeks.filter((x) => weeks.includes(x.weekNo) && (w ? x.weekNo > w.weekNo : x.startDate > date));
+  const next = photoWeek && !done && w ? thursdayOf(w) : later[0] ? thursdayOf(later[0]) : null;
+  return { photoWeek, done, next };
+}
+
+/** E20 cue: in a photo week, from Thursday morning until they are taken (Thursday–Sunday). */
+export function photosCue(data: CoachData, today: string): DailyCue | null {
+  if (!data.program || today < data.start || today > data.end || isoWeekday(today) < 4) return null;
+  const s = photoStatus(data, today);
+  if (!s.photoWeek || s.done) return null;
+  return { id: "body.photos", tone: "plain", input: "photos", text: "Progress photos: front, side, back, same spot and light." };
 }

@@ -172,8 +172,11 @@ describe("applying through the LocalStore", () => {
   it("input helpers: pain answer, session energy, waist and sleep (one per day)", async () => {
     const { local, ids } = await setup();
     const [pain] = await local.save("pain_checks", { date: "2026-10-20", site: "right_elbow", exercise_id: ids.get("incline_db_press")!, session_id: null, during_set: "ache", next_morning: null, worse_than_last: null, note: null });
-    await answerPainCheck(local, pain!.id, "sore");
-    expect(local.get("pain_checks", pain!.id)!.next_morning).toBe("sore");
+    expect(await answerPainCheck(local, pain!.id, 6)).toEqual({ morning_score: 6, next_morning: "sore", flare: true });
+    expect(local.get("pain_checks", pain!.id)).toMatchObject({ next_morning: "sore", morning_score: 6 });
+    // Within 1 point of the usual level (0): normal.
+    const [calm] = await local.save("pain_checks", { date: "2026-10-21", site: "right_elbow", exercise_id: null, session_id: null, during_set: "ache", next_morning: null, worse_than_last: null, note: null });
+    expect((await answerPainCheck(local, calm!.id, 1)).next_morning).toBe("normal");
 
     const [session] = await local.save("sessions", { date: "2026-10-20", title: "Upper A", status: "completed" });
     await saveSessionEnergy(local, session!.id, 4);

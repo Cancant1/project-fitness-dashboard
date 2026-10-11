@@ -4,7 +4,15 @@
 
 export type WeekType = 'calibration' | 'A' | 'B' | 'C' | 'D' | 'deload' | 'taper' | 'test';
 export type SlotRole = 'main' | 'compound' | 'isolation' | 'shoulder';
-export type SetKind = 'warmup' | 'working' | 'rep_out' | 'top' | 'backoff' | 'failure';
+/** 'timed' = an isometric hold (wrist ladder flare-up step): durationSec instead of reps. */
+export type SetKind = 'warmup' | 'working' | 'rep_out' | 'top' | 'backoff' | 'failure' | 'timed';
+/**
+ * How hard a set goes (E1, "tell me where to go max and where not"); labels in effort.ts.
+ * max = rep-out to a stop sign · controlled = stop at the prescribed reps · failure = isolation to failure ·
+ * stop_sign = isolation that ends at the first stop sign (elbow irritable, bad days, first week back) ·
+ * easy = warm-ups, shoulder care, isometric holds · care = the wrist ladder.
+ */
+export type Effort = 'max' | 'controlled' | 'failure' | 'stop_sign' | 'easy' | 'care';
 export type Unit = 'kg' | 'lb' | 'bodyweight';
 export type Equipment = 'barbell' | 'dumbbell' | 'cable' | 'cable_pair' | 'bodyweight' | 'belt';
 /** What the load number refers to. */
@@ -55,6 +63,8 @@ export interface ProgramWeek {
   repeatOf?: number;
   /** A training week turned into a deload by a coach adjustment (deload_now). */
   earlyDeload?: boolean;
+  /** A deload turned into a training week (skip_deload: week 5 or 6 was missed). */
+  deloadSkipped?: boolean;
 }
 
 export interface AccessoryScheme {
@@ -82,6 +92,44 @@ export interface ProgramSlot {
   /** Tendon-care work: keeps its sets in deload/taper/reduced weeks. */
   rehab?: boolean;
   group?: 'shoulder_care';
+  /** Curls, triceps extensions and pushdowns (E9): never two in one pair; stop-sign rule while the elbow is irritable. */
+  elbowLoading?: boolean;
+  /** P-TIMESAVE pair id: slots of a day with the same id are done alternately (A, B). */
+  pair?: string;
+  /** Listed equivalents (exercise keys) for the deload variety swap (P-VARIETY, weeks 7 and 10). */
+  alternatives?: string[];
+  /** Prescribed only when an extra-set target names it (the optional Tuesday rear delt fly). */
+  extraOnly?: boolean;
+  /** J-PAINRULE trend: sets × (1 − fraction), rounded, at least 1, on days dated from … until. Added by applyAdjustments. */
+  setCuts?: { fraction: number; from: string; until: string }[];
+}
+
+/** +1 set on this exercise on this day (R1-08 extra sets). */
+export interface ExtraSetSlot {
+  dayKey: LiftingDayKey;
+  exerciseKey: string;
+}
+
+/** A fixed extra-set package (P-EXTRASETS, R1-08). */
+export interface ExtraSetsPlan {
+  muscles: Muscle[];
+  targets: ExtraSetSlot[];
+}
+
+/** E13: the wrist-extension heavy-slow ladder (J-ELBOW, R1-15). */
+export interface WristLadder {
+  exerciseKey: string;
+  /** Reps per set from this plan week on: 0–1: 15 · 2–3: 12 · 4–5: 10 · 6–8: 8 · 9–12: 6. */
+  rungs: { fromWeek: number; reps: number }[];
+  sets: number;
+  /** Lifting days that carry the ladder (Mon, Fri); the home session is on `homeDayKey` (Wed). */
+  dayKeys: LiftingDayKey[];
+  homeDayKey: ConditioningDayKey;
+  /** From this week: maintenance, once a week on maintain.dayKey. */
+  maintainFromWeek: number;
+  maintain: { dayKey: LiftingDayKey; sets: number; reps: number };
+  /** Flare-up step: isometric holds instead (palm down, mid-range). */
+  isometric: { sets: number; holdSec: [number, number] };
 }
 
 export interface RideRule {
@@ -102,6 +150,13 @@ export interface RoundsRule {
   maxRounds: number;
   /** Last round within this fraction of the first → +1 round next week. */
   dropOffFraction: number;
+  /** From this plan week, `burstRounds` of the rounds are burst rounds (C-ROUNDS, R1-30). */
+  burstFromWeek?: number;
+  burstRounds?: number;
+  burstWorkSec?: number;
+  burstEasySec?: number;
+  /** "Finish by 14:00" (~30 h before Monday's squat). */
+  finishBy?: string;
 }
 export type ConditioningRule = RideRule | BoxingRule | RoundsRule;
 
@@ -151,6 +206,10 @@ export interface StepLiftDefinition {
   stepUpAtReps: number;
   /** Rep-out ≤ this → one step down. */
   stepDownAtReps: number;
+  /** Rep-out ≥ this → two steps up (incline 16: +2 dumbbells; pull-up 12: +5 kg). R1-04. */
+  doubleStepAtReps?: number;
+  /** Stuck: `after` rep-outs in a row at 6–9 reps at one load → the normal sets become reps[0], then reps[1] … */
+  stuck?: { after: number; reps: number[] };
   /** Deload/taper: sets × reps one step lighter, no rep-out. */
   lightSets: number;
   lightReps: number;
@@ -194,8 +253,38 @@ export interface ProgramDefinition {
   restSecByRole: Record<SlotRole, number>;
   /** Rest before a main-lift rep-out or deadlift top set. */
   repOutRestSec: number;
-  bodyweightRate: { minKgPerWeek: number; maxKgPerWeek: number; adjustKcal: number; fromWeek: number };
+  /**
+   * Rate checks every 2 weeks from `fromWeek`; the fit uses weigh-ins from `fitFromWeek` on (creatine water,
+   * E16), needs `minWeighIns` and drops readings more than `outlierKg` off a first-pass fit.
+   */
+  bodyweightRate: {
+    minKgPerWeek: number; maxKgPerWeek: number; adjustKcal: number; fromWeek: number;
+    fitFromWeek?: number; minWeighIns?: number; outlierKg?: number;
+  };
   nutrition: { kcal: number; proteinG: number; fatG: number; carbsG: number; targetBodyweightKg: [number, number] };
+  /** Old-best e1RMs (R1-03): once the TM reaches them a hit holds the TM and a beat adds at most +2.5 kg. */
+  oldBestE1rm?: Record<TmLiftKey, number>;
+  /** Creatine start (E16): the expected bodyweight band rises by creatineBandKg over the first 4 weeks. */
+  creatineStart?: string;
+  creatineBandKg?: number;
+  /** Date ranges left out of the bodyweight rate fit (England trip). */
+  rateExclusions?: { from: string; to: string; label: string }[];
+  /** P-TIMESAVE rest inside a pair (between A and B) and after the pair. */
+  pairRestSec?: { between: number; after: number };
+  /** Checkpoint fallbacks (R1-07): Friday light squat; deadlift back-off sets. */
+  mainLiftFallbacks?: {
+    squat: { dayKey: LiftingDayKey; beforeExerciseKey: string; pctTm: number; sets: number; reps: number };
+    deadlift: { pctOfTop: number; sets: number; reps: number; repRange: [number, number] };
+  };
+  /** Extra sets at checkpoint 1 (R1-08): arms (fixed) and the optional rear delt set. */
+  extraSets?: { arms: ExtraSetsPlan; rearDelt: ExtraSetsPlan };
+  wristLadder?: WristLadder;
+  /** Plan weeks with a progress-photo reminder (M-MEASURE), Thursday morning. */
+  photoWeeks?: number[];
+  /** Alternatives that are not in a slot (incline hammer curl), with their own scheme and start load. */
+  alternativeSlots?: Record<string, ProgramSlot>;
+  /** P-RESTART: rep-out cap after `capAfterDays` off; first week careful after `firstWeekAfterDays`. */
+  restart?: { capAfterDays: number; firstWeekAfterDays: number; capPlusReps: number };
 }
 
 // ---------- equipment profile ----------
@@ -223,6 +312,37 @@ export interface PlanState {
   addMainLiftSet?: Partial<Record<MainLiftKey, boolean>>;
   /** This week's planned Sunday rounds (before deload halving). */
   sundayRounds?: number;
+  /** R1-08 extra sets: +1 set on each (day, exercise); extraOnly slots appear only when named here. */
+  extraSetTargets?: readonly ExtraSetSlot[];
+  /** E5 stuck incline: the normal sets' reps (3 × 6, then 3 × 7) until the next load increase. */
+  normalReps?: Partial<Record<StepLiftKey, number>>;
+  /** E14: pain 4–5/10 last time → hold the load (planState already held it; the engine adds a note). */
+  holdLoad?: Partial<Record<string, boolean>>;
+  /** E3 recalibration (≥ 4 weeks off): load of the next calibration rep-out (75% of the last TM). */
+  recalibrate?: Partial<Record<TmLiftKey, number>>;
+  /** E9: isolation that ends at the first stop sign instead of failure. */
+  effort?: {
+    /** Elbow pain ≥ 4/10: elbow-loading isolation on days dated from … until (the check's date + 14 days). */
+    elbowIrritableFrom?: string;
+    elbowIrritableUntil?: string;
+    /** The last 2 sessions felt ≤ 2/5: all isolation in this plan week. */
+    lowFeelWeekNo?: number;
+  };
+  /** E12 restart after a gap. */
+  restart?: {
+    /** Gap ≥ 10 days on this date: rep-outs with a target on days dated this … +6 are capped at target + 2. */
+    capRepOutsFrom?: string;
+    /** Gap ≥ 14 days: the first plan week back (no extra sets or main-lift sets, no failure). */
+    firstWeekNo?: number;
+  };
+  /** E13: wrist ladder state. */
+  wristLadder?: {
+    /** Rungs back (one per flare-up), never before the first rung. */
+    rungOffset?: number;
+    /** Isometric holds on days dated from … until (3–7 days after a morning flare). */
+    isometricFrom?: string;
+    isometricUntil?: string;
+  };
 }
 
 export interface PrescribedSet {
@@ -236,6 +356,14 @@ export interface PrescribedSet {
   target?: number;
   pctTm?: number;
   note?: string;
+  /** Set only where it differs from the exercise's effort (warm-ups, rep-outs). Resolve with setEffort(). */
+  effort?: Effort;
+  /** E12: stop the rep-out at this many reps even if more are there (first session after ≥ 10 days off). */
+  capReps?: number;
+  /** Timed set (isometric hold): seconds per hold (the top of the range). */
+  durationSec?: number;
+  /** A calibration rep-out (week 0, or a recalibration after ≥ 4 weeks off): it sets the TM instead of moving it. */
+  calibration?: boolean;
 }
 
 export interface PrescribedExercise {
@@ -250,6 +378,18 @@ export interface PrescribedExercise {
   group?: 'shoulder_care';
   /** Care work (wrist extensions): not counted as a working set. */
   rehab?: boolean;
+  /** How hard this exercise's working sets go (E1). A set with its own `effort` overrides it (setEffort). */
+  effort: Effort;
+  /** Curl / triceps extension / pushdown (E9). */
+  elbowLoading?: boolean;
+  /**
+   * P-TIMESAVE pair id and position ("A", "B", "C"). Pair members are adjacent in `order`; restSec is then the
+   * short rest before the partner's set (A) or the rest after the pair (last member).
+   */
+  pair?: string;
+  pairLabel?: string;
+  /** Deload variety equivalents (exercise keys; label them with swapLabel). */
+  alternatives?: string[];
   sets: PrescribedSet[];
   restSec: number;
   restBeforeRepOutSec?: number;
@@ -264,6 +404,17 @@ export interface PrescribedConditioning {
   easySec?: number;
   warmupMin?: number;
   skipped?: boolean;
+  /** Sunday from week 4: how many of the rounds are burst rounds (5 s all-out / 10 s easy for 2 min). */
+  burstRounds?: number;
+  burstWorkSec?: number;
+  burstEasySec?: number;
+  /** "14:00": finish the rounds by then. */
+  finishBy?: string;
+  /** One line for the card, e.g. "8 rounds, of which 2 are burst rounds: …". */
+  text?: string;
+  notes?: string[];
+  /** Home tasks on this day (Wednesday: the wrist ladder). */
+  homeTasks?: { id: 'wrist_ladder'; text: string; sets: number; reps: number | null; holdSec?: [number, number] }[];
 }
 
 export interface PrescribedDay {
@@ -283,4 +434,6 @@ export interface PrescribedDay {
   minutes?: number;
   minutesAlternating?: number;
   notes: string[];
+  /** E2: the minimum session (~30 min). It counts as the day's session. */
+  minimum?: boolean;
 }

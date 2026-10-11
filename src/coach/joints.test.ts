@@ -10,15 +10,16 @@ describe("joints.swap", () => {
     const w = new World();
     w.pain(dayIn(1, "upper_a"), "right_elbow", "incline_db_press", { next_morning: "sore" });
     expect(get(weeklyReport(w.data(), 1, sunday(1)), "joints.swap.incline_db_press")).toMatchObject({
-      status: "act", message: "Right elbow sore after incline DB press. Swap to neutral-grip DB bench press for 2 weeks (until 3 Nov).",
-      action: { kind: "swap", exerciseKey: "incline_db_press", to: "db_bench_press", until: "2026-11-03" }
+      status: "act",
+      message: "Right elbow sore after incline DB press. Swap to neutral-grip DB bench press for 2 weeks (until 3 Nov). Start with the same dumbbells (22.5 kg); first session normal sets only, no rep-out.",
+      action: { kind: "swap", exerciseKey: "incline_db_press", to: "db_bench_press", until: "2026-11-03", startLoad: 22.5, unit: "kg" }
     });
   });
   it("worse at the next session counts too; shoulder pain on cross-body extension → rope pushdown", () => {
     const w = new World();
     w.pain(dayIn(1, "lower_a"), "right_shoulder", "cross_body_triceps_extension", { worse_than_last: true });
     expect(get(weeklyReport(w.data(), 1, sunday(1)), "joints.swap.cross_body_triceps_extension")?.message)
-      .toBe("Right shoulder worse after cross-body cable triceps extension. Swap to rope pushdown for 2 weeks (until 2 Nov).");
+      .toBe("Right shoulder worse after cross-body cable triceps extension. Swap to rope pushdown for 2 weeks (until 2 Nov). Start light; first session normal sets only, no rep-out.");
   });
   it("no swap on the list → watch", () => {
     const w = new World();
@@ -56,16 +57,16 @@ describe("joints.sharp and joints.trend", () => {
 });
 
 describe("joints.prompt (cue)", () => {
-  it("morning after an ache: asks Normal / Sore", () => {
+  it("morning after an ache: asks 0–10 with the site's usual level", () => {
     const w = new World();
     w.session(dayIn(1, "upper_a"), "upper_a");
     const p = w.pain(dayIn(1, "upper_a"), "right_elbow", "incline_db_press");
     expect(painPromptCue(w.data(), dayIn(1, "easy_ride"), 8)).toMatchObject({
-      id: "joints.prompt", tone: "warm", text: "Right elbow after incline DB press yesterday: how is it this morning?",
-      prompt: { kind: "pain_next_morning", painCheckId: p.id, options: ["normal", "sore"] }
+      id: "joints.prompt", tone: "warm", text: "Right elbow after incline DB press yesterday: how is it this morning (0–10)?",
+      prompt: { kind: "pain_next_morning", painCheckId: p.id, site: "right_elbow", options: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], baseline: 0 }
     });
     expect(painPromptCue(w.data(), dayIn(1, "easy_ride"), 12)).toBeNull();
-    expect(painPromptCue(w.data(), dayIn(1, "boxing"), 8)?.text).toBe("Right elbow after incline DB press on Tuesday: how is it this morning?");
+    expect(painPromptCue(w.data(), dayIn(1, "boxing"), 8)?.text).toBe("Right elbow after incline DB press on Tuesday: how is it this morning (0–10)?");
     p.next_morning = "normal";
     expect(painPromptCue(w.data(), dayIn(1, "easy_ride"), 8)).toBeNull();
   });

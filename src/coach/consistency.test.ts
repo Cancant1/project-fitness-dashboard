@@ -9,12 +9,13 @@ const ALL: LiftingDayKey[] = ["lower_a", "upper_a", "lower_b", "upper_b"];
 const get = (r: WeeklyReport, id: string) => r.signals.find((s) => s.id === id);
 
 describe("consistency.sessions", () => {
-  it("complete week: 4 of 4 good, 3 watch, ≤ 2 act", () => {
+  it("complete week: 4 of 4 good, 3 watch, 2 = the floor (watch), ≤ 1 act", () => {
     const cases: [number, string, string][] = [
       [4, "good", "4 of 4 sessions."],
       [3, "watch", "3 of 4 sessions. One missed day is fine; two in a row is a trend."],
-      [2, "act", "2 of 4 sessions. Bad week? The floor is Lower A + Upper A."],
-      [0, "act", "0 of 4 sessions. Bad week? The floor is Lower A + Upper A."]
+      [2, "watch", "2 of 4 sessions: the floor held. Aim for 4 next week."],
+      [1, "act", "1 of 4 sessions. Bad week? The floor is Lower A + Upper A; minimum sessions count."],
+      [0, "act", "0 of 4 sessions. Bad week? The floor is Lower A + Upper A; minimum sessions count."]
     ];
     for (const [n, status, message] of cases) {
       const w = new World();
@@ -43,14 +44,15 @@ describe("consistency.sessions", () => {
 });
 
 describe("consistency.missed_week", () => {
-  it("a finished week with no plan session → repeat it", () => {
+  it("a finished week with no plan session → move on (R1-01): no repeat, no action", () => {
     const w = new World();
     w.week(1);
     const s = get(weeklyReport(w.data(), 3, dayIn(3, "upper_a")), "consistency.missed_week");
     expect(s).toMatchObject({
-      status: "act", message: "Week 2 was missed. Repeat it instead of skipping ahead; everything after moves a week.",
-      action: { kind: "repeat_week", missedWeekNo: 2 }
+      status: "watch",
+      message: "Week 2 was missed. No catch-up: carry on with week 3 as planned. Missed weeks count as an unplanned deload."
     });
+    expect(s?.action).toBeUndefined();
   });
 
   it("is handled once the repeat is applied (the week is marked missed)", () => {
@@ -105,14 +107,14 @@ describe("consistency.streak", () => {
 });
 
 describe("consistency.floor (cue)", () => {
-  it("from Thursday with no lifting session this week", () => {
+  it("from Friday with no lifting session this week (Thursday has the if-then cue)", () => {
     const w = new World();
-    expect(floorCue(w.data(), dayIn(1, "boxing"))).toMatchObject({
+    expect(floorCue(w.data(), dayIn(1, "lower_b"))).toMatchObject({
       tone: "warm", text: "No lifting yet this week. Do Lower A today or tomorrow, then Upper A. That's the floor."
     });
-    expect(floorCue(w.data(), dayIn(1, "easy_ride"))).toBeNull();
-    expect(floorCue(w.data(), dayIn(7, "boxing"))).toBeNull(); // deload
-    w.session(dayIn(1, "lower_a"), "lower_a");
     expect(floorCue(w.data(), dayIn(1, "boxing"))).toBeNull();
+    expect(floorCue(w.data(), dayIn(7, "lower_b"))).toBeNull(); // deload
+    w.session(dayIn(1, "lower_a"), "lower_a");
+    expect(floorCue(w.data(), dayIn(1, "lower_b"))).toBeNull();
   });
 });

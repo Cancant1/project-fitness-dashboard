@@ -41,8 +41,11 @@ export function actionLabel(a: CoachAction): string {
     case "extra_sets": return `+1 set: ${a.muscles.map((m) => MUSCLE[m] ?? m).join(", ")}`;
     case "main_lift_set": return `+1 set: ${a.lifts.map((l) => LIFT[l] ?? l).join(", ")}`;
     case "repeat_week": return `Repeat week ${a.missedWeekNo}`;
+    case "skip_deload": return `Week ${a.weekNo} becomes a training week`;
     case "tm_reduce": return `Both training maxes −${a.percent}%`;
+    case "recalibrate": return "Calibration rep-outs at 75% of your last TM";
     case "swap": return `Swap to ${swapLabel(a.to)} until ${fmtShortDate(a.until)}`;
+    case "cut_sets": return `${swapLabel(a.exerciseKey)}: sets −${Math.round(a.fraction * 100)}% until ${fmtShortDate(a.until)}`;
   }
 }
 

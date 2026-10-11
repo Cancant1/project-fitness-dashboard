@@ -63,6 +63,8 @@ export interface CoachData {
   pain: PainCheck[];
   conditioning: Conditioning[];
   health: HealthDaily[];
+  /** Every health row (60-day baselines for resting HR and HRV, C-READINESS). */
+  allHealth: HealthDaily[];
 }
 
 const live = <T extends { deleted_at?: string | null }>(rows: readonly T[]): T[] => rows.filter((r) => !r.deleted_at);
@@ -70,7 +72,11 @@ const byDate = <T extends { date: string; created_at: string }>(a: T, b: T) => a
 
 const planKeyOf = (s: Session): string | undefined => (s.legacy_ref as { plan?: { programKey?: string } } | undefined)?.plan?.programKey;
 
-export function coachData(t: CoachTables): CoachData {
+/**
+ * opts.today feeds the engine state rules that depend on the current gap (E12 restart cap); leave it out for
+ * a date-independent state (tests, past reports).
+ */
+export function coachData(t: CoachTables, opts: { today?: string } = {}): CoachData {
   const exercisesList = live(t.exercises);
   const ids = planIds(exercisesList);
   const keyOf = new Map<string, string>();
@@ -101,9 +107,10 @@ export function coachData(t: CoachTables): CoachData {
   const maxes = live(t.training_maxes).sort((a, b) => a.effective_date.localeCompare(b.effective_date) || a.created_at.localeCompare(b.created_at));
   const equipment = equipmentFrom(live(t.profiles ?? [])[0]);
   const conditioning = fromStart(live(t.conditioning)).sort(byDate);
+  const pain = fromStart(live(t.pain_checks)).sort(byDate);
 
   const state: PlanState = program
-    ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan })
+    ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan, painChecks: pain, ...(opts.today ? { today: opts.today } : {}) })
     : (() => {
       const latest = latestMaxes(maxes, ids);
       return {
@@ -125,8 +132,9 @@ export function coachData(t: CoachTables): CoachData {
     foodEntries: fromStart(live(t.food_entries)),
     nutritionDays: fromStart(live(t.nutrition_days)),
     targets: live(t.nutrition_targets),
-    pain: fromStart(live(t.pain_checks)).sort(byDate),
+    pain,
     conditioning,
-    health: fromStart(live(t.health_daily)).sort(byDate)
+    health: fromStart(live(t.health_daily)).sort(byDate),
+    allHealth: live(t.health_daily).sort(byDate)
   };
 }

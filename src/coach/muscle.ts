@@ -6,7 +6,11 @@ import { fractionalVolume } from "../lib/analysis";
 import { addDays } from "../lib/format";
 import { PLAN } from "../plan/bridge";
 import { OVERSHOOT_REPS, weekForDate } from "../plan/engine";
+import { VARIETY_NOTE } from "../plan/strengthReturn";
 import type { Muscle, ProgramSlot } from "../plan/types";
+
+/** P-RESTART: logged working sets above planned × 1.1 is make-up volume. */
+export const OVERREACH_FACTOR = 1.1;
 import {
   TRAINING_WEEK, exerciseLabel, fmtLoad, isCareKey, keyOfSet, plural, sessionsIn, sig, weekBounds, weekTypeOfSession, workSets,
   type AreaResult, type WeekCtx
@@ -73,6 +77,18 @@ export function muscleRules(ctx: WeekCtx): AreaResult {
     else if (!ctx.complete) out.push(sig("muscle.volume", "muscle", "pending", "Volume so far", `${done} of ${planned} working sets so far.`, why, { metric }));
     else if (pct >= 0.7) out.push(sig("muscle.volume", "muscle", "watch", "Volume a bit low", `${done} of ${planned} working sets.`, why, { metric }));
     else out.push(sig("muscle.volume", "muscle", "act", "Volume too low", `${done} of ${planned} sets: below the dose that keeps you growing.`, why, { metric }));
+  }
+
+  // muscle.overreach (P-RESTART, E12): no make-up volume — the weekly cap is the planned sets + 10%.
+  if (planned > 0 && done > planned * OVERREACH_FACTOR + 1e-9) {
+    out.push(sig("muscle.overreach", "muscle", "watch", "More sets than planned",
+      `${done} working sets against ${planned} planned. Missed sets are gone; the next session is the plan.`, ["P-RESTART", "P-VOLUME"],
+      { metric: { label: "Working sets", value: String(done), target: `≤ ${Math.floor(planned * OVERREACH_FACTOR)}` } }));
+  }
+
+  // muscle.variety (P-VARIETY, E24): the deload weeks allow up to 2 accessory swaps for a listed equivalent.
+  if (ctx.week.notes.includes(VARIETY_NOTE)) {
+    out.push(sig("muscle.variety", "muscle", "info", "Variety week", VARIETY_NOTE, ["P-VARIETY"]));
   }
 
   // muscle.by_muscle

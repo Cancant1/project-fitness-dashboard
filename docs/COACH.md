@@ -307,3 +307,27 @@ interface Adjustment { id: string; kind: CoachAction["kind"]; created: string; s
 - Apple Watch sleep, resting HR and HRV through the iOS Shortcut, into `recovery`.
 - An e1RM-based week-0 load for the step lifts (incline, pull-up), if Mario agrees.
 - Readiness (HRV vs baseline) to suggest a lighter day.
+
+## 10. Research round 1 changes (docs/R1_BUILD.md, Part E; built 11 Oct 2026)
+
+These replace the matching rules above where they differ.
+
+| Rule | Change |
+|---|---|
+| `consistency.sessions` | Floor = 2 sessions (2 → `watch` "the floor held"; ≤ 1 → `act`). Minimum sessions count. The weekly headline leads with "{k} of {n} sessions." |
+| `consistency.missed_week` | Move on, never repeat (`watch`, no action). Week 5 or 6 missed → `act` with `skip_deload` (week 7 becomes a C week). `repeat_week` is only folded for old rows. |
+| `consistency.long_break` | 14–27 days → `tm_reduce`; ≥ 28 days → `recalibrate` (next squat/deadlift session: calibration rep-out at 75% of the last TM, provisional rules). |
+| `consistency.missed_twice` / `comeback` / `habit` | New (P-HABITS): two planned lifting dates in a row without a session → `watch`; a session within 48 h of a miss → `good`; weeks in a row with 4+ sessions, meter n/6. |
+| `strength.repout` | Past the old best (squat 165, deadlift 235) "TM stays / +2.5 kg … (capped past your old best)". A miss after a < 6 h night → `watch` with the short-night line. |
+| `strength.misses` | 2 rep-outs in a row ≥ 2 under, or 3 in a row ≥ 1 under; short-night misses don't count. |
+| `strength.checkpoint` | Met (cp 1): fixed arm package `extra_sets` with `targets` (+1 set on Bayesian, overhead extension, underhand curl, reverse pushdown) plus `strength.checkpoint.rear_delt` (optional Tuesday rear delt set). Behind: `main_lift_set` for the lifts behind + incline + pull-up; squat → Friday 2 × 3 at 75% TM, deadlift → 2 back-off sets × 3–5 at 80% of the top set. |
+| `muscle.overreach` / `muscle.variety` | New: logged sets > planned × 1.1 → `watch` ("Missed sets are gone…"); deload weeks 7 and 10 → `info` (up to 2 accessory swaps). |
+| `body.rate` | Checks from week 5 (fit from week 3, creatine); ≥ 20 weigh-ins; outliers > 1.5 kg dropped; SE corrected for autocorrelation; England 20 Dec – 3 Jan left out ("skipped (holiday)"). |
+| `body.path` | Band + creatine water (0 → +0.7 kg over weeks 0–4). |
+| `body.waist` | Slope of ≥ 3 readings; the due cue only while he logs it (a waist in 30 days, none in 14). |
+| `body.photos` | New: photo weeks 0, 4, 8, 12, 16, 19; Thursday cue until done (`body_measurements` kind `other`, value 1, note `photos`). |
+| `fuel.tdee` | "Maintenance (as logged)": ≥ 24 of 28 days, 6,000 kcal/kg, window after week 4. |
+| `joints.*` | Pain 0–10 (`pain_score`, `morning_score`): swap when the morning is ≥ the site's 14-day median + 2 (start load in the action); ≥ 6 counts as sharp; aches rising 2 weeks → `deload_now`; morning means rising 2 weeks → `joints.cut_sets` (sets × 2/3 for 2 weeks, red flags); 4 weeks at 0–3 → `joints.alternative` (incline hammer curl). |
+| `recovery.*` | `sleep_lifting` (≥ 7.5 h before lifting days, lights out 23:15); `resting_hr` and `hrv` as info only (7-day vs 60-day). |
+| `conditioning.gassed` | New: Thursday "gassed" 1–5 trend over 6 weeks; pacing tip from week 8. |
+| Daily cues | Pain prompt (0–10) → if-then cues (missed yesterday, Thursday floor, minimum session, first exercise after 17:00, Sunday planning) → pending action → floor (Fri+) → weigh-in → photos → caffeine/candy (from 15:00) → protein → monthly elbow check → waist → lights out → check-in. |

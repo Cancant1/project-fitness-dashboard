@@ -303,7 +303,8 @@ describe('week shapes', () => {
     expect(shape(ex(1, 'lower_a', 'romanian_deadlift').sets)).toEqual([['working', 80, 10], ['working', 80, 10], ['rep_out', 80, null]]);
     expect(shape(ex(1, 'lower_a', 'cable_leg_extension').sets)).toEqual([['failure', 30, null], ['failure', 30, null]]);
     expect(ex(1, 'lower_a', 'cable_leg_extension').unit).toBe('lb');
-    expect(shape(ex(1, 'lower_b', 'wrist_extension').sets)).toEqual([['working', 4, 15], ['working', 4, 15]]);
+    // E13: the wrist ladder, 3 sets at the week's rung (weeks 0–1: 15).
+    expect(shape(ex(1, 'lower_b', 'wrist_extension').sets)).toEqual([['working', 4, 15], ['working', 4, 15], ['working', 4, 15]]);
   });
 
   it('uses the accessory loads from state', () => {
@@ -316,12 +317,12 @@ describe('week shapes', () => {
     const mon = prescribeDay(P, 7, 'lower_a', STATE);
     expect(shape(notWarmup(ex(7, 'lower_a', 'squat').sets))).toEqual([['working', 82.5, 5], ['working', 82.5, 5], ['working', 82.5, 5]]);
     expect(shape(notWarmup(ex(7, 'lower_b', 'deadlift').sets))).toEqual([['working', 140, 3]]);
-    mon.exercises.filter((e) => e.role !== 'main').forEach((e) => {
+    mon.exercises.filter((e) => e.role !== 'main' && !e.rehab).forEach((e) => {
       expect(e.sets).toHaveLength(1);
       expect(e.sets[0]!.kind).toBe('working');
     });
     expect(ex(7, 'upper_a', 'cable_external_rotation').sets).toHaveLength(2); // shoulder care unchanged
-    expect(ex(7, 'lower_b', 'wrist_extension').sets).toHaveLength(2); // elbow care unchanged
+    expect(ex(7, 'lower_b', 'wrist_extension').sets).toHaveLength(3); // elbow care unchanged (the ladder keeps its 3 sets)
     expect(prescribeWeek(P, 7, STATE).map((d) => d.workingSetCount)).toEqual([10, 11, 0, 0, 8, 8, 0]);
   });
 
@@ -381,12 +382,20 @@ describe('extra sets and checkpoint fallbacks', () => {
     expect(weekTotal(7, s)).toBe(37);
   });
 
-  it('adds one normal set to a lagging main lift; deadlift gets a back-off set at 85%', () => {
+  it('R1-07 fallbacks: Friday light squat 2 × 3 at 75% before the BSS; deadlift 2 back-offs × 3–5 at 80%; +1 normal set on incline', () => {
     const s: PlanState = { ...STATE, addMainLiftSet: { squat: true, deadlift: true, incline_db_press: true } };
-    expect(notWarmup(ex(1, 'lower_a', 'squat', s).sets).map((x) => x.kind)).toEqual(['working', 'working', 'working', 'working', 'rep_out']);
-    expect(shape(notWarmup(ex(1, 'lower_b', 'deadlift', s).sets))).toEqual([['rep_out', 160, null], ['backoff', 135, 5]]);
+    // The Monday squat is unchanged: its fallback is the light Friday squat.
+    expect(notWarmup(ex(1, 'lower_a', 'squat', s).sets).map((x) => x.kind)).toEqual(['working', 'working', 'working', 'rep_out']);
+    const fri = prescribeDay(P, 1, 'lower_b', s).exercises;
+    expect(fri.map((e) => e.exerciseKey).slice(0, 3)).toEqual(['deadlift', 'squat', 'bulgarian_split_squat']);
+    const light = fri[1]!;
+    expect(shape(notWarmup(light.sets))).toEqual([['working', 105, 3], ['working', 105, 3]]);
+    expect(light).toMatchObject({ effort: 'controlled', mainLift: 'squat' });
+    expect(shape(notWarmup(ex(1, 'lower_b', 'deadlift', s).sets))).toEqual([['rep_out', 160, null], ['backoff', 127.5, 5], ['backoff', 127.5, 5]]);
+    expect(notWarmup(ex(1, 'lower_b', 'deadlift', s).sets)[1]).toMatchObject({ repRange: [3, 5], effort: 'controlled' });
     expect(notWarmup(ex(1, 'upper_a', 'incline_db_press', s).sets)).toHaveLength(5);
     expect(notWarmup(ex(7, 'lower_a', 'squat', s).sets)).toHaveLength(3); // not in a deload
+    expect(prescribeDay(P, 7, 'lower_b', s).exercises.filter((e) => e.exerciseKey === 'squat')).toEqual([]);
   });
 
   it('checkpointStatus', () => {
@@ -433,7 +442,7 @@ describe('conditioning and food', () => {
 
   it('ride: 30 min in weeks 0–2, +5 a week up to 45', () => {
     expect([0, 1, 2, 3, 4, 5, 6, 12].map((w) => rideMinutes(ride, w))).toEqual([30, 30, 30, 35, 40, 45, 45, 45]);
-    expect(prescribeDay(P, 3, 'easy_ride', STATE).conditioning).toEqual({ kind: 'ride', minutes: 35 });
+    expect(prescribeDay(P, 3, 'easy_ride', STATE).conditioning).toMatchObject({ kind: 'ride', minutes: 35 });
     expect(prescribeDay(P, 3, 'boxing', STATE).conditioning).toEqual({ kind: 'boxing', minutes: 45 });
   });
 

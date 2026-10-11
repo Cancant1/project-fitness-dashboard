@@ -1,4 +1,4 @@
-import { adaptiveTdee, slopeWithSe } from "./energy";
+import { adaptiveTdee, slopeWithSe, slopeWithoutOutliers } from "./energy";
 import { addDays } from "./format";
 
 const days = (from: string, n: number, kcal: number) => Array.from({ length: n }, (_, i) => ({ date: addDays(from, i), kcal }));
@@ -59,6 +59,27 @@ describe("slopeWithSe", () => {
     const rss = xs.reduce((s, x, i) => s + (ys[i]! - (my + slope * (x - 2))) ** 2, 0);
     expect(f.slope).toBeCloseTo(slope, 12);
     expect(f.se).toBeCloseTo(Math.sqrt(rss / 3 / 10), 12);
+  });
+
+  it("R1-21: SE corrected for lag-1 autocorrelation of the residuals, r clipped to 0–0.6", () => {
+    // Alternating noise: negative r → clipped to 0, so SE = the plain SE.
+    const alt = slopeWithSe(line(21, 0.02, (i) => (i % 2 ? -0.3 : 0.3)), "2026-10-19")!;
+    expect(alt.r).toBe(0);
+    expect(alt.se).toBeCloseTo(alt.seRaw!, 12);
+    // Runs of the same sign: r > 0, SE × √((1 + r) / (1 − r)).
+    const runs = slopeWithSe(line(28, 0.02, (i) => (Math.floor(i / 7) % 2 ? -0.4 : 0.4)), "2026-10-19")!;
+    expect(runs.r).toBeGreaterThan(0);
+    expect(runs.r).toBeLessThanOrEqual(0.6);
+    expect(runs.se).toBeCloseTo(runs.seRaw! * Math.sqrt((1 + runs.r) / (1 - runs.r)), 12);
+  });
+
+  it("slopeWithoutOutliers drops readings more than 1.5 kg off the first fit", () => {
+    const pts = line(21, 0.02);
+    pts[10] = { ...pts[10]!, kg: pts[10]!.kg + 3 };
+    const r = slopeWithoutOutliers(pts, "2026-10-19", 1.5)!;
+    expect(r.dropped).toBe(1);
+    expect(r.points).toHaveLength(20);
+    expect(r.fit.slope).toBeCloseTo(0.02, 10);
   });
 
   it("needs two points on different days; SE needs three", () => {

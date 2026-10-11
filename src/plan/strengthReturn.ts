@@ -39,7 +39,8 @@ const EXERCISES: ExerciseDefinition[] = [
   { key: 'bulgarian_split_squat', name: 'Bulgarian split squat', equipment: 'dumbbell', muscles: ['quads', 'glutes', 'adductors'] },
   { key: 'seated_cable_leg_curl', name: 'Seated cable leg curl, one leg at a time', equipment: 'cable', muscles: ['hamstrings'] },
   { key: 'hanging_knee_raise', name: 'Hanging knee raise', equipment: 'bodyweight', muscles: ['abs'] },
-  { key: 'preacher_curl', name: 'Preacher curl', equipment: 'cable', muscles: ['biceps'] },
+  // His gym's preacher substitute (DECISIONS 2026-10-11 evening): same loads, cable, lb.
+  { key: 'preacher_curl', name: 'Kneeling cable curl, elbow on knee (preacher-style)', equipment: 'cable', muscles: ['biceps'] },
   { key: 'wrist_extension', name: 'Slow wrist extension', equipment: 'dumbbell', muscles: ['forearms'] },
   { key: 'barbell_row', name: 'Barbell or Pendlay row', equipment: 'barbell', muscles: ['back', 'rear_delts', 'biceps'] },
   { key: 'db_bench_press', name: 'DB bench press, neutral grip', equipment: 'dumbbell', muscles: ['chest', 'triceps', 'front_delts'] },
@@ -47,7 +48,12 @@ const EXERCISES: ExerciseDefinition[] = [
   { key: 'cable_rear_delt_fly', name: 'Cable rear delt fly', equipment: 'cable', muscles: ['rear_delts'] },
   { key: 'underhand_cable_curl', name: 'Underhand cable curl', equipment: 'cable', muscles: ['biceps'] },
   { key: 'reverse_grip_pushdown', name: 'Reverse-grip pushdown', equipment: 'cable', muscles: ['triceps'] },
+  // Not a default: an alternative to the underhand cable curl once the elbow is at 0–3 for 4 weeks (E23).
+  { key: 'incline_hammer_curl', name: 'Seated high-incline hammer curl', equipment: 'dumbbell', muscles: ['biceps', 'forearms'] },
 ];
+
+/** Creatine 5 g a day from this date (DECISIONS, Mario's answers): bodyweight band and rate fit (E16). */
+export const CREATINE_START = '2026-10-11';
 
 // ---------- slot builders ----------
 
@@ -90,14 +96,23 @@ const SHOULDER_BLOCK: ProgramSlot[] = [
     notes: ['High pulley. Pull toward your forehead, fists beside your ears.'] },
 ];
 
-const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
-  ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.']);
+const LATERAL = (sets: number, pair?: string): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
+  ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.'],
+  { alternatives: ['db_lateral_raise'], ...(pair ? { pair } : {}) });
 const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
-  ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.']);
-const CALF_RAISE: ProgramSlot = isolation('cable_calf_raise', failure(2, 10, 15), 250, 'lb', 'total', // 125 + 125 lb ≈ 113 kg (plan 120 kg; no pin for it)
-  ['Bar between the two pulleys; knees straight; pause 1–2 s in the stretch. Half reps in the bottom after failure.']);
-const FLYE: ProgramSlot = isolation('chest_cable_flye', failure(2, 10, 15), 50, 'lb', 'per_arm', // 50 lb per side = the plan's 23 kg
-  ['Pulleys at chest height, 1 s pause in the stretch. Right shoulder: stop the stretch a little earlier.']);
+  ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.'], { alternatives: ['heel_elevated_goblet_squat'] });
+const CALF_RAISE = (pair?: string): ProgramSlot => isolation('cable_calf_raise', failure(2, 10, 15), 250, 'lb', 'total', // 125 + 125 lb ≈ 113 kg (plan 120 kg; no pin for it)
+  ['Bar between the two pulleys; knees straight; pause 1–2 s in the stretch. Half reps in the bottom after failure.'],
+  { alternatives: ['single_leg_db_calf_raise'], ...(pair ? { pair } : {}) });
+const FLYE = (pair?: string): ProgramSlot => isolation('chest_cable_flye', failure(2, 10, 15), 50, 'lb', 'per_arm', // 50 lb per side = the plan's 23 kg
+  ['Pulleys at chest height, 1 s pause in the stretch. Right shoulder: stop the stretch a little earlier.'],
+  { alternatives: ['low_to_high_cable_flye'], ...(pair ? { pair } : {}) });
+
+// E13 wrist-extension heavy-slow ladder (J-ELBOW, R1-15): Mon and Fri in the gym, Wed at home. Reps by plan week
+// come from WRIST_LADDER; the scheme here is the first rung. Care work: not counted as working sets.
+const WRIST_LADDER_SLOT: ProgramSlot = isolation('wrist_extension', scheme(3, 15, 15), 4, 'kg', 'per_hand',
+  ['Forearm supported, palm down; 3 s up, 3 s down; the last 1–2 reps hard but clean.',
+    'Right arm is the priority; do both. Pain rule. No extensor stretching.'], { restSec: 60, rehab: true });
 
 // ---------- days ----------
 
@@ -107,15 +122,20 @@ const DAYS: ProgramDay[] = [
     notes: ['Lunch walk.'],
     slots: [
       main('squat', 'squat', 100, 'total', ['Safety bars just below your bottom position.', 'About 2 s down, up fast.']),
-      compound('romanian_deadlift', repOutLast(3, 6, 10), 80, 'kg', 'total', ['Straps.', '2–3 s down.']),
+      compound('romanian_deadlift', repOutLast(3, 6, 10), 80, 'kg', 'total', ['Straps.', '2–3 s down.'], { alternatives: ['db_romanian_deadlift'] }),
       isolation('lying_db_hamstring_curl', failure(2, 10, 15), 25, 'kg', 'total',
-        ['Bench inclined ~30°, face down, dumbbell between your feet. Unstable: use the seated cable curl.']),
+        ['Bench inclined ~30°, face down, dumbbell between your feet. Unstable: use the seated cable curl.'],
+        { alternatives: ['seated_cable_leg_curl'] }),
       LEG_EXTENSION(2),
-      CALF_RAISE,
-      isolation('kneeling_cable_crunch', failure(2, 10, 15), 90, 'lb', 'total', ['Single pulley: 90 lb ≈ 41 kg, the plan’s 40 kg.','Curl ribs to pelvis; hips stay still.']),
+      CALF_RAISE('mon_1'),
+      isolation('kneeling_cable_crunch', failure(2, 10, 15), 90, 'lb', 'total', ['Single pulley: 90 lb ≈ 41 kg, the plan’s 40 kg.','Curl ribs to pelvis; hips stay still.'],
+        { alternatives: ['hanging_knee_raise'] }),
       LATERAL(2),
-      isolation('cross_body_triceps_extension', failure(2, 10, 15), 40, 'lb', 'per_arm',
-        ['Soft lockout.', 'Front of shoulder/collarbone hurts: switch to rope pushdowns.']),
+      // R1-10: triceps 12–20 (kinder to the elbow, same growth).
+      isolation('cross_body_triceps_extension', failure(2, 12, 20), 40, 'lb', 'per_arm',
+        ['Soft lockout.', 'Front of shoulder/collarbone hurts: switch to rope pushdowns.'],
+        { elbowLoading: true, pair: 'mon_1', alternatives: ['rope_pushdown'] }),
+      WRIST_LADDER_SLOT,
     ],
   },
   {
@@ -127,13 +147,19 @@ const DAYS: ProgramDay[] = [
         ['Bench ~30°, palms facing. Soft lockout. Right shoulder pinching: stop that side a little higher.']),
       main('weighted_pullup', 'weighted_pullup', 5, 'added',
         ['Neutral grip. Chin over the handles and a full hang count. Shoulders lightly set at the bottom.']),
-      compound('seated_cable_row', repOutLast(2, 8, 12), 100, 'lb', 'total', ['Neutral handle.'], { restSec: 120 }),
-      FLYE,
-      LATERAL(3),
+      compound('seated_cable_row', repOutLast(2, 8, 12), 100, 'lb', 'total', ['Neutral handle.'],
+        { restSec: 120, alternatives: ['chest_supported_db_row'] }),
+      FLYE('tue_1'),
+      LATERAL(3, 'tue_2'),
       // 50 lb = the plan's 23 kg
-      isolation('bayesian_curl', failure(2, 8, 12), 50, 'lb', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.']),
-      isolation('overhead_cable_triceps_extension', failure(2, 10, 15), 20, 'lb', 'per_arm',
-        ['Rope or wrist cuff, no bar grip. Soft lockout.']),
+      isolation('bayesian_curl', failure(2, 8, 12), 50, 'lb', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.'],
+        { elbowLoading: true, pair: 'tue_1', alternatives: ['preacher_curl'] }),
+      isolation('overhead_cable_triceps_extension', failure(2, 12, 20), 20, 'lb', 'per_arm',
+        ['Rope or wrist cuff, no bar grip. Soft lockout.'],
+        { elbowLoading: true, pair: 'tue_2', alternatives: ['cross_body_triceps_extension'] }),
+      // R1-08 optional: +1 rear delt set paired with the flye, only after checkpoint 1 (extra-set weeks).
+      isolation('cable_rear_delt_fly', failure(1, 12, 20), 30, 'lb', 'per_arm', ['Optional extra set (checkpoint 1 met). Cables crossed; keep it in the shoulders.'],
+        { extraOnly: true, pair: 'tue_1' }),
     ],
   },
   {
@@ -154,18 +180,22 @@ const DAYS: ProgramDay[] = [
       { ...main('deadlift', 'deadlift', 140, 'total',
         ['Low-rep ramp, then one top set. Straps are fine; no mixed grip.', 'Reset every rep from a dead stop, no bounce.']),
         restSec: 150 },
-      compound('bulgarian_split_squat', repOutLast(3, 8, 12), 14, 'kg', 'per_hand', ['Straps if grip limits.', '90 s between legs.']),
+      compound('bulgarian_split_squat', repOutLast(3, 8, 12), 14, 'kg', 'per_hand', ['Straps if grip limits.', '90 s between legs.'],
+        { alternatives: ['db_reverse_lunge'] }),
       // June 30 lb −10% → 20 (no 25 pin)
-      isolation('seated_cable_leg_curl', failure(2, 10, 15), 20, 'lb', 'per_leg', ['Torso leaning slightly forward, hips bent.']),
+      isolation('seated_cable_leg_curl', failure(2, 10, 15), 20, 'lb', 'per_leg', ['Torso leaning slightly forward, hips bent.'],
+        { alternatives: ['lying_db_hamstring_curl'] }),
       LEG_EXTENSION(1),
-      CALF_RAISE,
+      CALF_RAISE(),
       isolation('hanging_knee_raise', failure(2, 10, 15), 0, 'bodyweight', 'total',
-        ['Curl the pelvis up. Dip handles if grip or elbow bothers you.']),
-      LATERAL(2),
-      // June 50 lb −10% → 40 (no 45 pin)
-      isolation('preacher_curl', failure(2, 8, 12), 40, 'lb', 'total', ['No bouncing out of the bottom.']),
-      isolation('wrist_extension', scheme(2, 15, 15), 4, 'kg', 'per_hand',
-        ['Elbow care: start 4–6 kg, 3 s down. Right arm is the priority; do both. Pain rule.'], { restSec: 60, rehab: true }),
+        ['Curl the pelvis up. Dip handles if grip or elbow bothers you.'], { alternatives: ['kneeling_cable_crunch'] }),
+      LATERAL(2, 'fri_1'),
+      // June 50 lb −10% → 40 (no 45 pin). His kneeling single-arm cable curl, upper arm braced on the raised knee.
+      isolation('preacher_curl', failure(2, 8, 12), 40, 'lb', 'total',
+        ['Upper arm braced on the raised knee, arm in front of the body; full stretch at the bottom with a soft lockout.',
+          'No bouncing out of the bottom.'],
+        { elbowLoading: true, pair: 'fri_1', alternatives: ['bayesian_curl'] }),
+      WRIST_LADDER_SLOT,
     ],
   },
   {
@@ -173,20 +203,29 @@ const DAYS: ProgramDay[] = [
     notes: ['Shoulder care block first, about 10 minutes.'],
     slots: [
       ...SHOULDER_BLOCK,
-      compound('barbell_row', repOutLast(3, 6, 10), 70, 'kg', 'total', ['Straps. Elbow flares: try an underhand grip.']),
-      compound('db_bench_press', repOutLast(3, 6, 10), 25, 'kg', 'per_hand', ['Neutral grip, soft lockout.']),
-      compound('lat_pulldown', failure(2, 8, 12), 120, 'lb', 'total', ['Neutral handle, full stretch overhead.'], { restSec: 120 }),
-      FLYE,
-      LATERAL(3),
+      compound('barbell_row', repOutLast(3, 6, 10), 70, 'kg', 'total', ['Straps. Elbow flares: try an underhand grip.'],
+        { alternatives: ['chest_supported_db_row'] }),
+      compound('db_bench_press', repOutLast(3, 6, 10), 25, 'kg', 'per_hand', ['Neutral grip, soft lockout.'], { alternatives: ['db_floor_press'] }),
+      compound('lat_pulldown', failure(2, 8, 12), 120, 'lb', 'total', ['Neutral handle, full stretch overhead.'],
+        { restSec: 120, alternatives: ['single_arm_lat_pulldown'] }),
+      FLYE(),
+      LATERAL(3, 'sat_2'),
       // June 40 lb −10% → 30 (no 35 pin)
-      isolation('cable_rear_delt_fly', failure(2, 12, 20), 30, 'lb', 'per_arm', ['Cables crossed; keep it in the shoulders.']),
-      isolation('underhand_cable_curl', failure(2, 8, 12), 40, 'lb', 'total', ['Replaces hammer curl.']),
-      isolation('reverse_grip_pushdown', failure(2, 8, 12), 80, 'lb', 'total', ['Replaces overhand pushdown. Soft lockout.']),
+      isolation('cable_rear_delt_fly', failure(2, 12, 20), 30, 'lb', 'per_arm', ['Cables crossed; keep it in the shoulders.'],
+        { pair: 'sat_1', alternatives: ['prone_db_rear_delt_raise'] }),
+      isolation('underhand_cable_curl', failure(2, 8, 12), 40, 'lb', 'total', ['Replaces hammer curl.'],
+        { elbowLoading: true, pair: 'sat_1', alternatives: ['incline_hammer_curl', 'preacher_curl'] }),
+      isolation('reverse_grip_pushdown', failure(2, 12, 20), 80, 'lb', 'total', ['Replaces overhand pushdown. Soft lockout.'],
+        { elbowLoading: true, pair: 'sat_2', alternatives: ['rope_pushdown'] }),
     ],
   },
   {
     key: 'rounds', weekday: 7, title: 'Rounds', focus: 'Boxing-format intervals', kind: 'conditioning', slots: [],
-    conditioning: { kind: 'rounds', workSec: 120, easySec: 60, warmupMin: 5, startRounds: 6, maxRounds: 10, dropOffFraction: 0.1 },
+    conditioning: {
+      kind: 'rounds', workSec: 120, easySec: 60, warmupMin: 5, startRounds: 6, maxRounds: 10, dropOffFraction: 0.1,
+      // R1-30: from week 4, 2 of the rounds are burst rounds; finish by 14:00 (~30 h before Monday's squat).
+      burstFromWeek: 4, burstRounds: 2, burstWorkSec: 5, burstEasySec: 10, finishBy: '14:00',
+    },
     notes: ['Jump rope or running. Every round about equal; count skips (or distance) in round 1 and the last round.'],
   },
 ];
@@ -206,6 +245,11 @@ const WEEK_TYPE_LABELS: Record<WeekType, string> = {
   deload: 'Deload', taper: 'Taper', test: 'PR test',
 };
 
+/** E24 / P-VARIETY: at the deloads (weeks 7 and 10). Equivalents are each slot's `alternatives`. */
+export const VARIETY_NOTE = 'You may swap up to 2 accessories for a listed equivalent this week (same muscle).';
+/** R1-08: the extra sets after checkpoint 1 are fixed (arms), with an optional rear delt set. */
+const EXTRA_SETS_NOTE = 'If checkpoint 1 was met: +1 set on each curl and triceps exercise on Tue and Sat (optional +1 rear delt fly on Tue).';
+
 const CALENDAR: Array<[string, WeekType, string[], Partial<ProgramWeek>?]> = [
   ['2026-10-12', 'calibration', ['One rep-out at a known load per main lift sets the training maxes.',
     'Accessories: 2 easy sets, stop at the top of the range or 2 reps before failure.']],
@@ -215,11 +259,11 @@ const CALENDAR: Array<[string, WeekType, string[], Partial<ProgramWeek>?]> = [
   ['2026-11-09', 'A', []],
   ['2026-11-16', 'B', []],
   ['2026-11-23', 'C', ['Checkpoint 1 at the end of this week (29 Nov).'], { checkpoint: CHECKPOINT_1 }],
-  ['2026-11-30', 'deload', ['1 set per accessory, not to failure; half the Sunday rounds.']],
-  ['2026-12-07', 'A', ['If checkpoint 1 was met: +1 set for your two most lagging muscles.'], { extraSetsEligible: true }],
-  ['2026-12-14', 'B', ['If checkpoint 1 was met: +1 set for your two most lagging muscles.'], { extraSetsEligible: true }],
+  ['2026-11-30', 'deload', ['1 set per accessory, not to failure; half the Sunday rounds.', VARIETY_NOTE]],
+  ['2026-12-07', 'A', [EXTRA_SETS_NOTE], { extraSetsEligible: true }],
+  ['2026-12-14', 'B', [EXTRA_SETS_NOTE], { extraSetsEligible: true }],
   ['2026-12-21', 'deload', ['England 20–27 Dec. Hotel or local gym: do the deload sessions. No gym: rest and walk a lot.',
-    'Eat roughly as usual; keep protein up.']],
+    'Eat roughly as usual; keep protein up.', VARIETY_NOTE]],
   ['2026-12-28', 'C', []],
   ['2027-01-04', 'A', []],
   ['2027-01-11', 'B', []],
@@ -276,8 +320,16 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
       },
     },
     // "3 sets of 5 plus a rep-out at the same load, target 8"; ≥10 up, 6–9 same, ≤5 down.
-    incline_db_press: { scheme: 'load_step', sets: 3, reps: 5, repOutTarget: 8, stepUpAtReps: 10, stepDownAtReps: 5, lightSets: 3, lightReps: 5 },
-    weighted_pullup: { scheme: 'load_step', sets: 3, reps: 5, repOutTarget: 8, stepUpAtReps: 10, stepDownAtReps: 5, lightSets: 3, lightReps: 5 },
+    // R1-04: incline ≥16 → +2 dumbbells, stuck at 6–9 three times → normal sets 3 × 6, then 3 × 7;
+    // pull-up ≥12 → +5 kg.
+    incline_db_press: {
+      scheme: 'load_step', sets: 3, reps: 5, repOutTarget: 8, stepUpAtReps: 10, stepDownAtReps: 5, lightSets: 3, lightReps: 5,
+      doubleStepAtReps: 16, stuck: { after: 3, reps: [6, 7] },
+    },
+    weighted_pullup: {
+      scheme: 'load_step', sets: 3, reps: 5, repOutTarget: 8, stepUpAtReps: 10, stepDownAtReps: 5, lightSets: 3, lightReps: 5,
+      doubleStepAtReps: 12,
+    },
   },
   weekTypeRules: {
     calibration: { includeAccessories: true, accessorySetCap: 2, accessoryToFailure: false, compoundRepOut: false,
@@ -303,7 +355,47 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
   // Timing table: mains 3 min (4 before a rep-out), other compounds 2–3 min, isolation 90 s, shoulder block 45–60 s.
   restSecByRole: { main: 180, compound: 150, isolation: 90, shoulder: 50 },
   repOutRestSec: 240,
-  // Every 2 weeks from week 3: < +0.1 kg/wk → +100 kcal; > +0.25 → −100 kcal.
-  bodyweightRate: { minKgPerWeek: 0.1, maxKgPerWeek: 0.25, adjustKcal: 100, fromWeek: 3 },
+  // Every 2 weeks: < +0.1 kg/wk → +100 kcal; > +0.25 → −100 kcal. Creatine (E16): the fit starts at week 3
+  // (Mon 2 Nov), so the first check is week 5; ≥ 20 weigh-ins; readings > 1.5 kg off a first fit are dropped.
+  bodyweightRate: { minKgPerWeek: 0.1, maxKgPerWeek: 0.25, adjustKcal: 100, fromWeek: 5, fitFromWeek: 3, minWeighIns: 20, outlierKg: 1.5 },
   nutrition: { kcal: 2800, proteinG: 180, fatG: 80, carbsG: 370, targetBodyweightKg: [76, 78] },
+  oldBestE1rm: { squat: 165, deadlift: 235 },
+  creatineStart: CREATINE_START,
+  creatineBandKg: 0.7,
+  rateExclusions: [{ from: '2026-12-20', to: '2027-01-03', label: 'holiday' }],
+  pairRestSec: { between: 50, after: 75 },
+  mainLiftFallbacks: {
+    squat: { dayKey: 'lower_b', beforeExerciseKey: 'bulgarian_split_squat', pctTm: 0.75, sets: 2, reps: 3 },
+    deadlift: { pctOfTop: 0.8, sets: 2, reps: 5, repRange: [3, 5] },
+  },
+  extraSets: {
+    arms: {
+      muscles: ['triceps', 'biceps'],
+      targets: [
+        { dayKey: 'upper_a', exerciseKey: 'bayesian_curl' },
+        { dayKey: 'upper_a', exerciseKey: 'overhead_cable_triceps_extension' },
+        { dayKey: 'upper_b', exerciseKey: 'underhand_cable_curl' },
+        { dayKey: 'upper_b', exerciseKey: 'reverse_grip_pushdown' },
+      ],
+    },
+    rearDelt: { muscles: ['rear_delts'], targets: [{ dayKey: 'upper_a', exerciseKey: 'cable_rear_delt_fly' }] },
+  },
+  wristLadder: {
+    exerciseKey: 'wrist_extension',
+    rungs: [{ fromWeek: 0, reps: 15 }, { fromWeek: 2, reps: 12 }, { fromWeek: 4, reps: 10 }, { fromWeek: 6, reps: 8 }, { fromWeek: 9, reps: 6 }],
+    sets: 3,
+    dayKeys: ['lower_a', 'lower_b'],
+    homeDayKey: 'easy_ride',
+    maintainFromWeek: 13,
+    maintain: { dayKey: 'lower_b', sets: 2, reps: 8 },
+    isometric: { sets: 5, holdSec: [30, 45] },
+  },
+  photoWeeks: [0, 4, 8, 12, 16, 19],
+  alternativeSlots: {
+    // Start load = the last logged one (12 kg × 12, Sep 2026).
+    incline_hammer_curl: isolation('incline_hammer_curl', failure(2, 8, 12), 12, 'kg', 'per_hand',
+      ['Bench at a high incline, arms hanging behind the body; neutral grip. Only while the elbow stays at 0–3/10.'],
+      { elbowLoading: true }),
+  },
+  restart: { capAfterDays: 10, firstWeekAfterDays: 14, capPlusReps: 2 },
 };

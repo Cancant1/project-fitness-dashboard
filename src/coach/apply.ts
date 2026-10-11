@@ -7,6 +7,7 @@ import { planTargetRow } from "../lib/nutrition";
 import { adjustmentsOf, type Adjustment, type CoachAction } from "../plan/adjustments";
 import { activeProgram, latestMaxes, planIds } from "../plan/bridge";
 import { reduceTrainingMax } from "../plan/engine";
+import { elbowMonthlyRow, morningAnswer, painCheckRow, type ElbowMonthly } from "../plan/pain";
 
 export interface ApplyResult {
   ok: boolean;
@@ -35,7 +36,8 @@ async function recordAdjustment(local: LocalStore, adj: Adjustment): Promise<boo
  * - kcal → a nutrition_targets row effective `from` (next Monday): the current row copied with kcal ± 100
  *   (carbs ± 25 g, per-weekday kcal ± 100); an existing row on that date is updated instead;
  * - tm_reduce → new training_maxes rows for squat and deadlift, −5%, reason missed_weeks, dated `today`;
- * - deload_now, repeat_week, extra_sets, main_lift_set, swap → stored for applyAdjustments.
+ * - deload_now, skip_deload, repeat_week (old), extra_sets, main_lift_set, swap, cut_sets, recalibrate → stored for
+ *   applyAdjustments / planState.
  * Every applied action is also recorded in programs.rules.adjustments (so the report shows it as applied).
  * Applying the same action twice does nothing the second time.
  */
@@ -140,9 +142,59 @@ export async function ensurePlanProteinPerKg(local: LocalStore, planStart: strin
 
 // ---------- the coach's inputs ----------
 
-/** Next-morning pain answer (Today prompt): writes pain_checks.next_morning. */
-export async function answerPainCheck(local: LocalStore, painCheckId: string, answer: NonNullable<PainCheck["next_morning"]>): Promise<void> {
-  await local.save("pain_checks", { id: painCheckId, next_morning: answer });
+/**
+ * Next-morning pain answer, 0–10 (Today prompt, E14): writes pain_checks.morning_score and the legacy
+ * next_morning (sore when the score is ≥ the site's usual morning level + 2). Returns what was written; `flare`
+ * means the coach will suggest a swap (and the wrist ladder switches to isometric holds for an elbow).
+ */
+export async function answerPainCheck(local: LocalStore, painCheckId: string, score: number): Promise<{ morning_score: number; next_morning: PainCheck["next_morning"]; flare: boolean }> {
+  const all = local.all("pain_checks");
+  const check = all.find((p) => p.id === painCheckId);
+  const answer = check
+    ? morningAnswer(all, check, score)
+    : { morning_score: Math.max(0, Math.min(10, Math.round(score))), next_morning: null };
+  await local.save("pain_checks", { id: painCheckId, ...answer });
+  return { ...answer, flare: answer.next_morning === "sore" };
+}
+
+/**
+ * A pain check from the logger's 0–10 slider and "sharp" toggle (E14): writes pain_score and during_set.
+ * The logger shows "stop this exercise today" when painAction(score, sharp) is "stop" (≥ 6 or sharp).
+ */
+export async function savePainCheck(local: LocalStore, input: Parameters<typeof painCheckRow>[0]): Promise<PainCheck> {
+  const [row] = await local.save("pain_checks", painCheckRow(input));
+  return row!;
+}
+
+/** The monthly elbow check (3 questions, 0–10 each): a pain_checks row with site elbow_monthly, scores in `note`. */
+export async function saveElbowMonthly(local: LocalStore, date: string, scores: ElbowMonthly): Promise<PainCheck> {
+  const [row] = await local.save("pain_checks", elbowMonthlyRow(date, scores));
+  return row!;
+}
+
+/**
+ * Thursday boxing "Gassed? 1–5 + the round you faded" (E22): the day's boxing row gets `rating` and `rounds`
+ * (= the fade round); without a boxing row that day one is created (done, 45 min).
+ */
+export async function saveGassed(local: LocalStore, date: string, rating: 1 | 2 | 3 | 4 | 5, fadeRound: number | null): Promise<void> {
+  const existing = local.all("conditioning").find((c) => c.kind === "boxing" && c.date === date);
+  if (existing) {
+    await local.save("conditioning", { id: existing.id, rating, rounds: fadeRound });
+    return;
+  }
+  await local.save("conditioning", {
+    date, kind: "boxing", minutes: 45, loop_time_s: null, rounds: fadeRound, first_round_count: null, last_round_count: null,
+    rating, done: true, note: null
+  });
+}
+
+/**
+ * Progress photos taken (E20, M-MEASURE): a body_measurements row of kind "other", value 1, note "photos".
+ * One "other" row per day (unique per user, date, kind): an existing one that day is updated.
+ */
+export async function savePhotosDone(local: LocalStore, date: string): Promise<void> {
+  const existing = local.all("body_measurements").find((m) => m.kind === "other" && m.date === date);
+  await local.save("body_measurements", { ...(existing ? { id: existing.id } : {}), date, kind: "other", value: 1, unit: "cm", source: "app", note: "photos" });
 }
 
 /** Session energy 1–5 (finish-workout sheet): writes sessions.energy. */

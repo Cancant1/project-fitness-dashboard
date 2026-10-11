@@ -3,25 +3,28 @@
 import { addDays, fmtShortDate } from "../lib/format";
 import type { Adjustment, CoachAction } from "../plan/adjustments";
 import { isoWeekday, weekForDate } from "../plan/engine";
-import { bodyRules, waistDueCue } from "./body";
+import { bodyRules, photosCue, waistDueCue } from "./body";
 import { lcFirst as lc, weekContext, type AreaResult, type WeekCtx } from "./common";
 import { conditioningRules } from "./conditioning";
-import { consistencyRules, floorCue } from "./consistency";
+import { consistencyRules, floorCue, habitCues } from "./consistency";
 import type { CoachData } from "./data";
-import { fuelRules, proteinCue } from "./fuel";
-import { JOINT_RED_FLAGS, jointsRules, painPromptCue } from "./joints";
+import { fuelRules, proteinCue, sessionFuelCue } from "./fuel";
+import { JOINT_RED_FLAGS, elbowMonthlyCue, jointsRules, painPromptCue } from "./joints";
 import { muscleRules } from "./muscle";
-import { CAFFEINE_NOTE, recoveryRules } from "./recovery";
+import { ALCOHOL_NOTE, CAFFEINE_NOTE, lightsOutCue, recoveryRules } from "./recovery";
 import { strengthRules } from "./strength";
 import { AREAS, type DailyCue, type Signal, type Verdict, type WeekNumbers, type WeeklyReport } from "./types";
 
 /** Rule ids in priority order (most important first). A signal id matches its rule id or "rule.subject". */
 export const PRIORITY: readonly string[] = [
-  "joints.swap", "consistency.long_break", "consistency.missed_week", "strength.checkpoint", "strength.misses",
-  "body.rate", "fuel.kcal", "body.waist", "fuel.protein", "recovery.sleep", "consistency.sessions", "muscle.volume",
+  "joints.swap", "joints.cut_sets", "consistency.long_break", "consistency.missed_week", "strength.checkpoint", "strength.misses",
+  "joints.trend", "body.rate", "fuel.kcal", "body.waist", "fuel.protein", "recovery.sleep", "consistency.sessions",
+  "consistency.missed_twice", "muscle.volume", "muscle.overreach",
   "strength.tm", "strength.repout", "strength.checkpoint_ahead", "strength.step_pace", "strength.step",
-  "joints.sharp", "joints.trend", "fuel.logging", "body.weighins", "body.path", "fuel.tdee", "recovery.energy",
-  "muscle.progress", "muscle.effort", "muscle.by_muscle", "strength.calibration", "consistency.streak", "conditioning.week"
+  "joints.sharp", "fuel.logging", "body.weighins", "body.path", "body.photos", "fuel.tdee", "recovery.sleep_lifting",
+  "recovery.energy", "consistency.comeback", "consistency.habit", "joints.alternative", "conditioning.gassed",
+  "muscle.progress", "muscle.effort", "muscle.by_muscle", "muscle.variety", "strength.calibration", "consistency.streak",
+  "conditioning.week", "recovery.resting_hr", "recovery.hrv"
 ];
 
 export function priorityOf(id: string): number {
@@ -50,10 +53,14 @@ export function findApplied(action: CoachAction, adjustments: readonly Adjustmen
       case "kcal": return d.kind === "kcal" && d.from === action.from && d.delta === action.delta;
       case "deload_now": return d.kind === "deload_now" && d.weekNo === action.weekNo;
       case "repeat_week": return d.kind === "repeat_week" && d.missedWeekNo === action.missedWeekNo;
+      case "skip_deload": return d.kind === "skip_deload" && d.weekNo === action.weekNo;
       case "tm_reduce": return d.kind === "tm_reduce" && ctx.lastSession != null && a.created.slice(0, 10) >= ctx.lastSession;
-      case "extra_sets": return d.kind === "extra_sets" && d.fromWeek === action.fromWeek;
+      case "recalibrate": return d.kind === "recalibrate" && ctx.lastSession != null && a.created.slice(0, 10) >= ctx.lastSession;
+      case "extra_sets": return d.kind === "extra_sets" && d.fromWeek === action.fromWeek
+        && [...d.muscles].sort().join() === [...action.muscles].sort().join();
       case "main_lift_set": return d.kind === "main_lift_set" && d.fromWeek === action.fromWeek;
-      case "swap": return d.kind === "swap" && d.exerciseKey === action.exerciseKey && d.until >= ctx.asOf;
+      case "swap": return d.kind === "swap" && d.exerciseKey === action.exerciseKey && d.to === action.to && d.until >= ctx.asOf;
+      case "cut_sets": return d.kind === "cut_sets" && d.exerciseKey === action.exerciseKey && d.until >= ctx.asOf;
     }
   });
 }
@@ -118,7 +125,18 @@ export function verdictOf(weekNo: number, daysOfData: number, signals: readonly 
   return "on_track";
 }
 
-export function headlineOf(verdict: Verdict, weekNo: number, actions: readonly Signal[], signals: readonly Signal[]): string {
+/**
+ * The one-sentence headline. With `sessions` (E21, P-HABITS) it leads with them: "4 of 4 sessions. Week 3 is on
+ * plan. Keep going." ("2 of 4 sessions so far. …" while the week runs).
+ */
+export function headlineOf(verdict: Verdict, weekNo: number, actions: readonly Signal[], signals: readonly Signal[],
+  sessions?: { done: number; planned: number; complete: boolean }): string {
+  const lead = sessions && sessions.planned > 0
+    ? `${sessions.done} of ${sessions.planned} sessions${sessions.complete ? "" : " so far"}. ` : "";
+  return lead + headlineText(verdict, weekNo, actions, signals);
+}
+
+function headlineText(verdict: Verdict, weekNo: number, actions: readonly Signal[], signals: readonly Signal[]): string {
   switch (verdict) {
     case "too_early": return `Week ${weekNo}: too early to judge. Log everything.`;
     case "on_track": return `Week ${weekNo} is on plan. Keep going.`;
@@ -157,8 +175,8 @@ export function weeklyReport(data: CoachData, weekNo: number, today: string): We
   return {
     weekNo, weekType: ctx.week.type, label: ctx.complete ? `Week ${weekNo}` : `Week ${weekNo} so far`,
     from: ctx.from, to: ctx.to, complete: ctx.complete,
-    verdict, headline: headlineOf(verdict, weekNo, actions, settled), actions, signals, numbers,
-    staticInfo: [JOINT_RED_FLAGS, CAFFEINE_NOTE]
+    verdict, headline: headlineOf(verdict, weekNo, actions, settled, { ...numbers.sessions, complete: ctx.complete }), actions, signals, numbers,
+    staticInfo: [JOINT_RED_FLAGS, CAFFEINE_NOTE, ALCOHOL_NOTE]
   };
 }
 
@@ -173,14 +191,19 @@ function pendingAction(data: CoachData, weekNo: number, today: string): Signal |
 }
 
 /**
- * Today's cues, at most 3, in priority order (§5):
- * 1. joints.prompt (before 12:00) · 2. a pending coach action · 3. consistency.floor ·
- * 4. weigh-in reminder before 11:00 · 5. protein after 18:00 · 6. waist check due · 7. Sunday check-in.
+ * Today's cues, at most 3, in priority order (§5, E19–E21):
+ * 1. joints.prompt (before 12:00, 0–10) · 2. the if-then cues (habitCues: missed yesterday, Thursday floor,
+ * minimum session, first exercise after 17:00, Sunday planning) · 3. a pending coach action ·
+ * 4. consistency.floor (Fri–Sun, nothing done) · 5. weigh-in reminder before 11:00 · 6. progress photos (photo weeks,
+ * from Thursday) · 7. caffeine / candy (lifting days from 15:00) · 8. protein after 18:00 · 9. the monthly elbow
+ * check · 10. waist check due (only while he logs it) · 11. lights out before a lifting day (from 21:00) ·
+ * 12. Sunday check-in.
  */
 export function dailyCues(data: CoachData, today: string, nowHour: number): DailyCue[] {
   const cues: (DailyCue | null)[] = [];
   const week = weekForDate(data.plan, today);
   cues.push(painPromptCue(data, today, nowHour));
+  cues.push(...habitCues(data, today, nowHour));
   if (week && data.program) {
     const s = pendingAction(data, week.weekNo, today);
     if (s?.action) cues.push({ id: `action.${s.id}`, tone: "warm", text: s.message, action: s.action, signalId: s.id, to: "/checkin" });
@@ -189,8 +212,12 @@ export function dailyCues(data: CoachData, today: string, nowHour: number): Dail
   if (nowHour < 11 && !data.allMeasurements.some((m) => m.kind === "weight" && m.date === today)) {
     cues.push({ id: "body.weigh_in", tone: "plain", text: "Weigh in after the first pee.", to: "/weight" });
   }
+  cues.push(photosCue(data, today));
+  cues.push(sessionFuelCue(data, today, nowHour));
   cues.push(proteinCue(data, today, nowHour));
+  cues.push(elbowMonthlyCue(data, today, nowHour));
   cues.push(waistDueCue(data, today));
+  cues.push(lightsOutCue(data, today, nowHour));
   if (week && data.program && isoWeekday(today) === 7) {
     cues.push({ id: "checkin.ready", tone: "good", text: `Week ${week.weekNo} check-in is ready.`, to: "/checkin" });
   }

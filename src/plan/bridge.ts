@@ -3,16 +3,19 @@
 import { useMemo } from "react";
 import type { LocalStore } from "../data/local";
 import { useRows } from "../data/context";
-import type { Conditioning, Exercise, Profile, Program, SetRow, Session, TrainingMax } from "../data/types";
+import type { Conditioning, Exercise, PainCheck, Profile, Program, SetRow, Session, TrainingMax } from "../data/types";
 import { isFlagged } from "../lib/analysis";
 import { todayIso } from "../lib/format";
 import { adjustmentState, adjustmentsOf, applyAdjustments } from "./adjustments";
 import {
-  apreNextLoad, doubleProgression, DEFAULT_EQUIPMENT, failureProgression, progressionStep, roundsNextWeek, weekForDate
+  apreNextLoad, doubleProgression, DEFAULT_EQUIPMENT, dumbbellFloor, failureProgression, progressionStep, roundBarbell,
+  roundsNextWeek, stuckNormalReps, weekForDate
 } from "./engine";
 import { STRENGTH_RETURN_PLAN } from "./strengthReturn";
-import { GYM, weightsFor } from "./equipment";
-import type { EquipmentProfile, PlanState, PrescribedDay, ProgramDefinition, ProgramSlot, RoundsRule } from "./types";
+import { GYM, snapDown, weightsFor } from "./equipment";
+import { effortState, holdLoadState, lastLoggedWorkingLoad, recalibrateState, restartState, wristLadderState } from "./stateRules";
+import type { SwapHistory } from "./swaps";
+import type { EquipmentProfile, PlanState, PrescribedDay, ProgramDefinition, ProgramSlot, RoundsRule, Unit } from "./types";
 
 export const PLAN: ProgramDefinition = STRENGTH_RETURN_PLAN;
 export const PLAN_KEY = "strength-return-2026";
@@ -48,7 +51,15 @@ export const HISTORY_NAME: Record<string, string> = {
   lat_pulldown: "Lat Pulldown",
   cable_rear_delt_fly: "Rear Delt Fly",
   underhand_cable_curl: "Cable Curl",
-  reverse_grip_pushdown: "Reverse-Grip Pushdown"
+  reverse_grip_pushdown: "Reverse-Grip Pushdown",
+  // Alternatives and swap targets with history (start loads, R1-17). The incline hammer curl's last logged
+  // set (12 kg × 12, Sep 2026) is under "Hammer Curl".
+  incline_hammer_curl: "Hammer Curl",
+  hammer_curl: "Hammer Curl",
+  db_lateral_raise: "Lateral Raise (DB)",
+  heel_elevated_goblet_squat: "Heel-Elevated Goblet Squat",
+  single_arm_lat_pulldown: "Single-Arm Lat Pulldown",
+  db_reverse_lunge: "Lunges"
 };
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -157,9 +168,16 @@ const weekTypeOf = (s: Session | undefined): string | undefined => (s?.legacy_re
  *   - failure isolation: double progression, +2 steps when every set overshoots the range top by ≥ 5 (§6.3);
  *   - otherwise double progression (top of the range on every set → one step up);
  *   - a deload or taper session carries its load forward (those sets are not a test);
- * - from the programme row's adjustments: extra-set muscles and extra main-lift sets (§7);
+ * - APRE taper (R1-05): once the rep-out load ≥ the last logged working load (12 months before the plan),
+ *   the jumps are +5% / +2.5%;
+ * - the wrist ladder progresses at its rung's reps (the logged sets' rep range); isometric holds don't count;
+ * - E14 hold: an exercise whose latest pain check was ≥ 4/10 (and not trained since) keeps its load;
+ * - E5 stuck incline: normalReps from the incline rep-out history;
+ * - from the programme row's adjustments: extra sets, extra main-lift sets (§7), recalibration (E3);
+ * - E9 effort, E12 restart and E13 wrist-ladder state from sessions and pain checks (stateRules.ts);
  * - Sunday rounds from the conditioning log (roundsNextWeek).
- * Flagged sets are ignored.
+ * Flagged sets are ignored. Pass `today` for the restart rules that depend on the current gap, and `painChecks`
+ * for the pain rules (both optional: without them those parts are left out).
  */
 export function planState(args: {
   program: Program; ids: Map<string, string>; maxes: TrainingMax[]; sessions: Session[]; sets: SetRow[]; equipment: EquipmentProfile;
@@ -167,27 +185,39 @@ export function planState(args: {
   conditioning?: Conditioning[];
   /** The adjusted programme (week types for the rounds rule). Defaults to planFor(program). */
   plan?: ProgramDefinition;
+  /** Pain checks (E9 elbow rule, E13 flare-ups, E14 hold). */
+  painChecks?: PainCheck[];
+  /** Today (E12: the gap since the last plan session). */
+  today?: string;
 }): PlanState {
   const { program, ids, maxes, sessions, sets, equipment } = args;
   const plan = args.plan ?? planFor(program);
   const latest = latestMaxes(maxes, ids);
-  const planSessions = new Set(sessions.filter((s) => s.program_id === program.id && s.status === "completed").map((s) => s.id));
+  const completedPlan = sessions.filter((s) => s.program_id === program.id && s.status === "completed" && !s.deleted_at)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
+  const planSessions = new Set(completedPlan.map((s) => s.id));
   const sessionById = new Map(sessions.map((s) => [s.id, s]));
   const currentLoads: Partial<Record<string, number>> = {};
   if (latest.incline_db_press != null) currentLoads.incline_db_press = latest.incline_db_press;
   if (latest.weighted_pullup != null) currentLoads.weighted_pullup = latest.weighted_pullup;
+  const keyOf = new Map([...ids].map(([k, id]) => [id, k]));
+  const pain = (args.painChecks ?? []).filter((p) => !p.deleted_at);
+  const hold = holdLoadState(pain, keyOf, completedPlan, sets);
+  const wristKey = PLAN.wristLadder?.exerciseKey;
 
   const slots = new Map<string, ProgramSlot>();
   for (const d of PLAN.days) for (const s of d.slots) if (s.role !== "main" && !slots.has(s.exerciseKey)) slots.set(s.exerciseKey, s);
 
   for (const [key, slot] of slots) {
     const id = ids.get(key);
-    const mine = sets.filter((s) => s.exercise_id === id && planSessions.has(s.session_id) && s.completed && s.kind !== "warmup" && s.load != null && !isFlagged(s));
+    const mine = sets.filter((s) => s.exercise_id === id && planSessions.has(s.session_id) && s.completed && s.kind !== "warmup"
+      && s.kind !== "timed" && s.load != null && !isFlagged(s) && !s.deleted_at);
     if (!mine.length) continue;
     const lastDate = mine.reduce((d, s) => { const sd = sessionById.get(s.session_id)!.date; return sd > d ? sd : d; }, "");
     const last = mine.filter((s) => sessionById.get(s.session_id)!.date === lastDate);
     const lastLoad = Math.max(...last.map((s) => Number(s.load)));
-    const range = slot.scheme?.repRange;
+    // The wrist ladder progresses at the rung's reps (the logged sets' range), not the slot's first rung.
+    const range = key === wristKey ? refOf(last[0]!)?.repRange ?? slot.scheme?.repRange : slot.scheme?.repRange;
     const weekType = weekTypeOf(sessionById.get(last[0]!.session_id));
     if (!range || weekType === "deload" || weekType === "taper") {
       currentLoads[key] = lastLoad;
@@ -197,16 +227,40 @@ export function planState(args: {
     // Cables: the next real pin on that machine's stack; dumbbells: the rack; barbell: 2.5 kg.
     const step = weightsFor(key) ?? (def ? progressionStep(def.equipment, slot.unit, equipment) : 2.5);
     const repOut = slot.scheme?.lastSetRepOut ? last.find((s) => s.kind === "rep_out" && s.reps != null) : undefined;
+    let next: number;
     if (repOut) {
       const normal = last.filter((s) => s !== repOut).map((s) => s.reps);
-      currentLoads[key] = apreNextLoad(Number(repOut.load), repOut.reps!, normal, range, step).load;
+      const before = lastLoggedWorkingLoad(sets, sessions, id, PLAN.startDate, slot.unit);
+      const tapered = before != null && Number(repOut.load) >= before - 1e-9;
+      next = apreNextLoad(Number(repOut.load), repOut.reps!, normal, range, step, { tapered }).load;
     } else if (slot.scheme?.toFailure && last.every((s) => s.kind === "failure")) {
-      currentLoads[key] = failureProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
+      next = failureProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
     } else {
-      currentLoads[key] = doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
+      next = doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
     }
+    // E14: pain 4–5/10 last time → no increase.
+    currentLoads[key] = hold[key] ? Math.min(next, lastLoad) : next;
   }
 
+  // E5: incline stuck at 6–9 for 3 rep-outs at one load → the normal sets add reps.
+  const normalReps: PlanState["normalReps"] = {};
+  for (const lift of ["incline_db_press", "weighted_pullup"] as const) {
+    const def = PLAN.mainLifts[lift];
+    if (!def.stuck) continue;
+    const history = completedPlan.flatMap((sess) => sets.filter((s) => s.session_id === sess.id && s.completed && s.kind === "rep_out"
+      && refOf(s)?.mainLift === lift && s.reps != null && s.load != null && !isFlagged(s) && !s.deleted_at)
+      .map((s) => ({ load: Number(s.load), reps: s.reps! })));
+    // Only rep-outs at the load prescribed next count (a step up resets it).
+    const cur = currentLoads[lift];
+    const reps = cur != null && history.length && Math.abs(history.at(-1)!.load - cur) < 1e-9 ? stuckNormalReps(history, def) : undefined;
+    if (reps != null) normalReps[lift] = reps;
+  }
+
+  const holdLoad = Object.fromEntries(Object.entries(hold).filter(([, v]) => v));
+  const recalibrate = recalibrateState(adjustmentsOf(program.rules), maxes, ids);
+  const restart = restartState(completedPlan.map((s) => s.date), plan, args.today);
+  const effort = effortState(completedPlan, pain, plan);
+  const wristLadder = wristLadderState(pain, plan);
   const rounds = args.conditioning ? sundayRoundsFrom(args.conditioning, plan) : undefined;
   return {
     trainingMaxes: {
@@ -215,9 +269,62 @@ export function planState(args: {
     },
     currentLoads,
     ...adjustmentState(adjustmentsOf(program.rules)),
-    ...(rounds !== undefined ? { sundayRounds: rounds } : {})
+    ...(rounds !== undefined ? { sundayRounds: rounds } : {}),
+    ...(Object.keys(normalReps).length ? { normalReps } : {}),
+    ...(Object.keys(holdLoad).length ? { holdLoad } : {}),
+    ...(Object.keys(recalibrate).length ? { recalibrate } : {}),
+    ...(restart ? { restart } : {}),
+    ...(effort ? { effort } : {}),
+    ...(wristLadder ? { wristLadder } : {})
   };
 }
+
+const refOf = (s: SetRow) => (s.legacy_ref as { plan?: { mainLift?: string; repRange?: [number, number] } } | null)?.plan;
+
+/**
+ * E15: what swapStartLoad needs, from the rows: the latest clean working set of an exercise (by plan key or
+ * history name), the current plan loads, the 7-day bodyweight and how loads snap to the target's equipment.
+ */
+export function swapHistory(args: {
+  today: string; exercises: Exercise[]; sessions: Session[]; sets: SetRow[]; state: PlanState; bodyweightKg: number | null;
+  equipment?: EquipmentProfile;
+}): SwapHistory {
+  const sessionDate = new Map(args.sessions.filter((s) => !s.deleted_at).map((s) => [s.id, s.date]));
+  const equipment = args.equipment ?? DEFAULT_EQUIPMENT;
+  const slotOf = (key: string): ProgramSlot | undefined =>
+    PLAN.days.flatMap((d) => d.slots).find((s) => s.exerciseKey === key) ?? PLAN.alternativeSlots?.[key];
+  return {
+    today: args.today,
+    bodyweightKg: args.bodyweightKg,
+    latest: (key) => {
+      const ex = findExercise(args.exercises, key);
+      if (!ex) return null;
+      const rows = args.sets.filter((s) => s.exercise_id === ex.id && s.completed && s.kind !== "warmup" && s.kind !== "timed"
+        && s.load != null && !isFlagged(s) && !s.deleted_at && sessionDate.has(s.session_id) && sessionDate.get(s.session_id)! <= args.today);
+      if (!rows.length) return null;
+      const date = rows.reduce((d, s) => (sessionDate.get(s.session_id)! > d ? sessionDate.get(s.session_id)! : d), "");
+      const day = rows.filter((s) => sessionDate.get(s.session_id) === date);
+      const top = day.reduce((a, b) => (Number(b.load_kg ?? 0) > Number(a.load_kg ?? 0) ? b : a));
+      const unit = (slotOf(key)?.unit ?? (top.unit as Unit)) as Unit;
+      const load = top.unit === unit ? Number(top.load) : unit === "lb" ? Number(top.load_kg) * 2.20462 : Number(top.load_kg);
+      return { load, unit, date };
+    },
+    current: (key) => {
+      const slot = slotOf(key);
+      const load = args.state.currentLoads[key] ?? slot?.startLoad;
+      return load != null ? { load, unit: slot?.unit ?? "kg" } : null;
+    },
+    snap: (key, load, unit) => {
+      const pins = weightsFor(key);
+      if (pins) return snapDown(load, pins);
+      const def = PLAN.exercises[key];
+      if (unit === "lb") return Math.floor(load / 5) * 5;
+      if (def?.equipment === "dumbbell" || /db_|dumbbell/.test(key)) return dumbbellFloor(load, equipment.dumbbellRackKg) ?? load;
+      return roundBarbell(load);
+    }
+  };
+}
+
 
 /**
  * This week's planned Sunday rounds from the rounds log, oldest first: after a normal week,

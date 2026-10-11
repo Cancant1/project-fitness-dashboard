@@ -38,7 +38,10 @@ export interface Signal {
 
 /** The raw metrics behind a weekly report (for the check-in script and detail views). Null = no data. */
 export interface WeekNumbers {
-  sessions: { done: number; planned: number };
+  /** Completed plan sessions (minimum sessions count) vs planned lifting days. */
+  sessions: { done: number; planned: number; minimum?: number };
+  /** P-HABITS: weeks in a row with 4+ sessions (meter n/6), "missed twice in a row" events and comebacks this week. */
+  habit?: { weeks: number; target: number; missedTwice: number; comebacks: number };
   workingSets: { done: number; planned: number };
   trainingMax: Partial<Record<TmLiftKey, { tm: number | null; line: number | null; calibration: number | null; provisional: boolean }>>;
   repOuts: { lift: MainLiftKey; date: string; load: number; reps: number; target: number | null; tmFrom: number | null; tmTo: number | null; nextLoad: number | null }[];
@@ -50,19 +53,31 @@ export interface WeekNumbers {
     avg7d: number | null; band: [number, number] | null; weighIns: number;
     /** kg/week from the 28-day least-squares fit (rate weeks only) and its standard error. */
     rate: number | null; rateSe: number | null; rateN: number;
+    /** Set when this week's rate check was skipped (e.g. "holiday"). */
+    rateSkipped?: string | null;
   };
   waist: { latestCm: number | null; cmPerMonth: number | null };
+  /** M-MEASURE photos: a photo week, done, and the next photo Thursday. */
+  photos?: { photoWeek: boolean; done: boolean; next: string | null };
   food: {
     daysLogged: number; avgKcal: number | null; targetKcal: number | null;
     avgProtein: number | null; targetProtein: number | null; proteinPerKg: number | null; tdee: number | null;
   };
-  sleep: { nights: number; avgHours: number | null };
+  sleep: {
+    nights: number; avgHours: number | null;
+    /** C-SLEEP: nights before lifting days (dated the lifting day) and their average (target 7.5 h). */
+    beforeLifting?: { nights: number; avgHours: number | null };
+  };
+  /** C-READINESS (info only): 7-day averages against a 60-day baseline. */
+  heart?: { restingHr7d: number | null; restingHr60d: number | null; hrv7d: number | null; hrv60d: number | null };
   energy: { rated: number; avg: number | null; prevAvg: number | null };
   /** Sessions with an ache or sharp pain, per site. */
   pain: { site: string; sessions: number; sharp: number }[];
   conditioning: {
     rideMin: number; rideTarget: number | null; boxing: boolean;
     rounds: number | null; roundsTarget: number | null; roundsNext: number | null;
+    /** E22: this week's "gassed" rating (1–5) and fade round from the boxing row. */
+    gassed?: number | null; fadeRound?: number | null;
   };
 }
 
@@ -96,8 +111,11 @@ export interface WeeklyReport {
 export interface PainPrompt {
   kind: "pain_next_morning";
   painCheckId: string;
-  /** Buttons; answerPainCheck(local, painCheckId, option) writes pain_checks.next_morning. */
-  options: readonly ["normal", "sore"];
+  site: string;
+  /** The 0–10 scale; answerPainCheck(local, painCheckId, score) writes morning_score (and next_morning). */
+  options: readonly number[];
+  /** The site's usual morning level (median of the last 14 days, or 0): a score ≥ baseline + 2 suggests a swap. */
+  baseline: number;
 }
 
 /** Today page, at most 3, in priority order. */
@@ -113,4 +131,8 @@ export interface DailyCue {
   signalId?: string;
   /** The morning pain question (joints.prompt). */
   prompt?: PainPrompt;
+  /** E21: offer "Start the minimum session" (prescribeMinimum + startWorkout(..., { minimum: true })). */
+  startMinimum?: boolean;
+  /** An inline input the cue carries: progress photos done (savePhotosDone), the monthly elbow check (saveElbowMonthly). */
+  input?: "photos" | "elbow_monthly";
 }

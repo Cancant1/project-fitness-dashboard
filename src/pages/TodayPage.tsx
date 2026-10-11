@@ -296,10 +296,10 @@ function CueRow({ cue, today, onDone }: { cue: DailyCue; today: string; onDone: 
           {prompt.options.map((o) => (
             <button key={o} type="button" className="btn btn-tinted ci-btn" disabled={busy} onClick={async () => {
               setBusy(true);
-              await answerPainCheck(local, prompt.painCheckId, o);
+              const r = await answerPainCheck(local, prompt.painCheckId, o);
               setBusy(false);
-              onDone(o === "sore" ? "Saved. The check-in suggests a swap." : "Saved. Good.");
-            }}>{o === "normal" ? "Normal" : "Sore"}</button>
+              onDone(r.flare ? "Saved. The check-in suggests a swap." : "Saved. Good.");
+            }}>{o}</button>
           ))}
         </div>
       )}

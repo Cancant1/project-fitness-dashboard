@@ -159,7 +159,7 @@ describe("Today", () => {
     expect(host.querySelector('input[placeholder="Slept"]')).toBeTruthy();
   });
 
-  it("asks about yesterday's ache in the morning; Sore writes next_morning and the cue goes", async () => {
+  it("asks about yesterday's ache in the morning (0–10); 6 writes morning_score, next_morning sore, and the cue goes", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 21, 8, 0)); // Wednesday of week 1, 08:00
     try {
@@ -171,10 +171,10 @@ describe("Today", () => {
 
       await render(<TodayPage />);
       const coach = () => host.querySelector(".t-coach")!;
-      expect(coach().textContent).toContain("Right elbow after incline DB press yesterday: how is it this morning?");
-      await click([...coach().querySelectorAll("button")].find((b) => b.textContent === "Sore"));
+      expect(coach().textContent).toContain("Right elbow after incline DB press yesterday: how is it this morning (0–10)?");
+      await click([...coach().querySelectorAll("button")].find((b) => b.textContent === "6"));
       await until(() => local.get("pain_checks", pain.id)?.next_morning === "sore");
-      expect(local.get("pain_checks", pain.id)?.next_morning).toBe("sore");
+      expect(local.get("pain_checks", pain.id)).toMatchObject({ next_morning: "sore", morning_score: 6 });
       await until(() => !coach().textContent?.includes("how is it this morning"));
       expect(coach().textContent).not.toContain("how is it this morning");
     } finally {

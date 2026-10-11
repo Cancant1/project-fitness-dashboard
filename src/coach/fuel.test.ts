@@ -48,26 +48,28 @@ describe("fuel.protein (2.0 g/kg target, 1.6 g/kg floor)", () => {
   });
 });
 
-describe("fuel.tdee (28 days, ≥ 18 intake days, ≥ 10 weigh-ins)", () => {
-  const tdee = (perWeek: number) => {
+describe("fuel.tdee: maintenance (as logged), ≥ 24 of 28 days, 6,000 kcal/kg, weeks 0–4 left out", () => {
+  /** Weeks 5–8 (16 Nov – 13 Dec): the first window that lies after week 4. */
+  const tdee = (perWeek: number, logged = 28, week = 8) => {
     const w = new World();
-    for (let i = 0; i < 27; i++) w.food(addDays(monday(1), i), 2800, 150);
-    w.weighDaily(monday(1), 27, 75, perWeek);
-    return get(weeklyReport(w.data(), 4, sunday(4)), "fuel.tdee");
+    for (let i = 0; i < logged; i++) w.food(addDays(monday(5), i), 2800, 150);
+    w.weighDaily(monday(5), 28, 75.5, perWeek);
+    // Today (Sunday) is still being logged: judge on Monday.
+    return get(weeklyReport(w.data(), week, addDays(sunday(week), 1)), "fuel.tdee");
   };
-  it("measured maintenance and the surplus over it", () => {
-    // 2,800 − 0.25 kg/wk × 7,700 / 7 ≈ 2,525 (the synthetic weigh-ins are rounded to grams).
+  it("maintenance (as logged) and the surplus over it", () => {
+    // 2,800 − 0.25 kg/wk × 6,000 / 7 ≈ 2,586 (the synthetic weigh-ins are rounded to grams).
     const s = tdee(0.25);
-    expect(s?.status).toBe("info");
-    expect(s?.message).toMatch(/^Your measured maintenance: ≈2,5[23]0 kcal \(plan assumed 2,600\)\. Target 2,800 = \+11% over it\.$/);
+    expect(s).toMatchObject({ status: "info", title: "Maintenance (as logged)" });
+    expect(s?.message).toMatch(/^Your maintenance \(as logged\): ≈2,5[89]0 kcal \(plan assumed 2,600\)\. Target 2,800 = \+8% over it\.$/);
   });
   it("target under maintenance + 3% → watch", () => {
-    expect(tdee(0)).toMatchObject({ status: "watch", message: "Target is only 0% over your measured maintenance." });
+    expect(tdee(0)).toMatchObject({ status: "watch", message: "Target is only 0% over your maintenance (as logged)." });
   });
-  it("not enough data → nothing", () => {
-    const w = new World();
-    for (let i = 0; i < 10; i++) w.food(addDays(monday(1), i), 2800, 150);
-    expect(get(weeklyReport(w.data(), 4, sunday(4)), "fuel.tdee")).toBeUndefined();
+  it("needs 24 of the 28 days logged, and a window after week 4 (creatine)", () => {
+    expect(tdee(0.25, 24)).toBeDefined();
+    expect(tdee(0.25, 23)).toBeUndefined();
+    expect(tdee(0.25, 28, 7)).toBeUndefined(); // the 28 days to 6 Dec start in week 4
   });
 });
 

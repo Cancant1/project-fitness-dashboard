@@ -63,7 +63,8 @@ describe("planState: adjustments and rounds", () => {
     expect(s.extraSetsMuscles).toEqual(["triceps", "biceps"]);
     expect(s.addMainLiftSet).toEqual({ squat: true, deadlift: true });
     const total = prescribeWeek(PLAN, 8, { ...s, trainingMaxes: { squat: 140, deadlift: 200 } }).reduce((n, d) => n + d.workingSetCount, 0);
-    expect(total).toBe(72 + 2 + 2); // +1 triceps, +1 biceps, +1 squat set, +1 deadlift back-off
+    // +1 triceps, +1 biceps; R1-07: squat → light Friday squat 2 × 3, deadlift → 2 back-off sets
+    expect(total).toBe(72 + 2 + 2 + 2);
   });
 
   it("Sunday rounds follow the log: +1 when the last round is within 10% of the first; deloads hold", () => {

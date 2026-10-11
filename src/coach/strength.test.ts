@@ -96,9 +96,9 @@ describe("strength.misses", () => {
     setup?.(w);
     return get(weeklyReport(w.data(), 2, today), "strength.misses");
   };
-  it("two rep-out weeks under target, bodyweight and sleep fine → deload now (next week once this one is over)", () => {
+  it("two rep-outs ≥ 2 under target, bodyweight and sleep fine → deload now (next week once this one is over)", () => {
     expect(missed()).toMatchObject({
-      status: "act", message: "Rep-outs missed two weeks running. Take the deload now; the plan allows it early.", action: { kind: "deload_now", weekNo: 3 }
+      status: "act", message: "Rep-outs missed by 2+ reps two weeks running. Take the deload now; the plan allows it early.", action: { kind: "deload_now", weekNo: 3 }
     });
   });
   it("early in the week: this week becomes the deload", () => {
@@ -107,13 +107,13 @@ describe("strength.misses", () => {
   it("bodyweight falling → eat first, +100 kcal from Monday", () => {
     const s = missed((w) => { w.tables.body_measurements = []; w.weighDaily(monday(0), 21, 75, -0.4); });
     expect(s).toMatchObject({
-      status: "act", message: "Rep-outs missed two weeks running and bodyweight is dropping. Eat first: +100 kcal.",
+      status: "act", message: "Rep-outs missed by 2+ reps two weeks running and bodyweight is dropping. Eat first: +100 kcal.",
       action: { kind: "kcal", delta: 100, from: "2026-11-02" }
     });
   });
   it("short sleep → fix sleep first (no deload)", () => {
     const s = missed((w) => { for (const d of [0, 1, 2, 3]) w.sleep(`2026-10-${27 + d}`, 5.5); });
-    expect(s).toMatchObject({ status: "watch", message: "Rep-outs missed two weeks running. Sleep 5.5 h: fix sleep first." });
+    expect(s).toMatchObject({ status: "watch", message: "Rep-outs missed by 2+ reps two weeks running. Sleep 5.5 h: fix sleep first." });
   });
   it("one week only, or hit: nothing", () => {
     const w = new World();
@@ -125,7 +125,7 @@ describe("strength.misses", () => {
     const w = new World();
     w.session(dayIn(5, "lower_b"), "lower_b", { reps: (ex, p) => (ex.mainLift === "deadlift" && p.kind === "rep_out" ? 3 : undefined) });
     w.session(dayIn(6, "lower_b"), "lower_b", { reps: (ex, p) => (ex.mainLift === "deadlift" && p.kind === "rep_out" ? 1 : undefined) });
-    expect(get(weeklyReport(w.data(), 6, sunday(6)), "strength.misses")).toMatchObject({ status: "info", message: "Rep-outs missed two weeks running. The deload is next week anyway." });
+    expect(get(weeklyReport(w.data(), 6, sunday(6)), "strength.misses")).toMatchObject({ status: "info", message: "Rep-outs missed by 2+ reps two weeks running. The deload is next week anyway." });
   });
 });
 
@@ -140,21 +140,40 @@ describe("strength.checkpoint (week 6)", () => {
     w.weighDaily(monday(6), 7, opts.bw ?? 74.6, 0);
     return get(weeklyReport(w.data(), 6, sunday(6)), "strength.checkpoint");
   };
-  it("met → good, with extra sets for the two most lagging muscles from week 8", () => {
-    expect(cp()).toMatchObject({
-      status: "good", message: "Checkpoint 1 met: squat 145/145, deadlift 210/210, bodyweight 74.6/74.5.",
-      action: { kind: "extra_sets", muscles: ["triceps", "biceps"], fromWeek: 8 }
+  it("met → good, with the fixed arm package (R1-08) from week 8, and the optional rear delt set as a second action", () => {
+    const s = cp();
+    expect(s).toMatchObject({
+      status: "good",
+      action: {
+        kind: "extra_sets", muscles: ["triceps", "biceps"], fromWeek: 8,
+        targets: [
+          { dayKey: "upper_a", exerciseKey: "bayesian_curl" }, { dayKey: "upper_a", exerciseKey: "overhead_cable_triceps_extension" },
+          { dayKey: "upper_b", exerciseKey: "underhand_cable_curl" }, { dayKey: "upper_b", exerciseKey: "reverse_grip_pushdown" }
+        ]
+      }
     });
+    expect(s?.message.startsWith("Checkpoint 1 met: squat 145/145, deadlift 210/210, bodyweight 74.6/74.5. Extra arm work from week 8: +1 set on each curl and triceps exercise on Tue and Sat (+2 biceps and +2 triceps sets a week)")).toBe(true);
+    expect(s?.why).toEqual(expect.arrayContaining(["P-EXTRASETS", "P-TIMESAVE"]));
+    const w = new World();
+    for (const n of [1, 2, 3, 4, 5, 6]) w.week(n);
+    w.tm(monday(0), "squat", 140, "calibration");
+    w.tm(monday(0), "deadlift", 200, "calibration");
+    w.tm(dayIn(6, "lower_a"), "squat", 145);
+    w.tm(dayIn(6, "lower_b"), "deadlift", 210);
+    w.weighDaily(monday(6), 7, 74.6, 0);
+    const rear = get(weeklyReport(w.data(), 6, sunday(6)), "strength.checkpoint.rear_delt");
+    expect(rear).toMatchObject({ status: "info", action: { kind: "extra_sets", muscles: ["rear_delts"], fromWeek: 8, targets: [{ dayKey: "upper_a", exerciseKey: "cable_rear_delt_fly" }] } });
   });
   it("behind with bodyweight short → fix food first, +100 kcal", () => {
     expect(cp({ bw: 74.2 })).toMatchObject({
       status: "act", message: "Checkpoint 1 missed. Bodyweight 74.2 vs 74.5: fix food first, +100 kcal.", action: { kind: "kcal", delta: 100, from: "2026-11-30" }
     });
   });
-  it("behind on a lift with sessions and bodyweight fine → one more normal set on each main lift", () => {
+  it("behind on a lift with sessions and bodyweight fine → R1-07 fallbacks for the lifts behind, +1 set on incline and pull-up", () => {
     expect(cp({ squat: 140 })).toMatchObject({
-      status: "act", message: "Checkpoint 1 missed on squat. Add one normal set to each main lift.",
-      action: { kind: "main_lift_set", lifts: ["squat", "deadlift", "incline_db_press", "weighted_pullup"], fromWeek: 7 }
+      status: "act",
+      message: "Checkpoint 1 missed on squat. Add work: squat: a light Friday squat, 2 × 3 at 75% TM before the split squats; incline and pull-up: one more normal set.",
+      action: { kind: "main_lift_set", lifts: ["squat", "incline_db_press", "weighted_pullup"], fromWeek: 7 }
     });
   });
   it("behind with sessions short → sessions first, no action", () => {

@@ -1,9 +1,11 @@
 import type { LocalStore } from "../data/local";
-import type { Exercise, Program, SetRow, Session } from "../data/types";
+import type { Exercise, PainCheck, Program, SetRow, Session } from "../data/types";
 import { toKg } from "../lib/format";
-import { PROVISIONAL_NOTE, incrementAfterRepOut, trainingMaxAfterRepOut } from "./engine";
+import { PROVISIONAL_NOTE, STEP_RULES, incrementAfterRepOut, trainingMaxAfterRepOut } from "./engine";
 import { PLAN, latestMaxes } from "./bridge";
-import type { EquipmentProfile, PrescribedDay, PrescribedExercise, PrescribedSet } from "./types";
+import { setEffort } from "./effort";
+import { PAIN_HOLD, duringScore } from "./pain";
+import type { Effort, EquipmentProfile, PrescribedDay, PrescribedExercise, PrescribedSet } from "./types";
 
 export interface PlanSetRef {
   exerciseKey: string;
@@ -15,6 +17,17 @@ export interface PlanSetRef {
   repRange?: [number, number];
   restSec: number;
   note?: string;
+  /** E1: how hard this set goes (always resolved: the set's own effort or the exercise's). Old rows: absent. */
+  effort?: Effort;
+  /** E12: stop the rep-out at this many reps. */
+  capReps?: number;
+  /** P-TIMESAVE pair id and position (A, B, C). */
+  pair?: string;
+  pairLabel?: string;
+  /** Isometric hold: seconds. */
+  durationSec?: number;
+  /** A calibration rep-out (week 0 or a recalibration): sets the TM instead of moving it. */
+  calibration?: boolean;
 }
 
 export function planRef(s: SetRow): PlanSetRef | undefined {
@@ -22,19 +35,31 @@ export function planRef(s: SetRow): PlanSetRef | undefined {
 }
 
 function targetText(p: PrescribedSet): string | null {
-  if (p.repRange) return `${p.repRange[0]}–${p.repRange[1]}`;
+  if (p.durationSec != null) return `${p.durationSec} s`;
+  if (p.repRange) return p.repRange[0] === p.repRange[1] ? String(p.repRange[0]) : `${p.repRange[0]}–${p.repRange[1]}`;
   if (p.reps != null) return String(p.reps);
+  if (p.capReps != null && p.target != null) return `${p.target}–${p.capReps}`;
   if (p.target != null) return `${p.target}+`;
   return null;
 }
 
-/** Creates the session with every prescribed set as a planned (not yet completed) row. */
-export async function startWorkout(local: LocalStore, program: Program, day: PrescribedDay, ids: Map<string, string>, date: string): Promise<string> {
+/**
+ * Creates the session with every prescribed set as a planned (not yet completed) row. A minimum session
+ * (prescribeMinimum, or `opts.minimum`) stores legacy_ref.plan.minimum = true; it counts as the day's session.
+ */
+export async function startWorkout(local: LocalStore, program: Program, day: PrescribedDay, ids: Map<string, string>, date: string,
+  opts: { minimum?: boolean } = {}): Promise<string> {
+  const minimum = opts.minimum === true || day.minimum === true;
   const [session] = await local.save("sessions", {
-    date, title: day.title, status: "in_progress", started_at: new Date().toISOString(), ended_at: null, duration_min: null,
+    date, title: minimum ? `${day.title} (minimum)` : day.title, status: "in_progress", started_at: new Date().toISOString(), ended_at: null, duration_min: null,
     program_id: program.id, program_week_no: day.weekNo, program_day_id: null, energy: null, notes: null,
     date_confidence: "exact", date_basis: null, source: "app",
-    legacy_ref: { plan: { programKey: PLAN.id, dayKey: day.dayKey, weekType: day.weekType, weekLabel: day.weekLabel, notes: day.notes } }
+    legacy_ref: {
+      plan: {
+        programKey: PLAN.id, dayKey: day.dayKey, weekType: day.weekType, weekLabel: day.weekLabel, notes: day.notes,
+        ...(minimum ? { minimum: true } : {})
+      }
+    }
   });
   const rows: Partial<SetRow>[] = [];
   for (const ex of day.exercises) {
@@ -51,7 +76,11 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
           plan: {
             exerciseKey: ex.exerciseKey, role: ex.role, mainLift: ex.mainLift, group: ex.group, target: p.target, pctTm: p.pctTm,
             repRange: p.repRange, restSec: p.kind === "warmup" ? 60 : isLast ? ex.restSec : (ex.sets[i + 1]?.kind === "rep_out" ? ex.restBeforeRepOutSec ?? ex.restSec : ex.restSec),
-            note: p.note
+            note: p.note, effort: setEffort(ex, p),
+            ...(p.capReps != null ? { capReps: p.capReps } : {}),
+            ...(ex.pair ? { pair: ex.pair, pairLabel: ex.pairLabel } : {}),
+            ...(p.durationSec != null ? { durationSec: p.durationSec } : {}),
+            ...(p.calibration ? { calibration: true } : {})
           } satisfies PlanSetRef
         }
       });
@@ -65,31 +94,69 @@ export interface MaxUpdate {
   lift: string; from: number | undefined; to: number; reason: "calibration" | "rep_out"; label: string;
   /** Calibration (or first) rep-out past 12 clean reps: TM from 12 reps, marked provisional (§6.2). */
   provisional?: boolean;
+  /** R1-03: TM at or past the old best, so a hit held it and a beat added at most 2.5 kg. */
+  capped?: boolean;
+  /** E14: pain 4–5/10 (or more) on this lift today, so the increase was held back. */
+  held?: boolean;
   /** Written to the training_maxes row, e.g. "provisional (>12 reps)". */
   note?: string;
 }
 
-/** What finishing this workout changes: new squat/deadlift training max, next incline/pull-up load. */
-export function maxUpdates(session: Session, sets: SetRow[], ids: Map<string, string>, maxes: import("../data/types").TrainingMax[], equipment: EquipmentProfile): MaxUpdate[] {
+/**
+ * Main lifts with pain ≥ 4/10 logged in this session (E14 hold): their TM / next load does not go up.
+ * Matches the session's pain checks (session_id, else the same date) to the main-lift exercise ids.
+ */
+export function heldLifts(session: Pick<Session, "id" | "date">, painChecks: readonly PainCheck[], ids: Map<string, string>): Set<string> {
+  const out = new Set<string>();
+  for (const lift of ["squat", "deadlift", "incline_db_press", "weighted_pullup"]) {
+    const id = ids.get(lift);
+    if (!id) continue;
+    const hit = painChecks.some((p) => !p.deleted_at && p.exercise_id === id && (p.session_id === session.id || (p.session_id == null && p.date === session.date))
+      && (duringScore(p) ?? 0) >= PAIN_HOLD);
+    if (hit) out.add(lift);
+  }
+  return out;
+}
+
+/**
+ * What finishing this workout changes: new squat/deadlift training max, next incline/pull-up load.
+ * - Calibration rep-outs (week 0, or a recalibration after ≥ 4 weeks off) set the TM (provisional past 12 reps).
+ * - R1-03: past the old-best e1RM (squat 165, deadlift 235) a hit holds the TM, a beat adds ≤ 2.5 kg.
+ * - R1-04: incline ≥ 16 → +2 dumbbells; pull-up ≥ 12 → +5 kg.
+ * - E14 (`opts.painChecks`): a lift with pain ≥ 4/10 this session gets no increase (decreases still apply).
+ */
+export function maxUpdates(session: Session, sets: SetRow[], ids: Map<string, string>, maxes: import("../data/types").TrainingMax[],
+  equipment: EquipmentProfile, opts: { painChecks?: readonly PainCheck[] } = {}): MaxUpdate[] {
   const latest = latestMaxes(maxes.filter((m) => m.source_set_id == null || !sets.some((s) => s.id === m.source_set_id)), ids);
-  const calibration = (session.legacy_ref as { plan?: { weekType?: string } }).plan?.weekType === "calibration";
+  const calibrationWeek = (session.legacy_ref as { plan?: { weekType?: string } }).plan?.weekType === "calibration";
+  const held = opts.painChecks ? heldLifts(session, opts.painChecks, ids) : new Set<string>();
   const out: MaxUpdate[] = [];
   for (const s of sets) {
     const ref = planRef(s);
     if (!ref?.mainLift || !s.completed || s.reps == null || s.load == null) continue;
     if (s.kind !== "rep_out" && !(s.kind === "top" && ref.target != null)) continue;
     const lift = ref.mainLift;
+    const hold = held.has(lift);
     if (lift === "squat" || lift === "deadlift") {
       const from = latest[lift];
-      const r = trainingMaxAfterRepOut(Number(s.load), s.reps, { previous: from, target: ref.target, calibration });
+      const calibration = calibrationWeek || ref.calibration === true;
+      const r = trainingMaxAfterRepOut(Number(s.load), s.reps, { previous: from, target: ref.target, calibration, oldBest: PLAN.oldBestE1rm?.[lift] });
+      const isHeld = hold && from != null && r.reason === "rep_out" && r.tm > from;
+      const to = isHeld ? from! : r.tm;
       out.push({
-        lift, from, to: r.tm, reason: r.reason, label: lift === "squat" ? "Squat training max" : "Deadlift training max",
-        ...(r.provisional ? { provisional: true, note: PROVISIONAL_NOTE } : {})
+        lift, from, to, reason: r.reason, label: lift === "squat" ? "Squat training max" : "Deadlift training max",
+        ...(r.provisional ? { provisional: true, note: PROVISIONAL_NOTE } : {}),
+        ...(r.capped ? { capped: true } : {}),
+        ...(isHeld ? { held: true, note: `held at ${from} (pain 4/10 or more)` } : {})
       });
     } else {
       const from = Number(s.load);
-      const to = incrementAfterRepOut(lift, from, s.reps, equipment).load;
-      out.push({ lift, from, to, reason: "rep_out", label: lift === "incline_db_press" ? "Incline DB, next load" : "Pull-up, next added load" });
+      const next = incrementAfterRepOut(lift, from, s.reps, equipment, PLAN.mainLifts[lift] ?? STEP_RULES[lift]).load;
+      const isHeld = hold && next > from;
+      out.push({
+        lift, from, to: isHeld ? from : next, reason: "rep_out", label: lift === "incline_db_press" ? "Incline DB, next load" : "Pull-up, next added load",
+        ...(isHeld ? { held: true } : {})
+      });
     }
   }
   return out;

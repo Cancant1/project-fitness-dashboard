@@ -5,6 +5,7 @@ import type {
   Checkpoint,
   ConditioningRule,
   DayKey,
+  Effort,
   Equipment,
   EquipmentProfile,
   MainLiftKey,
@@ -23,7 +24,9 @@ import type {
   StepLiftKey,
   TmLiftKey,
   Unit,
+  WeekType,
   WeekTypeRule,
+  WristLadder,
 } from './types';
 
 const EPS = 1e-9;
@@ -164,42 +167,98 @@ export interface RepOutTrainingMax {
   reason: 'calibration' | 'rep_out';
   /** Set from a calibration (or first) rep-out of more than 12 clean reps: TM = load × (1 + 12/30). */
   provisional: boolean;
+  /** R1-03: the TM was at or past the old-best e1RM, so the change was capped (hit → hold, beat → ≤ +2.5 kg). */
+  capped?: boolean;
 }
+
+/** R1-03: once the TM reaches the old best, a beat adds at most this much. */
+export const TM_CAP_STEP_KG = 2.5;
 
 /**
  * The training max a squat/deadlift rep-out leads to.
  * - Calibration week, or no TM yet: TM = load × (1 + reps/30), floored to 2.5. Past 12 clean reps the
  *   TM is provisional and uses 12 reps (§6.2: conservative on purpose, so week-1 loads stay safe).
  * - Otherwise the rep-out table moves the previous TM (rounded to the nearest 2.5, as the plan page does).
+ * - R1-03 (`oldBest`): once the previous TM ≥ the old-best e1RM, a plain hit holds the TM and any beat adds at
+ *   most +2.5 kg; misses move it as usual.
  */
 export function trainingMaxAfterRepOut(load: number, reps: number,
-  opts: { previous?: number | null; target?: number | null; calibration?: boolean } = {}): RepOutTrainingMax {
+  opts: { previous?: number | null; target?: number | null; calibration?: boolean; oldBest?: number | null } = {}): RepOutTrainingMax {
   if (opts.calibration || opts.previous == null) {
     const provisional = reps > PROVISIONAL_REPS;
     return { tm: trainingMaxFromSet(load, provisional ? PROVISIONAL_REPS : reps), reason: 'calibration', provisional };
   }
-  return { tm: nextTrainingMax(opts.previous, reps, opts.target ?? 0, 'nearest'), reason: 'rep_out', provisional: false };
+  const prev = opts.previous;
+  const diff = reps - (opts.target ?? 0);
+  const tm = nextTrainingMax(prev, reps, opts.target ?? 0, 'nearest');
+  if (opts.oldBest != null && prev >= opts.oldBest - EPS && diff >= 0) {
+    const capped = diff === 0 ? prev : Math.min(tm, round2(prev + TM_CAP_STEP_KG));
+    return { tm: capped, reason: 'rep_out', provisional: false, capped: true };
+  }
+  return { tm, reason: 'rep_out', provisional: false };
 }
 
 // ---------- step lifts and accessories ----------
 
 export interface StepResult {
   load: number;
-  direction: -1 | 0 | 1;
+  /** Steps: 2 = two steps up (R1-04), 1 up, 0 same, −1 down. */
+  direction: -1 | 0 | 1 | 2;
 }
 
-/** Incline DB / pull-up after a rep-out: ≥10 next step up, 6–9 same, ≤5 one step lighter. */
+export type StepRule = Pick<StepLiftDefinition, 'stepUpAtReps' | 'stepDownAtReps' | 'doubleStepAtReps'>;
+
+/** R1-04 defaults: incline ≥16 → +2 dumbbells; pull-up ≥12 → +5 kg; ≥10 up, 6–9 same, ≤5 down. */
+export const STEP_RULES: Record<StepLiftKey, StepRule> = {
+  incline_db_press: { stepUpAtReps: 10, stepDownAtReps: 5, doubleStepAtReps: 16 },
+  weighted_pullup: { stepUpAtReps: 10, stepDownAtReps: 5, doubleStepAtReps: 12 },
+};
+
+/**
+ * Incline DB / pull-up after a rep-out (P-PROG-STEP, R1-04):
+ * incline ≥16 → two dumbbells up, ≥10 → one, 6–9 same, ≤5 one lighter;
+ * pull-up ≥12 → +5 kg, ≥10 → +2.5, 6–9 same, ≤5 → −2.5.
+ */
 export function incrementAfterRepOut(lift: StepLiftKey, load: number, cleanReps: number,
-  profile: EquipmentProfile = DEFAULT_EQUIPMENT,
-  rule: Pick<StepLiftDefinition, 'stepUpAtReps' | 'stepDownAtReps'> = { stepUpAtReps: 10, stepDownAtReps: 5 }): StepResult {
-  const direction: -1 | 0 | 1 = cleanReps >= rule.stepUpAtReps ? 1 : cleanReps <= rule.stepDownAtReps ? -1 : 0;
-  return { load: stepLiftLoad(lift, load, direction, profile), direction };
+  profile: EquipmentProfile = DEFAULT_EQUIPMENT, rule: StepRule = STEP_RULES[lift]): StepResult {
+  const direction: StepResult['direction'] = rule.doubleStepAtReps != null && cleanReps >= rule.doubleStepAtReps ? 2
+    : cleanReps >= rule.stepUpAtReps ? 1 : cleanReps <= rule.stepDownAtReps ? -1 : 0;
+  let next = load;
+  if (direction === 2) next = stepLiftLoad(lift, stepLiftLoad(lift, load, 1, profile), 1, profile);
+  else next = stepLiftLoad(lift, load, direction, profile);
+  return { load: next, direction };
 }
 
 function stepLiftLoad(lift: StepLiftKey, load: number, dir: -1 | 0 | 1, profile: EquipmentProfile): number {
   return lift === 'incline_db_press'
     ? dumbbellStep(load, dir, profile.dumbbellRackKg)
     : pullupStep(load, dir, profile.beltStepKg);
+}
+
+/**
+ * E5 stuck rule (incline): `stuck.after` rep-outs in a row at the same load with 6–9 clean reps (between the
+ * step-down and step-up thresholds) → the next normal sets use stuck.reps[0] reps, one more stuck rep-out →
+ * reps[1], and so on (the last value holds). Any load change resets it. `history` is oldest first.
+ * Returns undefined when not stuck.
+ */
+export function stuckNormalReps(history: readonly { load: number; reps: number }[],
+  def: Pick<StepLiftDefinition, 'stepUpAtReps' | 'stepDownAtReps' | 'stuck'>): number | undefined {
+  const rule = def.stuck;
+  const last = history.at(-1);
+  if (!rule || !last || !rule.reps.length) return undefined;
+  let n = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const h = history[i]!;
+    if (Math.abs(h.load - last.load) > EPS || h.reps >= def.stepUpAtReps || h.reps <= def.stepDownAtReps) break;
+    n++;
+  }
+  if (n < rule.after) return undefined;
+  return rule.reps[Math.min(n - rule.after, rule.reps.length - 1)];
+}
+
+/** M-E1RM / D-SYSTEM-MASS: the pull-up's e1RM uses system mass (7-day average bodyweight + belt). */
+export function systemMassE1rm(addedKg: number, reps: number, bodyweightKg: number): number | null {
+  return e1rm(bodyweightKg + addedKg, reps);
 }
 
 export interface LoggedSet {
@@ -275,13 +334,17 @@ export type ApreJump = 'plus7_5' | 'plus5' | 'plus1' | 'minus1' | 'same';
  * - otherwise the same load.
  * Percent jumps round UP to the next available load: the spec's own example (RDL 80 × 20 → 87.5) needs it,
  * since 80 × 1.075 = 86 lies nearer 85.
+ * `tapered` (R1-05): once the load is back at the last logged working load, the jumps are +5% (≥ hi + 7) and
+ * +2.5% (hi + 2 … hi + 6); the jump names stay 'plus7_5' / 'plus5' (the table rows).
  */
 export function apreNextLoad(load: number, repOutReps: number, normalReps: readonly (number | null)[],
-  repRange: readonly [number, number], step: LoadSteps): { load: number; jump: ApreJump } {
+  repRange: readonly [number, number], step: LoadSteps, opts: { tapered?: boolean } = {}): { load: number; jump: ApreJump } {
   const [lo, hi] = repRange;
   const percent = (p: number) => Math.max(ceilLoad(load * (1 + p / 100), step), stepLoad(load, step, 1));
-  if (repOutReps >= hi + 7) return { load: percent(7.5), jump: 'plus7_5' };
-  if (repOutReps >= hi + 2) return { load: percent(5), jump: 'plus5' };
+  // R1-05 (E6): back at the last logged working load → +5% / +2.5% instead of +7.5% / +5% (still ≥ 1 step).
+  const [big, small] = opts.tapered ? [5, 2.5] : [7.5, 5];
+  if (repOutReps >= hi + 7) return { load: percent(big), jump: 'plus7_5' };
+  if (repOutReps >= hi + 2) return { load: percent(small), jump: 'plus5' };
   if (repOutReps >= hi && normalReps.every((r) => r !== null && r >= hi)) return { load: stepLoad(load, step, 1), jump: 'plus1' };
   if (repOutReps < lo) return { load: stepLoad(load, step, -1), jump: 'minus1' };
   return { load, jump: 'same' };
@@ -488,18 +551,49 @@ export function rideMinutes(rule: RideRule, weekNo: number): number {
   return Math.min(rule.maxMinutes, rule.startMinutes + extra);
 }
 
-function prescribeConditioning(rule: ConditioningRule, week: ProgramWeek, state: PlanState): PrescribedConditioning {
+const dur = (sec: number) => (sec % 60 === 0 ? `${sec / 60} min` : `${sec} s`);
+
+function prescribeConditioning(program: ProgramDefinition, day: ProgramDay, rule: ConditioningRule, week: ProgramWeek,
+  state: PlanState, date: string): PrescribedConditioning {
   switch (rule.kind) {
-    case 'ride':
-      return { kind: 'ride', minutes: rideMinutes(rule, week.weekNo) };
+    case 'ride': {
+      const out: PrescribedConditioning = { kind: 'ride', minutes: rideMinutes(rule, week.weekNo) };
+      // E13: the Wednesday wrist ladder at home, in the ride card.
+      const ladder = program.wristLadder;
+      const dose = ladder && day.key === ladder.homeDayKey && week.type !== 'test'
+        ? wristLadderDose(ladder, week.weekNo, day.key, state.wristLadder?.rungOffset) : null;
+      if (ladder && dose) {
+        const [a, b] = ladder.isometric.holdSec;
+        out.homeTasks = [isometricOn(state, date)
+          ? { id: 'wrist_ladder', text: `Wrist isometric holds at home: ${ladder.isometric.sets} × ${a}–${b} s, palm down, mid-range`, sets: ladder.isometric.sets, reps: null, holdSec: [a, b] }
+          : { id: 'wrist_ladder', text: `Wrist ladder at home: ${dose.sets} × ${dose.reps}, dumbbell or water bottle`, sets: dose.sets, reps: dose.reps }];
+      }
+      return out;
+    }
     case 'boxing':
       return { kind: 'boxing', minutes: rule.minutes };
     case 'rounds': {
       const base = { kind: 'rounds' as const, workSec: rule.workSec, easySec: rule.easySec, warmupMin: rule.warmupMin };
       // "Skip Sunday rounds in the week of the PR test." / "In deload weeks … do half the rounds."
       if (week.type === 'test') return { ...base, rounds: 0, skipped: true };
+      const finish = rule.finishBy ? { finishBy: rule.finishBy, notes: [`Finish by ${rule.finishBy}.`] } : {};
       const planned = state.sundayRounds ?? rule.startRounds;
-      return { ...base, rounds: week.type === 'deload' ? Math.ceil(planned / 2) : planned };
+      const shape = `${dur(rule.workSec)} hard / ${dur(rule.easySec)} easy`;
+      if (week.type === 'deload') {
+        const n = Math.ceil(planned / 2);
+        return { ...base, rounds: n, ...finish, text: `${n} rounds, ${shape} (deload: half, no burst rounds)` };
+      }
+      // R1-30: from week 4, 2 of the rounds are burst rounds (5 s all-out / 10 s easy for the round).
+      const bursts = rule.burstFromWeek != null && week.weekNo >= rule.burstFromWeek ? Math.min(rule.burstRounds ?? 0, planned) : 0;
+      if (bursts > 0) {
+        const bw = rule.burstWorkSec ?? 5;
+        const be = rule.burstEasySec ?? 10;
+        return {
+          ...base, rounds: planned, ...finish, burstRounds: bursts, burstWorkSec: bw, burstEasySec: be,
+          text: `${planned} rounds, of which ${bursts} are burst rounds: ${bw} s all-out / ${be} s easy for ${dur(rule.workSec)} (rope or shadow-boxing, no bag)`,
+        };
+      }
+      return { ...base, rounds: planned, ...finish, text: `${planned} rounds, ${shape}` };
     }
   }
 }
@@ -521,7 +615,7 @@ export function extraSetTargets(program: ProgramDefinition, muscles: readonly Mu
   const days = program.days.filter((d) => d.kind === 'lifting').sort((a, b) => a.weekday - b.weekday);
   const find = (muscle: Muscle, role: 'isolation' | 'compound'): ExtraSetTarget | null => {
     for (const day of days) {
-      const slotIndex = day.slots.findIndex((s) => s.role === role && !s.rehab
+      const slotIndex = day.slots.findIndex((s) => s.role === role && !s.rehab && !s.extraOnly
         && program.exercises[s.exerciseKey]?.muscles[0] === muscle);
       const slot = day.slots[slotIndex];
       if (slot) return { muscle, dayKey: day.key, slotIndex, exerciseKey: slot.exerciseKey };
@@ -536,6 +630,8 @@ export function extraSetTargets(program: ProgramDefinition, muscles: readonly Mu
 
 // ---------- prescribing a day ----------
 
+const TRAINING_TYPES = new Set<WeekType>(['A', 'B', 'C', 'D']);
+
 interface SlotContext {
   program: ProgramDefinition;
   week: ProgramWeek;
@@ -544,18 +640,88 @@ interface SlotContext {
   profile: EquipmentProfile;
   extraSets: number;
   dayHasMain: boolean;
+  dayKey: DayKey;
+  /** The day's date. */
+  date: string;
+  /** E12: the first plan week back after ≥ 14 days off (no extra sets or main-lift sets, no failure). */
+  firstWeekBack: boolean;
+  /** E12: the first session after ≥ 10 days off (rep-outs capped at target + 2). */
+  capRepOuts: boolean;
+}
+
+/** A set while prescribing: its effort is always known; finalize() keeps it only where it differs. */
+type DraftSet = PrescribedSet & { effort: Effort };
+type DraftExercise = Omit<PrescribedExercise, 'sets' | 'effort'> & { sets: DraftSet[] };
+
+const easy = (s: PrescribedSet): DraftSet => ({ ...s, effort: 'easy' });
+
+/** The exercise's effort is its first non-warm-up set's; sets keep `effort` only where it differs (E1). */
+function finalize(ex: DraftExercise): PrescribedExercise {
+  const first = ex.sets.find((s) => s.kind !== 'warmup') ?? ex.sets[0];
+  const effort: Effort = first?.effort ?? 'controlled';
+  const sets: PrescribedSet[] = ex.sets.map((s) => {
+    const { effort: e, ...rest } = s;
+    return e === effort ? rest : { ...rest, effort: e };
+  });
+  return { ...ex, effort, sets };
+}
+
+/**
+ * P-TIMESAVE: pair members become adjacent (in the order of the first member), labelled A, B, C; every member
+ * but the last rests `between` (45–60 s) before the partner's set, the last rests `after` (75 s). A pair with
+ * one member left that day is done as a straight set.
+ */
+export function arrangePairs(exercises: readonly PrescribedExercise[], rest = { between: 50, after: 75 }): PrescribedExercise[] {
+  const out: PrescribedExercise[] = [];
+  const done = new Set<number>();
+  exercises.forEach((e, i) => {
+    if (done.has(i)) return;
+    done.add(i);
+    if (!e.pair) {
+      out.push(e);
+      return;
+    }
+    const members = exercises.flatMap((x, j) => (j > i && x.pair === e.pair ? [j] : []));
+    if (!members.length) {
+      const { pair: _p, pairLabel: _l, ...solo } = e;
+      out.push(solo);
+      return;
+    }
+    const all = [i, ...members];
+    all.forEach((j, k) => {
+      done.add(j);
+      out.push({ ...exercises[j]!, pairLabel: String.fromCharCode(65 + k), restSec: k < all.length - 1 ? rest.between : rest.after });
+    });
+  });
+  return out;
+}
+
+/** Pair problems in the plan data: two elbow-loading moves in one pair (never allowed, P-TIMESAVE). */
+export function validatePairs(program: ProgramDefinition): string[] {
+  const errors: string[] = [];
+  for (const day of program.days) {
+    const pairs = new Map<string, ProgramSlot[]>();
+    for (const s of day.slots) if (s.pair) pairs.set(s.pair, [...(pairs.get(s.pair) ?? []), s]);
+    for (const [id, slots] of pairs) {
+      const elbow = slots.filter((s) => s.elbowLoading);
+      if (elbow.length > 1) errors.push(`${day.key} ${id}: ${elbow.map((s) => s.exerciseKey).join(' + ')} both load the elbow`);
+      if (slots.length < 2) errors.push(`${day.key} ${id}: only one member`);
+    }
+  }
+  return errors;
 }
 
 export function prescribeDay(program: ProgramDefinition, weekNo: number, dayKey: DayKey, state: PlanState,
   profile: EquipmentProfile = DEFAULT_EQUIPMENT): PrescribedDay {
   const week = getWeek(program, weekNo);
   const day = getDay(program, dayKey);
+  const date = addDays(week.startDate, day.weekday - 1);
   const base = {
     programId: program.id,
     weekNo,
     weekType: week.type,
     weekLabel: week.label,
-    date: addDays(week.startDate, day.weekday - 1),
+    date,
     dayKey,
     weekday: day.weekday,
     title: day.title,
@@ -563,20 +729,38 @@ export function prescribeDay(program: ProgramDefinition, weekNo: number, dayKey:
   };
 
   if (day.kind === 'conditioning' && day.conditioning) {
-    const conditioning = prescribeConditioning(day.conditioning, week, state);
+    const conditioning = prescribeConditioning(program, day, day.conditioning, week, state, date);
     return { ...base, kind: conditioning.skipped ? 'rest' : 'conditioning', exercises: [], conditioning, workingSetCount: 0 };
   }
 
   const rule = program.weekTypeRules[week.type];
   const isTrainingWeek = rule.accessorySetCap === null;
-  const targets = week.extraSetsEligible && isTrainingWeek ? extraSetTargets(program, state.extraSetsMuscles ?? []) : [];
+  const firstWeekBack = state.restart?.firstWeekNo === weekNo;
+  const capFrom = state.restart?.capRepOutsFrom;
+  const capRepOuts = capFrom != null && date >= capFrom && date <= addDays(capFrom, 6);
+  // P-RESTART: no extra sets in the first week back.
+  const extraOk = !!week.extraSetsEligible && isTrainingWeek && !firstWeekBack;
+  const muscleTargets = extraOk ? extraSetTargets(program, state.extraSetsMuscles ?? []) : [];
+  const slotTargets = extraOk ? state.extraSetTargets ?? [] : [];
   const dayHasMain = day.slots.some((s) => s.role === 'main');
+  const ctxBase = { program, week, rule, state, profile, dayHasMain, dayKey, date, firstWeekBack, capRepOuts };
 
-  const exercises = day.slots.flatMap((slot, i) => {
-    const extraSets = targets.filter((t) => t.dayKey === dayKey && t.slotIndex === i).length;
-    const ex = prescribeSlot(slot, { program, week, rule, state, profile, extraSets, dayHasMain });
+  const drafts: DraftExercise[] = day.slots.flatMap((slot, i) => {
+    const extraSets = muscleTargets.filter((t) => t.dayKey === dayKey && t.slotIndex === i).length
+      + slotTargets.filter((t) => t.dayKey === dayKey && t.exerciseKey === slot.exerciseKey).length;
+    if (slot.extraOnly && extraSets === 0) return [];
+    const ex = prescribeSlot(slot, { ...ctxBase, extraSets });
     return ex ? [ex] : [];
-  }).map((ex, i) => ({ ...ex, order: i + 1 }));
+  });
+
+  // R1-07: behind on the squat at a checkpoint → a light Friday squat (2 × 3 at 75% TM) before the BSS.
+  const light = lightSquat({ ...ctxBase, extraSets: 0 });
+  if (light) {
+    const at = drafts.findIndex((e) => e.exerciseKey === program.mainLiftFallbacks!.squat.beforeExerciseKey);
+    drafts.splice(at < 0 ? drafts.length : at, 0, light);
+  }
+
+  const exercises = arrangePairs(drafts.map(finalize), program.pairRestSec).map((ex, i) => ({ ...ex, order: i + 1 }));
 
   if (exercises.length === 0) {
     return { ...base, kind: 'rest', exercises, workingSetCount: 0, notes: [...base.notes, 'No accessories this week.'] };
@@ -604,14 +788,84 @@ export function countWorkingSets(exercises: readonly PrescribedExercise[]): numb
     .reduce((n, e) => n + e.sets.filter((s) => s.kind !== 'warmup').length, 0);
 }
 
-function prescribeSlot(slot: ProgramSlot, ctx: SlotContext): PrescribedExercise | null {
+// ---------- the minimum session (E2, P-MINIMUM) ----------
+
+export const MINIMUM_SESSION_NOTE = 'Minimum session (~30 min): the main lift, then one hard set of two accessories. It counts as the day\'s session.';
+const PULL = new Set<Muscle>(['back', 'biceps', 'rear_delts']);
+const PUSH = new Set<Muscle>(['chest', 'triceps', 'front_delts']);
+
+/**
+ * The minimum session for a lifting day, flagged `minimum: true`:
+ * - each main lift: its warm-up ramp and the rep-out only (deadlift: ramp + top set); calibration, test, deload
+ *   and taper weeks keep the main-lift work as prescribed (deload: the light sets instead of a rep-out);
+ * - then one hard set of the first 2 accessories of the day (not the shoulder block, not care work); on Upper
+ *   days one pull and one push. Isolation: one set to failure (stop sign while E9/E12 apply); a rep-out-last
+ *   compound: one rep-out to a stop sign; a failure compound: one set to failure. In weeks without failure work
+ *   (calibration, deload, taper) the set stops at the top of the range.
+ * - No extra sets, no checkpoint fallbacks, no pairs. TM and step rules apply as usual.
+ */
+export function prescribeMinimum(program: ProgramDefinition, weekNo: number, dayKey: DayKey, state: PlanState,
+  profile: EquipmentProfile = DEFAULT_EQUIPMENT): PrescribedDay {
+  const plain: PlanState = { ...state, extraSetsMuscles: [], extraSetTargets: [], addMainLiftSet: {} };
+  const full = prescribeDay(program, weekNo, dayKey, plain, profile);
+  if (full.kind !== 'lifting') return { ...full, minimum: true };
+  const day = getDay(program, dayKey);
+
+  const mains = full.exercises.filter((e) => e.role === 'main').map((e): PrescribedExercise => {
+    if (!e.sets.some((s) => s.kind === 'rep_out')) return e;
+    return finalize({ ...e, sets: e.sets.filter((s) => s.kind === 'warmup' || s.kind === 'rep_out').map((s) => ({ ...s, effort: s.effort ?? e.effort })) });
+  });
+
+  const present = new Map(full.exercises.map((e) => [e.exerciseKey, e]));
+  const candidates = day.slots.filter((s) => (s.role === 'compound' || s.role === 'isolation') && !s.rehab && !s.extraOnly
+    && present.has(s.exerciseKey));
+  const muscle = (s: ProgramSlot) => program.exercises[s.exerciseKey]?.muscles[0];
+  let picks = candidates.slice(0, 2);
+  if (dayKey.startsWith('upper')) {
+    const pull = candidates.find((s) => PULL.has(muscle(s)!));
+    const push = candidates.find((s) => PUSH.has(muscle(s)!));
+    if (pull && push) picks = candidates.filter((s) => s === pull || s === push);
+  }
+  const rule = program.weekTypeRules[full.weekType];
+  const accessories = picks.map((slot): PrescribedExercise => {
+    const e = present.get(slot.exerciseKey)!;
+    const scheme = slot.scheme!;
+    const first = e.sets.find((s) => s.kind !== 'warmup') ?? e.sets[0]!;
+    const repRange: [number, number] = [scheme.repRange[0], scheme.repRange[1]];
+    const failSet = e.sets.find((s) => s.kind === 'failure');
+    const set: DraftSet = !rule.accessoryToFailure
+      ? { kind: 'working', load: first.load, unit: first.unit, reps: scheme.repRange[1], repRange, effort: 'controlled' }
+      : scheme.lastSetRepOut
+        ? { kind: 'rep_out', load: first.load, unit: first.unit, reps: null, repRange, note: 'Rep-out: stop at a stop sign.', effort: 'max' }
+        : { kind: 'failure', load: first.load, unit: first.unit, reps: null, repRange, effort: failSet ? setEffortOf(e, failSet) : 'failure' };
+    const { pair: _p, pairLabel: _l, restBeforeRepOutSec: _r, ...rest } = e;
+    return finalize({ ...rest, sets: [set], restSec: slot.restSec ?? program.restSecByRole[slot.role] });
+  });
+
+  const exercises = [...mains, ...accessories].map((ex, i) => ({ ...ex, order: i + 1 }));
+  const { minutesAlternating: _m, ...withoutAlt } = full;
+  return {
+    ...withoutAlt,
+    exercises,
+    workingSetCount: countWorkingSets(exercises),
+    minutes: 30,
+    notes: [MINIMUM_SESSION_NOTE],
+    minimum: true,
+  };
+}
+
+const setEffortOf = (e: PrescribedExercise, s: PrescribedSet): Effort => s.effort ?? e.effort;
+
+// ---------- slots ----------
+
+function prescribeSlot(slot: ProgramSlot, ctx: SlotContext): DraftExercise | null {
   if (slot.role === 'main') return prescribeMain(slot, ctx);
   // Test week: "No accessories." The shoulder block stays only as preparation before a main lift.
   if (!ctx.rule.includeAccessories && !(slot.role === 'shoulder' && ctx.dayHasMain)) return null;
   return prescribeAccessory(slot, ctx);
 }
 
-function exerciseShell(slot: ProgramSlot, ctx: SlotContext): Omit<PrescribedExercise, 'sets'> {
+function exerciseShell(slot: ProgramSlot, ctx: Pick<SlotContext, 'program'>): Omit<DraftExercise, 'sets'> {
   const def = ctx.program.exercises[slot.exerciseKey];
   if (!def) throw new Error(`Unknown exercise ${slot.exerciseKey}`);
   return {
@@ -625,22 +879,67 @@ function exerciseShell(slot: ProgramSlot, ctx: SlotContext): Omit<PrescribedExer
     loadBasis: slot.loadBasis,
     ...(slot.group ? { group: slot.group } : {}),
     ...(slot.rehab ? { rehab: true } : {}),
+    ...(slot.elbowLoading ? { elbowLoading: true } : {}),
+    ...(slot.pair ? { pair: slot.pair } : {}),
+    ...(slot.alternatives?.length ? { alternatives: [...slot.alternatives] } : {}),
     restSec: slot.restSec ?? ctx.program.restSecByRole[slot.role],
     notes: [...slot.notes],
   };
 }
 
+/** J-PAINRULE trend cut running on `date`: the fraction to take off, or null. */
+function activeCut(slot: ProgramSlot, date: string): number | null {
+  const cut = slot.setCuts?.find((c) => date >= c.from && date <= c.until);
+  return cut ? cut.fraction : null;
+}
+
+function cutSets(slot: ProgramSlot, ctx: SlotContext, n: number): number {
+  const f = activeCut(slot, ctx.date);
+  return f == null || n <= 0 ? n : Math.max(1, Math.round(n * (1 - f)));
+}
+
+const HOLD_NOTE = 'Hold the load: pain was 4–5/10 last time. No increase until a session at 3/10 or less.';
+
+function painNotes(slot: ProgramSlot, ctx: SlotContext): string[] {
+  const out: string[] = [];
+  if (ctx.state.holdLoad?.[slot.exerciseKey]) out.push(HOLD_NOTE);
+  const f = activeCut(slot, ctx.date);
+  if (f != null) out.push(`Sets cut by ${Math.round(f * 100) === 33 ? 'a third' : `${Math.round(f * 100)}%`}: morning pain rising two weeks running.`);
+  return out;
+}
+
 function accessorySetCount(slot: ProgramSlot, ctx: SlotContext): number {
+  if (slot.extraOnly) return ctx.extraSets;
   const written = slot.scheme?.sets ?? 0;
   if (slot.role === 'shoulder' || slot.rehab) return written;
   let n = written;
   // Default 4: weeks 15–17 take one set off isolation slots only, never below 1.
   if (slot.role === 'isolation' && ctx.week.isolationSetDelta) n = Math.max(1, n + ctx.week.isolationSetDelta);
   if (ctx.rule.accessorySetCap !== null) n = Math.min(n, ctx.rule.accessorySetCap);
-  return n + ctx.extraSets;
+  return cutSets(slot, ctx, n + ctx.extraSets);
 }
 
-function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): PrescribedExercise {
+/**
+ * E9 / E12: why a failure set ends at the first stop sign instead, or null.
+ * First week back after ≥ 14 days: every failure set. The last 2 sessions felt ≤ 2/5: isolation that week.
+ * Elbow pain ≥ 4/10 in the last 14 days: elbow-loading isolation.
+ */
+function stopSignReason(slot: ProgramSlot, ctx: SlotContext): string | null {
+  const e = ctx.state.effort;
+  if (ctx.firstWeekBack) return 'First week back after a break: stop at the first stop sign, not failure.';
+  if (slot.role === 'isolation' && e?.lowFeelWeekNo === ctx.week.weekNo) {
+    return 'The last 2 sessions felt hard (2/5 or less): isolation stops at the first stop sign this week.';
+  }
+  if (slot.elbowLoading && e?.elbowIrritableUntil && ctx.date <= e.elbowIrritableUntil
+    && (e.elbowIrritableFrom == null || ctx.date >= e.elbowIrritableFrom)) {
+    return 'Elbow irritable (pain 4/10 or more in the last 2 weeks): stop at the first stop sign, not failure.';
+  }
+  return null;
+}
+
+function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): DraftExercise | null {
+  const ladder = ctx.program.wristLadder;
+  if (ladder && slot.exerciseKey === ladder.exerciseKey) return prescribeWristLadder(slot, ctx, ladder);
   const scheme = slot.scheme;
   if (!scheme) throw new Error(`Slot ${slot.exerciseKey} has no scheme`);
   const isShoulder = slot.role === 'shoulder';
@@ -649,55 +948,125 @@ function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): PrescribedExer
   const lastRepOut = scheme.lastSetRepOut && ctx.rule.compoundRepOut;
   const load = ctx.state.currentLoads[slot.exerciseKey] ?? slot.startLoad;
   const unit = slot.unit;
+  const stopSign = toFailure ? stopSignReason(slot, ctx) : null;
+  const failEffort: Effort = stopSign ? 'stop_sign' : 'failure';
+  const plainEffort: Effort = isShoulder ? 'easy' : slot.rehab ? 'care' : 'controlled';
 
-  const sets: PrescribedSet[] = Array.from({ length: n }, (_, i): PrescribedSet => {
+  const sets: DraftSet[] = Array.from({ length: n }, (_, i): DraftSet => {
     const repRange: [number, number] = [scheme.repRange[0], scheme.repRange[1]];
-    if (lastRepOut && i === n - 1) return { kind: 'rep_out', load, unit, reps: null, repRange, note: 'Rep-out: stop at a stop sign.' };
-    if (toFailure) return { kind: 'failure', load, unit, reps: null, repRange };
-    return { kind: 'working', load, unit, reps: scheme.repRange[1], repRange };
+    if (lastRepOut && i === n - 1) return { kind: 'rep_out', load, unit, reps: null, repRange, note: 'Rep-out: stop at a stop sign.', effort: 'max' };
+    if (toFailure) return { kind: 'failure', load, unit, reps: null, repRange, effort: failEffort };
+    return { kind: 'working', load, unit, reps: scheme.repRange[1], repRange, effort: plainEffort };
   });
 
   const shell = exerciseShell(slot, ctx);
   const ruleNote = !isShoulder && !slot.rehab ? ctx.rule.accessoryNote : undefined;
-  const extraNote = ctx.extraSets > 0 ? `+${ctx.extraSets} set for a lagging muscle (checkpoint 1 met).` : undefined;
+  const extraNote = ctx.extraSets > 0 && !slot.extraOnly ? `+${ctx.extraSets} ${ctx.extraSets === 1 ? 'set' : 'sets'} (checkpoint 1 met).` : undefined;
   return {
     ...shell,
     sets,
     ...(lastRepOut ? { restBeforeRepOutSec: shell.restSec } : {}),
-    notes: [...shell.notes, ...(ruleNote ? [ruleNote] : []), ...(extraNote ? [extraNote] : [])],
+    notes: [...shell.notes, ...(ruleNote ? [ruleNote] : []), ...(extraNote ? [extraNote] : []), ...(stopSign ? [stopSign] : []), ...painNotes(slot, ctx)],
   };
 }
 
-function prescribeMain(slot: ProgramSlot, ctx: SlotContext): PrescribedExercise {
+/**
+ * E13: the wrist ladder. Mon and Fri (and Wed at home): 3 sets at the rung's reps (15 → 12 → 10 → 8 → 6 by plan
+ * week, one rung back per flare-up), 3 s up / 3 s down, effort `care`; from week 13 2 × 8 once a week (Fri).
+ * During a flare-up (3–7 days after a morning elbow score ≥ baseline + 2): isometric holds, effort `easy`.
+ */
+function prescribeWristLadder(slot: ProgramSlot, ctx: SlotContext, ladder: WristLadder): DraftExercise | null {
+  const dose = wristLadderDose(ladder, ctx.week.weekNo, ctx.dayKey, ctx.state.wristLadder?.rungOffset);
+  if (!dose) return null;
+  const load = ctx.state.currentLoads[slot.exerciseKey] ?? slot.startLoad;
+  const shell = exerciseShell(slot, ctx);
+  if (isometricOn(ctx.state, ctx.date)) {
+    const [a, b] = ladder.isometric.holdSec;
+    return {
+      ...shell,
+      sets: Array.from({ length: ladder.isometric.sets }, (): DraftSet => ({
+        kind: 'timed', load, unit: slot.unit, reps: null, durationSec: b, note: `Hold ${a}–${b} s, palm down, mid-range.`, effort: 'easy',
+      })),
+      notes: ['Flare-up step: isometric holds for 3–7 days, then the ladder restarts one rung lower.', ...shell.notes],
+    };
+  }
+  const maintain = ctx.week.weekNo >= ladder.maintainFromWeek;
+  return {
+    ...shell,
+    sets: Array.from({ length: dose.sets }, (): DraftSet => ({
+      kind: 'working', load, unit: slot.unit, reps: dose.reps, repRange: [dose.reps, dose.reps], effort: 'care',
+    })),
+    notes: [maintain ? `Maintenance: ${dose.sets} × ${dose.reps}, once a week.` : `Ladder: ${dose.sets} × ${dose.reps}. All sets at ${dose.reps}: next dumbbell up.`, ...shell.notes],
+  };
+}
+
+/** E13: the ladder's sets and reps on a day (lifting or the home day), or null when the ladder is not on it. */
+export function wristLadderDose(ladder: WristLadder, weekNo: number, dayKey: DayKey, rungOffset = 0): { sets: number; reps: number } | null {
+  if (weekNo >= ladder.maintainFromWeek) {
+    return dayKey === ladder.maintain.dayKey ? { sets: ladder.maintain.sets, reps: ladder.maintain.reps } : null;
+  }
+  if (!(ladder.dayKeys as readonly DayKey[]).includes(dayKey) && dayKey !== ladder.homeDayKey) return null;
+  let i = 0;
+  ladder.rungs.forEach((r, k) => { if (r.fromWeek <= weekNo) i = k; });
+  const rung = ladder.rungs[Math.max(0, i - Math.max(0, rungOffset))]!;
+  return { sets: ladder.sets, reps: rung.reps };
+}
+
+function isometricOn(state: PlanState, date: string): boolean {
+  const w = state.wristLadder;
+  return !!w?.isometricFrom && !!w.isometricUntil && date >= w.isometricFrom && date <= w.isometricUntil;
+}
+
+function prescribeMain(slot: ProgramSlot, ctx: SlotContext): DraftExercise {
   const lift = slot.mainLift;
   if (!lift) throw new Error(`Main slot ${slot.exerciseKey} has no mainLift`);
   const sets = lift === 'squat' || lift === 'deadlift' ? tmLiftSets(lift, ctx) : stepLiftSets(lift, ctx);
   const shell = exerciseShell(slot, ctx);
   const heavyFinish = sets.some((s) => s.kind === 'rep_out' || s.kind === 'top');
-  return { ...shell, sets, ...(heavyFinish ? { restBeforeRepOutSec: ctx.program.repOutRestSec } : {}) };
+  const stuck = (lift === 'incline_db_press' || lift === 'weighted_pullup') && TRAINING_TYPES.has(ctx.week.type)
+    ? ctx.state.normalReps?.[lift] : undefined;
+  const notes = [
+    ...shell.notes,
+    ...(sets.some((s) => s.calibration) && ctx.week.type !== 'calibration' ? ['Back after 4+ weeks off: one calibration rep-out at 75% of your last TM.'] : []),
+    ...(stuck ? [`Stuck at 6–9 reps: normal sets of ${stuck} until the load goes up.`] : []),
+    ...painNotes(slot, ctx),
+  ];
+  return { ...shell, sets, notes, ...(heavyFinish ? { restBeforeRepOutSec: ctx.program.repOutRestSec } : {}) };
 }
 
-function working(load: number, reps: number, pctTm?: number): PrescribedSet {
-  return { kind: 'working', load, unit: 'kg', reps, ...(pctTm !== undefined ? { pctTm } : {}) };
+function working(load: number, reps: number, pctTm?: number): DraftSet {
+  return { kind: 'working', load, unit: 'kg', reps, ...(pctTm !== undefined ? { pctTm } : {}), effort: 'controlled' };
 }
-function repOut(load: number, target: number | undefined, note: string, pctTm?: number): PrescribedSet {
+function repOut(load: number, target: number | undefined, note: string, pctTm?: number): DraftSet {
   return {
     kind: 'rep_out', load, unit: 'kg', reps: null,
-    ...(target !== undefined ? { target } : {}), ...(pctTm !== undefined ? { pctTm } : {}), note,
+    ...(target !== undefined ? { target } : {}), ...(pctTm !== undefined ? { pctTm } : {}), note, effort: 'max',
   };
 }
 
-function tmLiftSets(lift: TmLiftKey, ctx: SlotContext): PrescribedSet[] {
+/** E12: the first session after ≥ 10 days off caps a rep-out with a target at target + 2. */
+function capped(set: DraftSet, ctx: SlotContext): DraftSet {
+  if (!ctx.capRepOuts || set.target == null) return set;
+  const cap = set.target + (ctx.program.restart?.capPlusReps ?? 2);
+  return { ...set, capReps: cap, note: `${set.note ? `${set.note} ` : ''}Stop at ${cap} even if more are there.` };
+}
+
+function tmLiftSets(lift: TmLiftKey, ctx: SlotContext): DraftSet[] {
   const { program, week, state, profile } = ctx;
-  const ramp = (load: number, test = false) => warmupRamp(lift, load, profile.barKg, { test });
+  const ramp = (load: number, test = false) => warmupRamp(lift, load, profile.barKg, { test }).map(easy);
 
   if (week.type === 'calibration') {
     const load = program.calibrationLoads[lift];
-    return [...ramp(load), repOut(load, undefined, 'One set to your last clean rep. Sets your training max.')];
+    return [...ramp(load), { ...repOut(load, undefined, 'One set to your last clean rep. Sets your training max.'), calibration: true }];
   }
   if (week.type === 'test') {
     const goal = program.goals[lift];
     return [...ramp(goal.load, true), repOut(goal.load, goal.reps, 'PR test.')];
+  }
+  // E3: back after ≥ 4 weeks off → a calibration rep-out at 75% of the last TM (provisional-TM rules).
+  const recal = state.recalibrate?.[lift];
+  if (recal != null) {
+    return [...ramp(recal), { ...repOut(recal, undefined, 'Calibration rep-out: one set to your last clean rep. It resets the training max.'), calibration: true }];
   }
 
   const row = program.mainLifts[lift].byWeekType[week.type];
@@ -705,30 +1074,63 @@ function tmLiftSets(lift: TmLiftKey, ctx: SlotContext): PrescribedSet[] {
   const tm = state.trainingMaxes[lift];
   if (tm === undefined) throw new Error(`Training max for ${lift} is required in week ${week.weekNo}`);
   const load = roundBarbell(tm * row.pctTm, profile.barbellStepKg);
-  const addSet = state.addMainLiftSet?.[lift] === true && row.repOutTarget !== null;
+  const addSet = state.addMainLiftSet?.[lift] === true && row.repOutTarget !== null && !ctx.firstWeekBack;
   const out = [...ramp(load)];
 
   if (lift === 'deadlift' && row.sets === 0) {
-    out.push(repOut(load, row.repOutTarget ?? undefined, 'Top set: rep-out, reset every rep.', row.pctTm));
-    // Checkpoint fallback for the deadlift: "one set of 5 at 85% of that day's top load".
-    if (addSet) out.push({ kind: 'backoff', load: roundBarbell(load * 0.85), unit: 'kg', reps: 5, note: 'Back-off set.' });
+    out.push(capped(repOut(load, row.repOutTarget ?? undefined, 'Top set: rep-out, reset every rep.', row.pctTm), ctx));
+    // R1-07: behind at a checkpoint → 1–2 back-off sets × 3–5 at 80% of that day's top-set load.
+    if (addSet) {
+      const fb = program.mainLiftFallbacks?.deadlift ?? { pctOfTop: 0.8, sets: 2, reps: 5, repRange: [3, 5] as [number, number] };
+      const backoff = roundBarbell(load * fb.pctOfTop);
+      for (let i = 0; i < fb.sets; i++) {
+        out.push({
+          kind: 'backoff', load: backoff, unit: 'kg', reps: fb.reps, repRange: [fb.repRange[0], fb.repRange[1]], effort: 'controlled',
+          note: i === 0 ? `Back-off: ${fb.repRange[0]}–${fb.repRange[1]} reps, stop at ${fb.reps}.` : 'Second back-off set: optional on a bad day.',
+        });
+      }
+    }
     return out;
   }
 
-  const normalSets = row.sets + (addSet ? 1 : 0);
+  // The squat's checkpoint fallback is the light Friday squat (lightSquat), not an extra Monday set.
+  const normalSets = cutMainSets(lift, ctx, row.sets);
   for (let i = 0; i < normalSets; i++) {
     out.push(lift === 'deadlift' && row.reps === 1 && row.repOutTarget === null
-      ? { kind: 'top', load, unit: 'kg', reps: 1, pctTm: row.pctTm, note: 'Single, no rep-out.' }
+      ? { kind: 'top', load, unit: 'kg', reps: 1, pctTm: row.pctTm, note: 'Single, no rep-out.', effort: 'controlled' }
       : working(load, row.reps, row.pctTm));
   }
-  if (row.repOutTarget !== null) out.push(repOut(load, row.repOutTarget, 'Rep-out at the same load.', row.pctTm));
+  if (row.repOutTarget !== null) out.push(capped(repOut(load, row.repOutTarget, 'Rep-out at the same load.', row.pctTm), ctx));
   return out;
 }
 
-function stepLiftSets(lift: StepLiftKey, ctx: SlotContext): PrescribedSet[] {
+function cutMainSets(lift: MainLiftKey, ctx: SlotContext, n: number): number {
+  const slot = ctx.program.days.flatMap((d) => d.slots).find((s) => s.mainLift === lift);
+  return slot ? cutSets(slot, ctx, n) : n;
+}
+
+/** R1-07: the light Friday squat (2 × 3 at 75% TM) when the squat is behind at a checkpoint, else null. */
+function lightSquat(ctx: SlotContext): DraftExercise | null {
+  const { program, week, state, profile } = ctx;
+  const fb = program.mainLiftFallbacks?.squat;
+  const tm = state.trainingMaxes.squat;
+  if (!fb || fb.dayKey !== ctx.dayKey || state.addMainLiftSet?.squat !== true || !TRAINING_TYPES.has(week.type)
+    || ctx.firstWeekBack || tm === undefined) return null;
+  const slot = program.days.flatMap((d) => d.slots).find((s) => s.mainLift === 'squat');
+  if (!slot) return null;
+  const load = roundBarbell(tm * fb.pctTm, profile.barbellStepKg);
+  const shell = exerciseShell(slot, ctx);
+  return {
+    ...shell,
+    sets: [...warmupRamp('squat', load, profile.barKg).map(easy), ...Array.from({ length: fb.sets }, () => working(load, fb.reps, fb.pctTm))],
+    notes: [`Checkpoint fallback: light squat, ${fb.sets} × ${fb.reps} at ${Math.round(fb.pctTm * 100)}% TM. Fast, clean reps.`],
+  };
+}
+
+function stepLiftSets(lift: StepLiftKey, ctx: SlotContext): DraftSet[] {
   const { program, week, state, profile } = ctx;
   const def = program.mainLifts[lift];
-  const ramp = (load: number) => warmupRamp(lift, load, profile.barKg, { rack: profile.dumbbellRackKg, beltStepKg: profile.beltStepKg });
+  const ramp = (load: number) => warmupRamp(lift, load, profile.barKg, { rack: profile.dumbbellRackKg, beltStepKg: profile.beltStepKg }).map(easy);
 
   if (week.type === 'calibration') {
     const load = program.calibrationLoads[lift];
@@ -745,10 +1147,11 @@ function stepLiftSets(lift: StepLiftKey, ctx: SlotContext): PrescribedSet[] {
     const light = stepLiftLoad(lift, current, -1, profile);
     return [...ramp(light), ...Array.from({ length: def.lightSets }, () => working(light, def.lightReps))];
   }
-  const normalSets = def.sets + (state.addMainLiftSet?.[lift] === true ? 1 : 0);
+  const reps = state.normalReps?.[lift] ?? def.reps;
+  const normalSets = cutMainSets(lift, ctx, def.sets + (state.addMainLiftSet?.[lift] === true && !ctx.firstWeekBack ? 1 : 0));
   return [
     ...ramp(current),
-    ...Array.from({ length: normalSets }, () => working(current, def.reps)),
-    repOut(current, def.repOutTarget, 'Rep-out at the same load.'),
+    ...Array.from({ length: normalSets }, () => working(current, reps)),
+    capped(repOut(current, def.repOutTarget, 'Rep-out at the same load.'), ctx),
   ];
 }
