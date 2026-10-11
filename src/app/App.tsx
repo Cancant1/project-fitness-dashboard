@@ -15,6 +15,8 @@ import { FoodPage } from "../pages/FoodPage";
 import { WeightPage } from "../pages/WeightPage";
 import { HistoryPage } from "../pages/HistoryPage";
 import { SessionPage } from "../pages/SessionPage";
+import { ExercisePage } from "../pages/ExercisePage";
+import { FoodLibraryPage } from "../pages/FoodLibraryPage";
 
 export function App() {
   const [auth, setAuth] = useState<AuthSession | null | undefined>(undefined);
@@ -46,6 +48,8 @@ export function App() {
             <Route path="weight" element={<WeightPage />} />
             <Route path="history" element={<HistoryPage />} />
             <Route path="session/:sessionId" element={<SessionPage />} />
+            <Route path="exercise/:exerciseId" element={<ExercisePage />} />
+            <Route path="food/library" element={<FoodLibraryPage />} />
           </Route>
         </Routes>
       </HashRouter>
