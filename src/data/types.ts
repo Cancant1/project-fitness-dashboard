@@ -209,6 +209,21 @@ export interface Fact extends Base {
   source: string | null;
 }
 
+/** One day of Apple Watch (iOS Shortcut) or manual health data. One live row per user and date (unique index). */
+export interface HealthDaily extends Base {
+  /** For sleep: the morning the night ended. */
+  date: string;
+  sleep_total_min: number | null;
+  sleep_deep_min: number | null;
+  sleep_rem_min: number | null;
+  sleep_core_min: number | null;
+  sleep_awake_min: number | null;
+  resting_hr: number | null;
+  hrv_sdnn_ms: number | null;
+  /** "ios-shortcut" (the database default) or "manual". */
+  source: string;
+}
+
 export interface Tables {
   profiles: Profile;
   exercises: Exercise;
@@ -226,6 +241,7 @@ export interface Tables {
   nutrition_days: NutritionDay;
   annotations: Annotation;
   facts: Fact;
+  health_daily: HealthDaily;
 }
 
 export type TableName = keyof Tables;
@@ -233,12 +249,12 @@ export type TableName = keyof Tables;
 export const TABLES: TableName[] = [
   "profiles", "exercises", "programs", "training_maxes", "sessions", "sets", "pain_checks",
   "conditioning", "body_measurements", "foods", "food_entries", "saved_meals",
-  "nutrition_targets", "nutrition_days", "annotations", "facts"
+  "nutrition_targets", "nutrition_days", "annotations", "facts", "health_daily"
 ];
 
 // Push order respects foreign keys.
 export const PUSH_ORDER: TableName[] = [
   "profiles", "exercises", "programs", "training_maxes", "sessions", "sets", "pain_checks",
   "conditioning", "body_measurements", "foods", "food_entries", "saved_meals",
-  "nutrition_targets", "nutrition_days", "annotations", "facts"
+  "nutrition_targets", "nutrition_days", "annotations", "facts", "health_daily"
 ];

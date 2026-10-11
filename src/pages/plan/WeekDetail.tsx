@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useRows, useStore } from "../../data/store";
 import { fmtNum, fmtShortDate, todayIso } from "../../lib/format";
 import { getWeek } from "../../plan/engine";
-import { PLAN, ensurePlanExercises } from "../../plan/bridge";
+import { ensurePlanExercises } from "../../plan/bridge";
 import { startWorkout } from "../../plan/workout";
 import type { DayKey, PrescribedDay, PrescribedExercise, WeekType } from "../../plan/types";
 import { Card, Label, Pill } from "../../ui/kit";
@@ -15,7 +15,7 @@ import {
 
 /** The selected week: four lifting cards, the three conditioning days as chips, notes behind a disclosure. */
 export function WeekDays({ weekNo, ctx, onSetMax }: { weekNo: number; ctx: PlanContext; onSetMax: () => void }) {
-  const week = getWeek(PLAN, weekNo);
+  const week = getWeek(ctx.plan, weekNo);
   const today = todayIso();
   const sessions = useRows("sessions");
   const { slots } = doneSlots(sessions, ctx.program);
@@ -190,7 +190,7 @@ export function StartDay({ weekNo, dayKey, ctx, onSetMax, onStartPlan, primary =
   if (!ctx.program) {
     return onStartPlan ? <button type="button" className="btn btn-primary pl-start" onClick={onStartPlan}>Start the plan</button> : null;
   }
-  const real = tryDay(weekNo, dayKey, ctx.state, ctx.equipment);
+  const real = tryDay(weekNo, dayKey, ctx.state, ctx.equipment, ctx.plan);
   if (!real) {
     return onSetMax ? <button type="button" className="btn btn-tinted pl-start" onClick={onSetMax}>Set training max</button> : null;
   }

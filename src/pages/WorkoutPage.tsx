@@ -3,9 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { Exercise, SetRow } from "../data/types";
 import { fmtNum, parseDecimal, toKg } from "../lib/format";
-import { platesPerSide, trainingMaxFromSet, nextTrainingMax } from "../plan/engine";
+import { platesPerSide, trainingMaxAfterRepOut } from "../plan/engine";
 import { STACK_LABEL, STACK_OF, pinLabel, weightsFor } from "../plan/equipment";
-import { PLAN, activeProgram, equipmentFrom, latestMaxes, usePlanIds } from "../plan/bridge";
+import { activeProgram, equipmentFrom, latestMaxes, usePlan, usePlanIds } from "../plan/bridge";
 import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef } from "../plan/workout";
 import { Sheet } from "../ui/Sheet";
 import { CheckIcon, ChevronDown, ChevronLeft, ChevronRight, MinusIcon, PlusIcon } from "../ui/icons";
@@ -205,7 +205,8 @@ function ExerciseSubtitle({ block }: { block: Block }) {
 function ExerciseNotes({ block }: { block: Block }) {
   const [open, setOpen] = useState(false);
   const key = planRef(block.sets[0]!)?.exerciseKey;
-  const notes = PLAN.days.flatMap((d) => d.slots).find((s) => s.exerciseKey === key)?.notes ?? [];
+  const plan = usePlan();
+  const notes = plan.days.flatMap((d) => d.slots).find((s) => s.exerciseKey === key)?.notes ?? [];
   if (!notes.length) return null;
   return (
     <>
@@ -309,7 +310,7 @@ function RepOutCard({ s, calibration, latest, onUpdate, onToggle }: {
   const lift = ref.mainLift!;
   const tmLift = lift === "squat" || lift === "deadlift";
   const tm = tmLift
-    ? (calibration || latest[lift] == null ? trainingMaxFromSet(Number(s.load), reps) : nextTrainingMax(latest[lift]!, reps, ref.target ?? 0, "nearest"))
+    ? trainingMaxAfterRepOut(Number(s.load), reps, { previous: latest[lift], target: ref.target, calibration }).tm
     : null;
   return (
     <section className="repout-card" aria-label="Rep-out set">

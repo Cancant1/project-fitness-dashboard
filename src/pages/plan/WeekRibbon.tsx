@@ -1,16 +1,20 @@
+import { useMemo } from "react";
 import { PLAN } from "../../plan/bridge";
+import type { ProgramDefinition } from "../../plan/types";
 import { TYPE_NAME, fmtRange, phaseOf, weekEnd, weekIntensity } from "./planView";
 
 const month = new Intl.DateTimeFormat("en-GB", { month: "short" });
 
 /** Month labels: the first week, then every week that contains a 1st. */
-const MONTHS = PLAN.weeks.flatMap((w, i) => {
-  const start = new Date(`${w.startDate}T12:00:00`);
-  const end = new Date(`${weekEnd(w)}T12:00:00`);
-  if (i === 0) return [{ col: 1, label: month.format(start) }];
-  if (start.getDate() === 1) return [{ col: i + 1, label: month.format(start) }];
-  return end.getMonth() !== start.getMonth() ? [{ col: i + 1, label: month.format(end) }] : [];
-});
+function monthsOf(plan: ProgramDefinition) {
+  return plan.weeks.flatMap((w, i) => {
+    const start = new Date(`${w.startDate}T12:00:00`);
+    const end = new Date(`${weekEnd(w)}T12:00:00`);
+    if (i === 0) return [{ col: 1, label: month.format(start) }];
+    if (start.getDate() === 1) return [{ col: i + 1, label: month.format(start) }];
+    return end.getMonth() !== start.getMonth() ? [{ col: i + 1, label: month.format(end) }] : [];
+  });
+}
 
 /** Bar height 0..1: squat %TM mapped from 55–100% onto 16–100% of the track; calibration a short neutral bar. */
 function height(pct: number | null): number {
@@ -30,11 +34,15 @@ export function Flag() {
 /**
  * The block at a glance: one bar per week, height = intensity, colour = phase. Checkpoints are red flags,
  * the current week is raised with a red dot, the selected week has a filled number.
+ * Pass the adjusted programme (a repeated week adds a bar); defaults to PLAN.
  */
-export function WeekRibbon({ selected, onSelect, nowWeekNo, compact = false }: {
-  selected: number; onSelect: (weekNo: number) => void; nowWeekNo: number | null; compact?: boolean;
+export function WeekRibbon({ plan = PLAN, selected, onSelect, nowWeekNo, compact = false }: {
+  plan?: ProgramDefinition; selected: number; onSelect: (weekNo: number) => void; nowWeekNo: number | null; compact?: boolean;
 }) {
-  const last = PLAN.weeks.length - 1;
+  const months = useMemo(() => monthsOf(plan), [plan]);
+  const last = plan.weeks.length - 1;
+  // plan.css lays out 20 columns; a repeated week (coach adjustment) adds one.
+  const cols = { gridTemplateColumns: `repeat(${plan.weeks.length}, minmax(0, 1fr))` };
   function onKey(e: React.KeyboardEvent) {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!d) return;
@@ -45,8 +53,8 @@ export function WeekRibbon({ selected, onSelect, nowWeekNo, compact = false }: {
   }
   return (
     <div className={`pl-ribbon${compact ? " is-compact" : ""}`}>
-      <div className="pl-rib-cols" role="group" aria-label="Weeks" onKeyDown={onKey}>
-        {PLAN.weeks.map((w) => {
+      <div className="pl-rib-cols" role="group" aria-label="Weeks" onKeyDown={onKey} style={cols}>
+        {plan.weeks.map((w) => {
           const cls = ["pl-rib", phaseOf(w.type), w.weekNo === nowWeekNo ? "now" : ""].join(" ");
           return (
             <button key={w.weekNo} type="button" className={cls} aria-pressed={w.weekNo === selected}
@@ -63,8 +71,8 @@ export function WeekRibbon({ selected, onSelect, nowWeekNo, compact = false }: {
         })}
       </div>
       {!compact && (
-        <div className="pl-rib-months" aria-hidden="true">
-          {MONTHS.map((m) => <span key={m.col} style={{ gridColumn: m.col }}>{m.label}</span>)}
+        <div className="pl-rib-months" aria-hidden="true" style={cols}>
+          {months.map((m) => <span key={m.col} style={{ gridColumn: m.col }}>{m.label}</span>)}
         </div>
       )}
     </div>

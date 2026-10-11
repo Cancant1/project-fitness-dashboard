@@ -1,4 +1,4 @@
-import { adaptiveTdee } from "./energy";
+import { adaptiveTdee, slopeWithSe } from "./energy";
 import { addDays } from "./format";
 
 const days = (from: string, n: number, kcal: number) => Array.from({ length: n }, (_, i) => ({ date: addDays(from, i), kcal }));
@@ -32,5 +32,38 @@ describe("adaptiveTdee", () => {
     const intake = days("2026-09-01", 10, 2600);
     const weights = days("2026-09-01", 28, 0).map((d) => ({ date: d.date, kg: 74 }));
     expect(adaptiveTdee(intake, weights, "2026-09-28", 28)).toBeNull();
+  });
+});
+
+describe("slopeWithSe", () => {
+  const line = (n: number, perDay: number, noise: (i: number) => number = () => 0) =>
+    Array.from({ length: n }, (_, i) => ({ date: addDays("2026-10-19", i), kg: 74 + perDay * i + noise(i) }));
+
+  it("recovers the slope of a clean line with a zero standard error", () => {
+    const f = slopeWithSe(line(21, 0.02), "2026-10-19")!;
+    expect(f.slope).toBeCloseTo(0.02, 10);
+    expect(f.se).toBeCloseTo(0, 10);
+    expect(f.intercept).toBeCloseTo(74, 10);
+    expect(f.n).toBe(21);
+    expect(f.spanDays).toBe(20);
+  });
+
+  it("SE = √(RSS / (n − 2) / Sxx)", () => {
+    const pts = line(5, 0, (i) => [0.3, -0.2, 0.1, -0.4, 0.2][i]!);
+    const f = slopeWithSe(pts, "2026-10-19")!;
+    // Hand check: x = 0..4, mean 2, Sxx = 10; y residuals from the fitted line.
+    const xs = [0, 1, 2, 3, 4];
+    const ys = pts.map((p) => p.kg);
+    const my = ys.reduce((a, b) => a + b, 0) / 5;
+    const slope = xs.reduce((s, x, i) => s + (x - 2) * (ys[i]! - my), 0) / 10;
+    const rss = xs.reduce((s, x, i) => s + (ys[i]! - (my + slope * (x - 2))) ** 2, 0);
+    expect(f.slope).toBeCloseTo(slope, 12);
+    expect(f.se).toBeCloseTo(Math.sqrt(rss / 3 / 10), 12);
+  });
+
+  it("needs two points on different days; SE needs three", () => {
+    expect(slopeWithSe(line(1, 0.1), "2026-10-19")).toBeNull();
+    expect(slopeWithSe([{ date: "2026-10-19", kg: 74 }, { date: "2026-10-19", kg: 75 }], "2026-10-19")).toBeNull();
+    expect(slopeWithSe(line(2, 0.1), "2026-10-19")!.se).toBeNull();
   });
 });

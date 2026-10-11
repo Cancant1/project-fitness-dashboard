@@ -6,16 +6,18 @@ import { useRows } from "../../data/store";
 import type { Program, Session } from "../../data/types";
 import { addDays as addDaysIso, fmtNum } from "../../lib/format";
 import { addDays, dayForDate, prescribeDay, prescribeWeek, trainingMaxFromSet, weekForDate } from "../../plan/engine";
-import { PLAN, activeProgram, equipmentFrom, latestMaxes, planState, usePlanIds } from "../../plan/bridge";
+import { PLAN, activeProgram, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../../plan/bridge";
 import type {
   DayKey, EquipmentProfile, LiftingDayKey, LoadBasis, MainLiftKey, PlanState, PrescribedDay, PrescribedExercise, PrescribedSet,
-  ProgramDay, ProgramWeek, TmLiftKey, WeekType
+  ProgramDay, ProgramDefinition, ProgramWeek, TmLiftKey, WeekType
 } from "../../plan/types";
 
 /** The plan page's own defaults, used when no training max is known yet. */
 export const EXAMPLE_TMS: Record<TmLiftKey, number> = { squat: 140, deadlift: 200 };
 
 export interface PlanContext {
+  /** The adjusted programme (PLAN + accepted coach adjustments): use it for weeks and prescriptions. */
+  plan: ProgramDefinition;
   program: Program | undefined;
   ids: Map<string, string>;
   equipment: EquipmentProfile;
@@ -35,15 +37,17 @@ export function usePlanContext(): PlanContext {
   const sets = useRows("sets");
   const exercises = useRows("exercises");
   const profiles = useRows("profiles");
+  const conditioning = useRows("conditioning");
   const ids = usePlanIds(exercises);
   const program = activeProgram(programs);
   const profile = profiles[0];
+  const plan = usePlan();
 
   return useMemo(() => {
     const equipment = equipmentFrom(profile);
     const latest = latestMaxes(maxes, ids);
     const state: PlanState = program
-      ? planState({ program, ids, maxes, sessions, sets, equipment })
+      ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan })
       : {
         trainingMaxes: {
           ...(latest.squat != null ? { squat: latest.squat } : {}),
@@ -59,37 +63,37 @@ export function usePlanContext(): PlanContext {
       ...state,
       trainingMaxes: { squat: state.trainingMaxes.squat ?? EXAMPLE_TMS.squat, deadlift: state.trainingMaxes.deadlift ?? EXAMPLE_TMS.deadlift }
     };
-    return { program, ids, equipment, latest, state, preview, example };
-  }, [program, ids, maxes, sessions, sets, profile]);
+    return { plan, program, ids, equipment, latest, state, preview, example };
+  }, [plan, program, ids, maxes, sessions, sets, profile, conditioning]);
 }
 
 export function weekDays(weekNo: number, ctx: PlanContext): { days: PrescribedDay[]; error: string | null } {
   try {
-    return { days: prescribeWeek(PLAN, weekNo, ctx.preview, ctx.equipment), error: null };
+    return { days: prescribeWeek(ctx.plan, weekNo, ctx.preview, ctx.equipment), error: null };
   } catch (e) {
     return { days: [], error: e instanceof Error ? e.message : String(e) };
   }
 }
 
-/** prescribeDay that returns null instead of throwing (e.g. no training max yet). */
-export function tryDay(weekNo: number, dayKey: DayKey, state: PlanState, equipment: EquipmentProfile): PrescribedDay | null {
+/** prescribeDay that returns null instead of throwing (e.g. no training max yet). Pass the adjusted plan (ctx.plan). */
+export function tryDay(weekNo: number, dayKey: DayKey, state: PlanState, equipment: EquipmentProfile, plan: ProgramDefinition = PLAN): PrescribedDay | null {
   try {
-    return prescribeDay(PLAN, weekNo, dayKey, state, equipment);
+    return prescribeDay(plan, weekNo, dayKey, state, equipment);
   } catch {
     return null;
   }
 }
 
 /** The week containing `today`, or the first week before the plan starts. Null after it ends. */
-export function currentWeek(today: string): { week: ProgramWeek; status: "before" | "during" } | null {
-  const w = weekForDate(PLAN, today);
+export function currentWeek(today: string, plan: ProgramDefinition = PLAN): { week: ProgramWeek; status: "before" | "during" } | null {
+  const w = weekForDate(plan, today);
   if (w) return { week: w, status: "during" };
-  if (today < PLAN.startDate) return { week: PLAN.weeks[0]!, status: "before" };
+  if (today < plan.startDate) return { week: plan.weeks[0]!, status: "before" };
   return null;
 }
 
 export const weekEnd = (w: ProgramWeek) => addDays(w.startDate, 6);
-export const planEnd = () => weekEnd(PLAN.weeks[PLAN.weeks.length - 1]!);
+export const planEnd = (plan: ProgramDefinition = PLAN) => weekEnd(plan.weeks[plan.weeks.length - 1]!);
 
 export const LIFTING_DAYS: LiftingDayKey[] = ["lower_a", "upper_a", "lower_b", "upper_b"];
 export const dayDef = (key: DayKey): ProgramDay => PLAN.days.find((d) => d.key === key)!;
@@ -106,12 +110,12 @@ export function doneSlots(sessions: Session[], program: Program | undefined): { 
 }
 
 /** First lifting day from today on that isn't done yet. */
-export function nextPlanned(sessions: Session[], program: Program | undefined, today: string): { date: string; week: ProgramWeek; day: ProgramDay } | null {
-  const first = PLAN.weeks[0]!.startDate;
-  const end = planEnd();
+export function nextPlanned(sessions: Session[], program: Program | undefined, today: string, plan: ProgramDefinition = PLAN): { date: string; week: ProgramWeek; day: ProgramDay } | null {
+  const first = plan.weeks[0]!.startDate;
+  const end = planEnd(plan);
   const { slots, dates } = doneSlots(sessions, program);
   for (let d = today < first ? first : today; d <= end; d = addDaysIso(d, 1)) {
-    const slot = dayForDate(PLAN, d);
+    const slot = dayForDate(plan, d);
     if (slot && slot.day.kind === "lifting" && !dates.has(d) && !slots.has(`${slot.week.weekNo}:${slot.day.key}`)) return { date: d, ...slot };
   }
   return null;

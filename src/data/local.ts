@@ -8,6 +8,9 @@ type Listener = () => void;
 
 interface OutboxItem { key?: number; table: TableName; id: string }
 
+/** Bump when TABLES gains a table (1 → 2: health_daily). */
+const DB_VERSION = 2;
+
 export class LocalStore {
   private db!: IDBPDatabase;
   private cache = new Map<TableName, Map<string, Base>>();
@@ -20,11 +23,13 @@ export class LocalStore {
   }
 
   async open(): Promise<void> {
-    this.db = await openDB(`reps-v3-${this.userId}`, 1, {
+    // Version 2 added health_daily. The upgrade only creates stores that are missing, so a v1 database
+    // keeps its rows, outbox and sync cursors (the new table pulls from the start on the next sync).
+    this.db = await openDB(`reps-v3-${this.userId}`, DB_VERSION, {
       upgrade(db) {
-        for (const t of TABLES) db.createObjectStore(t, { keyPath: "id" });
-        db.createObjectStore("outbox", { keyPath: "key", autoIncrement: true });
-        db.createObjectStore("meta");
+        for (const t of TABLES) if (!db.objectStoreNames.contains(t)) db.createObjectStore(t, { keyPath: "id" });
+        if (!db.objectStoreNames.contains("outbox")) db.createObjectStore("outbox", { keyPath: "key", autoIncrement: true });
+        if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
       }
     });
     for (const t of TABLES) {

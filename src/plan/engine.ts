@@ -154,6 +154,33 @@ export function reduceTrainingMax(tm: number, percent = 5): number {
   return roundBarbell(tm * (1 - percent / 100));
 }
 
+/** Past this many clean reps the Epley formula is rough (science check A2). */
+export const PROVISIONAL_REPS = 12;
+/** Note written on a training_maxes row set from a >12-rep calibration rep-out. */
+export const PROVISIONAL_NOTE = 'provisional (>12 reps)';
+
+export interface RepOutTrainingMax {
+  tm: number;
+  reason: 'calibration' | 'rep_out';
+  /** Set from a calibration (or first) rep-out of more than 12 clean reps: TM = load × (1 + 12/30). */
+  provisional: boolean;
+}
+
+/**
+ * The training max a squat/deadlift rep-out leads to.
+ * - Calibration week, or no TM yet: TM = load × (1 + reps/30), floored to 2.5. Past 12 clean reps the
+ *   TM is provisional and uses 12 reps (§6.2: conservative on purpose, so week-1 loads stay safe).
+ * - Otherwise the rep-out table moves the previous TM (rounded to the nearest 2.5, as the plan page does).
+ */
+export function trainingMaxAfterRepOut(load: number, reps: number,
+  opts: { previous?: number | null; target?: number | null; calibration?: boolean } = {}): RepOutTrainingMax {
+  if (opts.calibration || opts.previous == null) {
+    const provisional = reps > PROVISIONAL_REPS;
+    return { tm: trainingMaxFromSet(load, provisional ? PROVISIONAL_REPS : reps), reason: 'calibration', provisional };
+  }
+  return { tm: nextTrainingMax(opts.previous, reps, opts.target ?? 0, 'nearest'), reason: 'rep_out', provisional: false };
+}
+
 // ---------- step lifts and accessories ----------
 
 export interface StepResult {
@@ -180,20 +207,84 @@ export interface LoggedSet {
   reps: number | null;
 }
 
+/** A load step: a fixed increment (barbell 2.5 kg, 0 = cannot load), or the list of loads that exist (rack, pin stack). */
+export type LoadSteps = number | readonly number[];
+
+/** `times` steps up (dir 1) or down (dir −1) from `load`; stays put at the ends of a list and never goes below 0. */
+export function stepLoad(load: number, step: LoadSteps, dir: -1 | 1, times = 1): number {
+  let x = load;
+  for (let i = 0; i < times; i++) {
+    if (typeof step === 'number') {
+      x = step > 0 ? Math.max(0, round2(x + dir * step)) : x;
+    } else {
+      const sorted = [...step].sort((a, b) => a - b);
+      x = dir > 0 ? (sorted.find((w) => w > x + 0.01) ?? x) : (sorted.filter((w) => w < x - 0.01).at(-1) ?? x);
+    }
+  }
+  return x;
+}
+
+/** The lightest available load at or above `x` (the heaviest one if nothing is that heavy). */
+export function ceilLoad(x: number, step: LoadSteps): number {
+  if (typeof step === 'number') return step > 0 ? round2(Math.ceil(x / step - EPS) * step) : x;
+  const sorted = [...step].sort((a, b) => a - b);
+  return sorted.find((w) => w >= x - EPS) ?? sorted.at(-1) ?? x;
+}
+
 /**
  * Double progression: when every set reached the top of the range, add the smallest step next session.
  * `step` is an increment, or a list of available loads (dumbbell rack).
  */
 export function doubleProgression(lastSets: readonly LoggedSet[], repRange: readonly [number, number],
-  step: number | readonly number[]): { load: number; increased: boolean } | null {
+  step: LoadSteps): { load: number; increased: boolean } | null {
   if (lastSets.length === 0) return null;
   const load = Math.max(...lastSets.map((s) => s.load));
   const allTop = lastSets.every((s) => s.reps !== null && s.reps >= repRange[1]);
   if (!allTop) return { load, increased: false };
-  const next = typeof step === 'number'
-    ? round2(load + step)
-    : ([...step].sort((a, b) => a - b).find((w) => w > load + 0.01) ?? load);
+  const next = stepLoad(load, step, 1);
   return { load: next, increased: next > load };
+}
+
+/** §6.3: every failure set at least this many reps above the range top → +2 steps instead of +1. */
+export const OVERSHOOT_REPS = 5;
+
+/**
+ * Failure-scheme isolation: double progression, except that when every set overshoots the range top by
+ * ≥ 5 reps the load jumps two steps (§6.3).
+ */
+export function failureProgression(lastSets: readonly LoggedSet[], repRange: readonly [number, number],
+  step: LoadSteps): { load: number; steps: 0 | 1 | 2 } | null {
+  if (lastSets.length === 0) return null;
+  const load = Math.max(...lastSets.map((s) => s.load));
+  const hi = repRange[1];
+  const overshoot = lastSets.every((s) => s.reps !== null && s.reps >= hi + OVERSHOOT_REPS);
+  const allTop = lastSets.every((s) => s.reps !== null && s.reps >= hi);
+  const steps: 0 | 1 | 2 = overshoot ? 2 : allTop ? 1 : 0;
+  return { load: steps ? stepLoad(load, step, 1, steps) : load, steps };
+}
+
+export type ApreJump = 'plus7_5' | 'plus5' | 'plus1' | 'minus1' | 'same';
+
+/**
+ * §6.1 (NEW 11 Oct 2026), APRE-style jumps for "last set rep-out" accessories (RDL, seated row, Bulgarian
+ * split squat, barbell row, DB bench). The rep-out reps against the range top `hi` set the next load:
+ * - ≥ hi + 7 → +7.5%, at least one step
+ * - hi + 2 … hi + 6 → +5%, at least one step
+ * - hi … hi + 1 with every normal set at hi → +1 step (double progression, unchanged)
+ * - below the range bottom → −1 step
+ * - otherwise the same load.
+ * Percent jumps round UP to the next available load: the spec's own example (RDL 80 × 20 → 87.5) needs it,
+ * since 80 × 1.075 = 86 lies nearer 85.
+ */
+export function apreNextLoad(load: number, repOutReps: number, normalReps: readonly (number | null)[],
+  repRange: readonly [number, number], step: LoadSteps): { load: number; jump: ApreJump } {
+  const [lo, hi] = repRange;
+  const percent = (p: number) => Math.max(ceilLoad(load * (1 + p / 100), step), stepLoad(load, step, 1));
+  if (repOutReps >= hi + 7) return { load: percent(7.5), jump: 'plus7_5' };
+  if (repOutReps >= hi + 2) return { load: percent(5), jump: 'plus5' };
+  if (repOutReps >= hi && normalReps.every((r) => r !== null && r >= hi)) return { load: stepLoad(load, step, 1), jump: 'plus1' };
+  if (repOutReps < lo) return { load: stepLoad(load, step, -1), jump: 'minus1' };
+  return { load, jump: 'same' };
 }
 
 // ---------- warm-ups ----------

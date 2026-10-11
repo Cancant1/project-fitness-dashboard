@@ -1,7 +1,7 @@
 import type { LocalStore } from "../data/local";
 import type { Exercise, Program, SetRow, Session } from "../data/types";
 import { toKg } from "../lib/format";
-import { incrementAfterRepOut, nextTrainingMax, trainingMaxFromSet } from "./engine";
+import { PROVISIONAL_NOTE, incrementAfterRepOut, trainingMaxAfterRepOut } from "./engine";
 import { PLAN, latestMaxes } from "./bridge";
 import type { EquipmentProfile, PrescribedDay, PrescribedExercise, PrescribedSet } from "./types";
 
@@ -61,7 +61,13 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
   return session!.id;
 }
 
-export interface MaxUpdate { lift: string; from: number | undefined; to: number; reason: "calibration" | "rep_out"; label: string }
+export interface MaxUpdate {
+  lift: string; from: number | undefined; to: number; reason: "calibration" | "rep_out"; label: string;
+  /** Calibration (or first) rep-out past 12 clean reps: TM from 12 reps, marked provisional (§6.2). */
+  provisional?: boolean;
+  /** Written to the training_maxes row, e.g. "provisional (>12 reps)". */
+  note?: string;
+}
 
 /** What finishing this workout changes: new squat/deadlift training max, next incline/pull-up load. */
 export function maxUpdates(session: Session, sets: SetRow[], ids: Map<string, string>, maxes: import("../data/types").TrainingMax[], equipment: EquipmentProfile): MaxUpdate[] {
@@ -75,10 +81,11 @@ export function maxUpdates(session: Session, sets: SetRow[], ids: Map<string, st
     const lift = ref.mainLift;
     if (lift === "squat" || lift === "deadlift") {
       const from = latest[lift];
-      const to = calibration || from == null
-        ? trainingMaxFromSet(Number(s.load), s.reps)
-        : nextTrainingMax(from, s.reps, ref.target ?? 0, "nearest");
-      out.push({ lift, from, to, reason: calibration || from == null ? "calibration" : "rep_out", label: lift === "squat" ? "Squat training max" : "Deadlift training max" });
+      const r = trainingMaxAfterRepOut(Number(s.load), s.reps, { previous: from, target: ref.target, calibration });
+      out.push({
+        lift, from, to: r.tm, reason: r.reason, label: lift === "squat" ? "Squat training max" : "Deadlift training max",
+        ...(r.provisional ? { provisional: true, note: PROVISIONAL_NOTE } : {})
+      });
     } else {
       const from = Number(s.load);
       const to = incrementAfterRepOut(lift, from, s.reps, equipment).load;
@@ -99,7 +106,7 @@ export async function finishWorkout(local: LocalStore, session: Session, sets: S
     const sourceSet = (lift: string) => sets.find((s) => planRef(s)?.mainLift === lift && (s.kind === "rep_out" || s.kind === "top"))?.id ?? null;
     await local.save("training_maxes", updates.map((u) => ({
       exercise_id: ids.get(u.lift)!, program_id: program?.id ?? null, effective_date: session.date, value_kg: u.to,
-      reason: u.reason, source_set_id: sourceSet(u.lift), note: u.from != null ? `from ${u.from}` : null
+      reason: u.reason, source_set_id: sourceSet(u.lift), note: u.note ?? (u.from != null ? `from ${u.from}` : null)
     })));
   }
 }

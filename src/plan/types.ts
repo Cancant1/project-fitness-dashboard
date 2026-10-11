@@ -53,6 +53,8 @@ export interface ProgramWeek {
   /** Set by shiftAfterMissedWeek. */
   missed?: boolean;
   repeatOf?: number;
+  /** A training week turned into a deload by a coach adjustment (deload_now). */
+  earlyDeload?: boolean;
 }
 
 export interface AccessoryScheme {

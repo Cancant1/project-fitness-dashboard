@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { daysBetween, fmtShortDateYear, todayIso } from "../lib/format";
 import { PLAN } from "../plan/bridge";
+import type { ProgramDefinition } from "../plan/types";
 import { Card, Label, Pill, Stat } from "../ui/kit";
 import { ChevronLeft, ChevronRight } from "../ui/icons";
 import { MaxesPanel, SetMaxSheet, type Lift } from "./plan/MaxesPanel";
@@ -26,16 +27,16 @@ export function PlanPage() {
   const [confirm, setConfirm] = useState(false);
   const [setting, setSetting] = useState<Lift | null>(null);
   const today = todayIso();
-  const now = currentWeek(today);
+  const now = currentWeek(today, ctx.plan);
   const nowNo = now?.week.weekNo ?? null;
 
   const weekParam = params.get("week");
-  const weekNo = weekParam != null && /^\d+$/.test(weekParam) && Number(weekParam) < PLAN.weeks.length ? Number(weekParam) : null;
+  const weekNo = weekParam != null && /^\d+$/.test(weekParam) && Number(weekParam) < ctx.plan.weeks.length ? Number(weekParam) : null;
   const selected = weekNo ?? now?.week.weekNo ?? 0;
   const select = (n: number) => setParams(n === (now?.week.weekNo ?? 0) ? {} : { week: String(n) }, { replace: true });
 
-  const first = PLAN.weeks[0]!;
-  const test = PLAN.weeks[PLAN.weeks.length - 1]!;
+  const first = ctx.plan.weeks[0]!;
+  const test = ctx.plan.weeks[ctx.plan.weeks.length - 1]!;
   const lastNo = test.weekNo;
   const status = !now ? "Finished"
     : now.status === "before"
@@ -46,7 +47,7 @@ export function PlanPage() {
     <main className="page plan">
       <header className="k-head pl-head">
         <div>
-          <p className="k-eyebrow">{fmtShortDateYear(first.startDate)} – {fmtShortDateYear(planEnd())}</p>
+          <p className="k-eyebrow">{fmtShortDateYear(first.startDate)} – {fmtShortDateYear(planEnd(ctx.plan))}</p>
           <h1 className="k-title">{PLAN.name}</h1>
         </div>
         <div className="k-head-actions">
@@ -69,7 +70,7 @@ export function PlanPage() {
         </div>
       </section>
 
-      <Ribbon selected={selected} onSelect={select} nowNo={nowNo} nowLabel={now?.status === "before" ? "Next" : "Now"} />
+      <Ribbon plan={ctx.plan} selected={selected} onSelect={select} nowNo={nowNo} nowLabel={now?.status === "before" ? "Next" : "Now"} />
 
       <div className="k-dash">
         <div className="k-col">
@@ -87,11 +88,11 @@ export function PlanPage() {
   );
 }
 
-function Ribbon({ selected, onSelect, nowNo, nowLabel }: { selected: number; onSelect: (n: number) => void; nowNo: number | null; nowLabel: string }) {
-  const week = PLAN.weeks[selected]!;
+function Ribbon({ plan, selected, onSelect, nowNo, nowLabel }: { plan: ProgramDefinition; selected: number; onSelect: (n: number) => void; nowNo: number | null; nowLabel: string }) {
+  const week = plan.weeks[selected]!;
   const pct = weekIntensity(week.type);
   const phase = phaseOf(week.type);
-  const last = PLAN.weeks.length - 1;
+  const last = plan.weeks.length - 1;
   return (
     <Card className="pl-ribbon-card" aria-label="The 20 weeks">
       <div className="pl-rib-head">
@@ -109,7 +110,7 @@ function Ribbon({ selected, onSelect, nowNo, nowLabel }: { selected: number; onS
           <button type="button" className="pl-nav-btn" disabled={selected === last} aria-label="Next week" onClick={() => onSelect(selected + 1)}><ChevronRight style={{ width: 18, height: 18 }} /></button>
         </nav>
       </div>
-      <WeekRibbon selected={selected} onSelect={onSelect} nowWeekNo={nowNo} />
+      <WeekRibbon plan={plan} selected={selected} onSelect={onSelect} nowWeekNo={nowNo} />
       <RibbonLegend />
     </Card>
   );

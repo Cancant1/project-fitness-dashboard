@@ -1,0 +1,150 @@
+// Applying coach actions and saving the coach's inputs through the LocalStore (docs/COACH.md §7).
+// Every write goes through local.save, so it lands in IndexedDB and the outbox and syncs like any edit.
+
+import type { LocalStore } from "../data/local";
+import type { Base, NutritionTarget, PainCheck } from "../data/types";
+import { planTargetRow } from "../lib/nutrition";
+import { adjustmentsOf, type Adjustment, type CoachAction } from "../plan/adjustments";
+import { activeProgram, latestMaxes, planIds } from "../plan/bridge";
+import { reduceTrainingMax } from "../plan/engine";
+
+export interface ApplyResult {
+  ok: boolean;
+  /** Short text for a toast: what changed, or why nothing did. */
+  message: string;
+  adjustment?: Adjustment;
+}
+
+const sign = (n: number) => (n > 0 ? `+${n}` : `−${Math.abs(n)}`);
+
+function sameAction(a: CoachAction, b: CoachAction): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** Appends an adjustment to the active programme row's rules.adjustments. */
+async function recordAdjustment(local: LocalStore, adj: Adjustment): Promise<boolean> {
+  const program = activeProgram(local.all("programs"));
+  if (!program) return false;
+  const rules = program.rules ?? {};
+  await local.save("programs", { id: program.id, rules: { ...rules, adjustments: [...adjustmentsOf(rules), adj] } });
+  return true;
+}
+
+/**
+ * Applies a coach action ("Apply" button):
+ * - kcal → a nutrition_targets row effective `from` (next Monday): the current row copied with kcal ± 100
+ *   (carbs ± 25 g, per-weekday kcal ± 100); an existing row on that date is updated instead;
+ * - tm_reduce → new training_maxes rows for squat and deadlift, −5%, reason missed_weeks, dated `today`;
+ * - deload_now, repeat_week, extra_sets, main_lift_set, swap → stored for applyAdjustments.
+ * Every applied action is also recorded in programs.rules.adjustments (so the report shows it as applied).
+ * Applying the same action twice does nothing the second time.
+ */
+export async function applyCoachAction(local: LocalStore, action: CoachAction,
+  opts: { signalId: string; today: string; now?: string }): Promise<ApplyResult> {
+  const program = activeProgram(local.all("programs"));
+  const existing = program ? adjustmentsOf(program.rules) : [];
+  if (existing.some((a) => sameAction(a.data, action) && (action.kind !== "tm_reduce" || a.created.slice(0, 10) === opts.today))) {
+    return { ok: false, message: "Already applied." };
+  }
+  const adj: Adjustment = {
+    id: crypto.randomUUID(), kind: action.kind, created: opts.now ?? new Date().toISOString(), signalId: opts.signalId, data: action
+  };
+
+  if (action.kind === "kcal") {
+    await writeKcalTarget(local, action, opts.signalId, opts.today);
+    await recordAdjustment(local, adj);
+    return { ok: true, message: `Calories ${sign(action.delta)} from ${action.from}.`, adjustment: adj };
+  }
+
+  if (action.kind === "tm_reduce") {
+    const ids = planIds(local.all("exercises"));
+    const latest = latestMaxes(local.all("training_maxes"), ids);
+    const rows = (["squat", "deadlift"] as const).flatMap((lift) => {
+      const v = latest[lift];
+      const id = ids.get(lift);
+      return v != null && id ? [{
+        exercise_id: id, program_id: program?.id ?? null, effective_date: opts.today, value_kg: reduceTrainingMax(v, action.percent),
+        reason: "missed_weeks" as const, source_set_id: null, note: `−${action.percent}% after a break (from ${v})`
+      }] : [];
+    });
+    if (!rows.length) return { ok: false, message: "No training max to lower yet." };
+    await local.save("training_maxes", rows);
+    await recordAdjustment(local, adj);
+    return { ok: true, message: `Training maxes −${action.percent}%.`, adjustment: adj };
+  }
+
+  if (!program) return { ok: false, message: "Start the plan first." };
+  await recordAdjustment(local, adj);
+  return { ok: true, message: "Plan updated.", adjustment: adj };
+}
+
+async function writeKcalTarget(local: LocalStore, action: Extract<CoachAction, { kind: "kcal" }>, signalId: string, today: string) {
+  const targets = local.all("nutrition_targets")
+    .filter((t) => t.effective_from <= action.from)
+    .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || b.created_at.localeCompare(a.created_at));
+  const current: Omit<NutritionTarget, keyof Base> = targets[0] ?? planTargetRow();
+  const d = action.delta;
+  const perWeekday = current.per_weekday
+    ? Object.fromEntries(Object.entries(current.per_weekday).map(([k, v]) => [k, { ...v, kcal: v.kcal + d }]))
+    : null;
+  const note = `Coach ${sign(d)} kcal (${signalId}), applied ${today}.`;
+  const sameDay = targets[0]?.effective_from === action.from ? targets[0] : undefined;
+  await local.save("nutrition_targets", {
+    ...(sameDay ? { id: sameDay.id } : {}),
+    effective_from: action.from,
+    phase: current.phase,
+    kcal: Number(current.kcal) + d,
+    protein: current.protein,
+    protein_per_kg: current.protein_per_kg ?? null,
+    carbs: current.carbs != null ? Math.max(0, Number(current.carbs) + d / 4) : null,
+    fat: current.fat,
+    per_weekday: perWeekday,
+    target_weight: current.target_weight,
+    note: sameDay?.note ? `${sameDay.note} ${note}` : note
+  });
+}
+
+/** Undo: removes an adjustment from the programme (kcal and TM rows it wrote stay; edit them directly). */
+export async function removeAdjustment(local: LocalStore, adjustmentId: string): Promise<boolean> {
+  const program = activeProgram(local.all("programs"));
+  if (!program) return false;
+  const list = adjustmentsOf(program.rules);
+  if (!list.some((a) => a.id === adjustmentId)) return false;
+  await local.save("programs", { id: program.id, rules: { ...program.rules, adjustments: list.filter((a) => a.id !== adjustmentId) } });
+  return true;
+}
+
+// ---------- the coach's inputs ----------
+
+/** Next-morning pain answer (Today prompt): writes pain_checks.next_morning. */
+export async function answerPainCheck(local: LocalStore, painCheckId: string, answer: NonNullable<PainCheck["next_morning"]>): Promise<void> {
+  await local.save("pain_checks", { id: painCheckId, next_morning: answer });
+}
+
+/** Session energy 1–5 (finish-workout sheet): writes sessions.energy. */
+export async function saveSessionEnergy(local: LocalStore, sessionId: string, energy: 1 | 2 | 3 | 4 | 5): Promise<void> {
+  await local.save("sessions", { id: sessionId, energy });
+}
+
+/** Waist at the navel in cm. One per day (unique per user, date, kind): an existing entry that day is updated. */
+export async function saveWaist(local: LocalStore, date: string, cm: number): Promise<void> {
+  const existing = local.all("body_measurements").find((m) => m.kind === "waist" && m.date === date);
+  await local.save("body_measurements", { ...(existing ? { id: existing.id } : {}), date, kind: "waist", value: cm, unit: "cm", source: "app", note: existing?.note ?? null });
+}
+
+/**
+ * Hours slept, dated the morning the night ended. One health_daily row per day (unique per user and date):
+ * an existing row (e.g. from the iOS Shortcut) keeps its other fields and source; a new row is source "manual".
+ */
+export async function saveSleep(local: LocalStore, date: string, hours: number): Promise<void> {
+  const existing = local.all("health_daily").find((h) => h.date === date);
+  const minutes = Math.round(hours * 60);
+  if (existing) {
+    await local.save("health_daily", { id: existing.id, sleep_total_min: minutes });
+    return;
+  }
+  await local.save("health_daily", {
+    date, sleep_total_min: minutes, sleep_deep_min: null, sleep_rem_min: null, sleep_core_min: null, sleep_awake_min: null,
+    resting_hr: null, hrv_sdnn_ms: null, source: "manual"
+  });
+}

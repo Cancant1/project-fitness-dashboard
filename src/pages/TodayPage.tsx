@@ -5,7 +5,7 @@ import { addDays, fmtLongDate, fmtNum, fmtShortDate, parseDecimal, todayIso } fr
 import { bodyweight7d, dayTotals, targetFor } from "../lib/nutrition";
 import { countsForStrength, e1rm } from "../lib/analysis";
 import { dayForDate, prescribeDay } from "../plan/engine";
-import { PLAN, PLAN_KEY, activeProgram, ensurePlanExercises, equipmentFrom, latestMaxes, planState, usePlanIds } from "../plan/bridge";
+import { PLAN, PLAN_KEY, activeProgram, ensurePlanExercises, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../plan/bridge";
 import { startWorkout } from "../plan/workout";
 import type { PrescribedDay } from "../plan/types";
 import { Card, Label, Pill, Ring, Sparkline, Stat } from "../ui/kit";
@@ -39,21 +39,22 @@ export function TodayPage() {
   const equipment = equipmentFrom(profiles[0]);
   const ids = usePlanIds(exercises);
   const inProgress = sessions.find((s) => s.status === "in_progress");
+  const plan = usePlan();
 
-  const planDate = today < PLAN.weeks[0]!.startDate ? PLAN.weeks[0]!.startDate : today;
-  const slot = dayForDate(PLAN, planDate);
+  const planDate = today < plan.weeks[0]!.startDate ? plan.weeks[0]!.startDate : today;
+  const slot = dayForDate(plan, planDate);
   const dayLabel = planDate === today ? "Today" : planDate === addDays(today, 1) ? "Tomorrow" : fmtShortDate(planDate);
   const doneToday = sessions.some((s) => s.date === today && s.status === "completed" && s.program_id === program?.id);
 
   const prescription = useMemo((): { day: PrescribedDay | null; error: string | null } => {
     if (!slot) return { day: null, error: null };
     try {
-      const state = program ? planState({ program, ids, maxes, sessions, sets, equipment }) : { trainingMaxes: {}, currentLoads: {} };
-      return { day: prescribeDay(PLAN, slot.week.weekNo, slot.day.key, state, equipment), error: null };
+      const state = program ? planState({ program, ids, maxes, sessions, sets, equipment, conditioning, plan }) : { trainingMaxes: {}, currentLoads: {} };
+      return { day: prescribeDay(plan, slot.week.weekNo, slot.day.key, state, equipment), error: null };
     } catch (e) {
       return { day: null, error: e instanceof Error ? e.message : String(e) };
     }
-  }, [program, slot, ids, maxes, sessions, sets, equipment]);
+  }, [program, slot, ids, maxes, sessions, sets, equipment, conditioning, plan]);
 
   const bw = bodyweight7d(weights, today);
   const target = targetFor(today, targets, bw);

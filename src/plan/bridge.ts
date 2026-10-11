@@ -2,11 +2,17 @@
 
 import { useMemo } from "react";
 import type { LocalStore } from "../data/local";
-import type { Exercise, Profile, Program, SetRow, Session, TrainingMax } from "../data/types";
-import { buildDumbbellRack, doubleProgression, DEFAULT_EQUIPMENT, progressionStep } from "./engine";
+import { useRows } from "../data/context";
+import type { Conditioning, Exercise, Profile, Program, SetRow, Session, TrainingMax } from "../data/types";
+import { isFlagged } from "../lib/analysis";
+import { todayIso } from "../lib/format";
+import { adjustmentState, adjustmentsOf, applyAdjustments } from "./adjustments";
+import {
+  apreNextLoad, doubleProgression, DEFAULT_EQUIPMENT, failureProgression, progressionStep, roundsNextWeek, weekForDate
+} from "./engine";
 import { STRENGTH_RETURN_PLAN } from "./strengthReturn";
 import { GYM, weightsFor } from "./equipment";
-import type { EquipmentProfile, PlanState, PrescribedDay, ProgramDefinition, ProgramSlot } from "./types";
+import type { EquipmentProfile, PlanState, PrescribedDay, ProgramDefinition, ProgramSlot, RoundsRule } from "./types";
 
 export const PLAN: ProgramDefinition = STRENGTH_RETURN_PLAN;
 export const PLAN_KEY = "strength-return-2026";
@@ -57,15 +63,35 @@ export function findExercise(exercises: Exercise[], key: string): Exercise | und
 }
 
 /** Plan exercise key → exercise id, for the exercises that exist. */
+export function planIds(exercises: Exercise[]): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const def of Object.values(PLAN.exercises)) {
+    const e = findExercise(exercises, def.key);
+    if (e) m.set(def.key, e.id);
+  }
+  return m;
+}
+
+/** planIds, memoised on the exercise rows. */
 export function usePlanIds(exercises: Exercise[]): Map<string, string> {
-  return useMemo(() => {
-    const m = new Map<string, string>();
-    for (const def of Object.values(PLAN.exercises)) {
-      const e = findExercise(exercises, def.key);
-      if (e) m.set(def.key, e.id);
-    }
-    return m;
-  }, [exercises]);
+  return useMemo(() => planIds(exercises), [exercises]);
+}
+
+/** PLAN with the programme row's accepted coach adjustments folded in (docs/COACH.md §7). */
+export function planFor(program: Program | null | undefined, today?: string): ProgramDefinition {
+  const adjustments = program ? adjustmentsOf(program.rules) : [];
+  return adjustments.length ? applyAdjustments(PLAN, adjustments, today) : PLAN;
+}
+
+/**
+ * The adjusted programme for the active programme row. Use it for prescriptions and the calendar
+ * (weeks can move: a repeated week adds one); keep PLAN for static data such as exercise definitions.
+ */
+export function usePlan(): ProgramDefinition {
+  const programs = useRows("programs");
+  const program = activeProgram(programs);
+  const today = todayIso();
+  return useMemo(() => planFor(program, today), [program, today]);
 }
 
 /** Returns exercise ids for every plan exercise, creating the few that are new to this plan. */
@@ -121,17 +147,32 @@ export function latestMaxes(maxes: TrainingMax[], ids: Map<string, string>): Par
   return out;
 }
 
+const weekTypeOf = (s: Session | undefined): string | undefined => (s?.legacy_ref as { plan?: { weekType?: string } } | undefined)?.plan?.weekType;
+
 /**
- * Engine state from the log: training maxes, and for every accessory the next load by double progression
- * from its last session in this plan (top of the range on every set → one step up).
+ * Engine state from the log:
+ * - training maxes (squat, deadlift) and the next incline/pull-up load;
+ * - for every accessory, the next load from its last session in this plan:
+ *   - last set a rep-out (`kind === "rep_out"`): APRE jump from the rep-out reps (§6.1);
+ *   - failure isolation: double progression, +2 steps when every set overshoots the range top by ≥ 5 (§6.3);
+ *   - otherwise double progression (top of the range on every set → one step up);
+ *   - a deload or taper session carries its load forward (those sets are not a test);
+ * - from the programme row's adjustments: extra-set muscles and extra main-lift sets (§7);
+ * - Sunday rounds from the conditioning log (roundsNextWeek).
+ * Flagged sets are ignored.
  */
 export function planState(args: {
   program: Program; ids: Map<string, string>; maxes: TrainingMax[]; sessions: Session[]; sets: SetRow[]; equipment: EquipmentProfile;
+  /** Conditioning logs, for next Sunday's rounds. */
+  conditioning?: Conditioning[];
+  /** The adjusted programme (week types for the rounds rule). Defaults to planFor(program). */
+  plan?: ProgramDefinition;
 }): PlanState {
   const { program, ids, maxes, sessions, sets, equipment } = args;
+  const plan = args.plan ?? planFor(program);
   const latest = latestMaxes(maxes, ids);
   const planSessions = new Set(sessions.filter((s) => s.program_id === program.id && s.status === "completed").map((s) => s.id));
-  const sessionDate = new Map(sessions.map((s) => [s.id, s.date]));
+  const sessionById = new Map(sessions.map((s) => [s.id, s]));
   const currentLoads: Partial<Record<string, number>> = {};
   if (latest.incline_db_press != null) currentLoads.incline_db_press = latest.incline_db_press;
   if (latest.weighted_pullup != null) currentLoads.weighted_pullup = latest.weighted_pullup;
@@ -141,25 +182,65 @@ export function planState(args: {
 
   for (const [key, slot] of slots) {
     const id = ids.get(key);
-    const mine = sets.filter((s) => s.exercise_id === id && planSessions.has(s.session_id) && s.completed && s.kind !== "warmup" && s.load != null);
+    const mine = sets.filter((s) => s.exercise_id === id && planSessions.has(s.session_id) && s.completed && s.kind !== "warmup" && s.load != null && !isFlagged(s));
     if (!mine.length) continue;
-    const lastDate = mine.reduce((d, s) => (sessionDate.get(s.session_id)! > d ? sessionDate.get(s.session_id)! : d), "");
-    const last = mine.filter((s) => sessionDate.get(s.session_id) === lastDate);
+    const lastDate = mine.reduce((d, s) => { const sd = sessionById.get(s.session_id)!.date; return sd > d ? sd : d; }, "");
+    const last = mine.filter((s) => sessionById.get(s.session_id)!.date === lastDate);
+    const lastLoad = Math.max(...last.map((s) => Number(s.load)));
     const range = slot.scheme?.repRange;
+    const weekType = weekTypeOf(sessionById.get(last[0]!.session_id));
+    if (!range || weekType === "deload" || weekType === "taper") {
+      currentLoads[key] = lastLoad;
+      continue;
+    }
     const def = PLAN.exercises[key];
     // Cables: the next real pin on that machine's stack; dumbbells: the rack; barbell: 2.5 kg.
     const step = weightsFor(key) ?? (def ? progressionStep(def.equipment, slot.unit, equipment) : 2.5);
-    const next = range ? doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step) : null;
-    currentLoads[key] = next?.load ?? Math.max(...last.map((s) => Number(s.load)));
+    const repOut = slot.scheme?.lastSetRepOut ? last.find((s) => s.kind === "rep_out" && s.reps != null) : undefined;
+    if (repOut) {
+      const normal = last.filter((s) => s !== repOut).map((s) => s.reps);
+      currentLoads[key] = apreNextLoad(Number(repOut.load), repOut.reps!, normal, range, step).load;
+    } else if (slot.scheme?.toFailure && last.every((s) => s.kind === "failure")) {
+      currentLoads[key] = failureProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
+    } else {
+      currentLoads[key] = doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
+    }
   }
 
+  const rounds = args.conditioning ? sundayRoundsFrom(args.conditioning, plan) : undefined;
   return {
     trainingMaxes: {
       ...(latest.squat != null ? { squat: latest.squat } : {}),
       ...(latest.deadlift != null ? { deadlift: latest.deadlift } : {}),
     },
-    currentLoads
+    currentLoads,
+    ...adjustmentState(adjustmentsOf(program.rules)),
+    ...(rounds !== undefined ? { sundayRounds: rounds } : {})
   };
+}
+
+/**
+ * This week's planned Sunday rounds from the rounds log, oldest first: after a normal week,
+ * roundsNextWeek(rounds done, first-round count, last-round count) — or the rounds done when the counts
+ * are missing; deload (half rounds) and test weeks hold the number. Undefined before the first log
+ * (the engine then uses the plan's start of 6).
+ */
+export function sundayRoundsFrom(conditioning: Conditioning[], plan: ProgramDefinition): number | undefined {
+  const rule = plan.days.find((d) => d.conditioning?.kind === "rounds")?.conditioning as RoundsRule | undefined;
+  if (!rule) return undefined;
+  const logs = conditioning
+    .filter((c) => c.kind === "rounds" && c.done && c.rounds != null && c.rounds > 0 && c.date >= plan.startDate)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
+  let planned: number | undefined;
+  for (const c of logs) {
+    const type = weekForDate(plan, c.date)?.type;
+    if (type === "deload" || type === "test") continue;
+    const done = Number(c.rounds);
+    planned = c.first_round_count != null && c.last_round_count != null
+      ? roundsNextWeek(done, Number(c.first_round_count), Number(c.last_round_count), rule.maxRounds, rule.dropOffFraction)
+      : Math.min(rule.maxRounds, done);
+  }
+  return planned;
 }
 
 export type { PrescribedDay };

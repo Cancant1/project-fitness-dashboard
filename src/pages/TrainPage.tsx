@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, fmtShortDateYear, todayIso } from "../lib/format";
-import { PLAN } from "../plan/bridge";
 import { startFreeWorkout } from "../plan/workout";
 import type { LiftingDayKey } from "../plan/types";
 import { Card, Label, Pill } from "../ui/kit";
@@ -27,8 +26,8 @@ export function TrainPage() {
   const ctx = usePlanContext();
   const today = todayIso();
   const inProgress = sessions.find((s) => s.status === "in_progress");
-  const next = useMemo(() => nextPlanned(sessions, ctx.program, today), [sessions, ctx.program, today]);
-  const tileWeek = next?.week.weekNo ?? currentWeek(today)?.week.weekNo ?? 0;
+  const next = useMemo(() => nextPlanned(sessions, ctx.program, today, ctx.plan), [sessions, ctx.program, today, ctx.plan]);
+  const tileWeek = next?.week.weekNo ?? currentWeek(today, ctx.plan)?.week.weekNo ?? 0;
   const [picking, setPicking] = useState<LiftingDayKey | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [setting, setSetting] = useState<Lift | null>(null);
@@ -99,7 +98,7 @@ export function TrainPage() {
 function NextHero({ next, ctx, today, onStartPlan, onSetMax }: {
   next: NonNullable<ReturnType<typeof nextPlanned>>; ctx: PlanContext; today: string; onStartPlan: () => void; onSetMax: () => void;
 }) {
-  const day = tryDay(next.week.weekNo, next.day.key, ctx.preview, ctx.equipment);
+  const day = tryDay(next.week.weekNo, next.day.key, ctx.preview, ctx.equipment, ctx.plan);
   const main = day ? headlineLifts(day)[0] : undefined;
   const s = main && day ? mainSummary(main, ctx.preview.trainingMaxes, day.weekType === "calibration" || day.weekType === "test") : null;
   const when = next.date === today ? "Today" : next.date === addDays(today, 1) ? "Tomorrow" : `${DAY_SHORT[next.day.weekday - 1]} ${fmtShortDate(next.date)}`;
@@ -127,7 +126,7 @@ function NextHero({ next, ctx, today, onStartPlan, onSetMax }: {
 
 function DayTile({ dayKey, weekNo, ctx, onOpen }: { dayKey: LiftingDayKey; weekNo: number; ctx: PlanContext; onOpen: () => void }) {
   const def = dayDef(dayKey);
-  const day = tryDay(weekNo, dayKey, ctx.preview, ctx.equipment);
+  const day = tryDay(weekNo, dayKey, ctx.preview, ctx.equipment, ctx.plan);
   const lifts = day && day.kind === "lifting" ? headlineLifts(day).map(shortName).join(" · ") : "Rest";
   return (
     <button type="button" className="k-card tr-tile" onClick={onOpen}>
@@ -144,16 +143,16 @@ function DaySheet({ dayKey, initialWeek, ctx, onClose, onStartPlan, onSetMax }: 
   dayKey: LiftingDayKey; initialWeek: number; ctx: PlanContext; onClose: () => void; onStartPlan: () => void; onSetMax: () => void;
 }) {
   const [weekNo, setWeekNo] = useState(initialWeek);
-  const week = PLAN.weeks[weekNo]!;
-  const day = tryDay(weekNo, dayKey, ctx.preview, ctx.equipment);
-  const now = currentWeek(todayIso());
+  const week = ctx.plan.weeks[weekNo]!;
+  const day = tryDay(weekNo, dayKey, ctx.preview, ctx.equipment, ctx.plan);
+  const now = currentWeek(todayIso(), ctx.plan);
   return (
     <Sheet title={dayDef(dayKey).title} onClose={onClose}>
       <div className="tr-sheet-week">
         <span className="tr-sheet-week-no">Week {weekNo}</span>
         <span className="k-muted">{TYPE_NAME[week.type]} · {fmtRange(week.startDate, weekEnd(week))}</span>
       </div>
-      <WeekRibbon compact selected={weekNo} onSelect={setWeekNo} nowWeekNo={now?.week.weekNo ?? null} />
+      <WeekRibbon compact plan={ctx.plan} selected={weekNo} onSelect={setWeekNo} nowWeekNo={now?.week.weekNo ?? null} />
       {day && day.kind === "lifting"
         ? <div className="k-card tr-sheet-day"><DayBody day={day} ctx={ctx} /></div>
         : <p className="k-muted">No lifting this week.</p>}

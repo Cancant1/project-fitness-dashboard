@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useStore } from "../data/store";
+import { useRows, useStore } from "../data/store";
 import type { Conditioning } from "../data/types";
 import { fmtNum, parseDecimal } from "../lib/format";
 import { getDay, getWeek, prescribeDay } from "../plan/engine";
-import { PLAN } from "../plan/bridge";
+import { sundayRoundsFrom, usePlan } from "../plan/bridge";
 import type { DayKey } from "../plan/types";
 import { CheckIcon } from "../ui/icons";
 
@@ -12,8 +12,12 @@ const KIND: Record<string, Conditioning["kind"]> = { easy_ride: "ride", boxing: 
 /** Wed ride, Thu boxing, Sun rounds: what the plan asks and a quick log. */
 export function ConditioningCard({ date, dayKey, weekNo, existing }: { date: string; dayKey: DayKey; weekNo: number; existing: Conditioning[] }) {
   const { local } = useStore();
-  const day = getDay(PLAN, dayKey);
-  const p = prescribeDay(PLAN, weekNo, dayKey, { trainingMaxes: { squat: 1, deadlift: 1 }, currentLoads: {} }).conditioning;
+  const plan = usePlan();
+  const conditioning = useRows("conditioning");
+  const day = getDay(plan, dayKey);
+  // Sunday rounds follow the log (roundsNextWeek); the TMs are irrelevant for conditioning days.
+  const sundayRounds = sundayRoundsFrom(conditioning.filter((c) => c.date < date), plan);
+  const p = prescribeDay(plan, weekNo, dayKey, { trainingMaxes: { squat: 1, deadlift: 1 }, currentLoads: {}, ...(sundayRounds !== undefined ? { sundayRounds } : {}) }).conditioning;
   const kind = KIND[dayKey] ?? "other";
   const logged = existing.find((c) => c.kind === kind);
   const [f, setF] = useState({ minutes: p?.minutes ? String(p.minutes) : "", loop: "", rounds: p?.rounds ? String(p.rounds) : "", first: "", last: "" });
@@ -36,7 +40,7 @@ export function ConditioningCard({ date, dayKey, weekNo, existing }: { date: str
     <section className="card card-hero">
       <div style={{ padding: "12px 12px 10px", display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-          <span className="chip chip-plain">Week {weekNo} · {getWeek(PLAN, weekNo).label}</span>
+          <span className="chip chip-plain">Week {weekNo} · {getWeek(plan, weekNo).label}</span>
           {logged && <span className="chip chip-good"><CheckIcon /> Logged</span>}
         </div>
         <span style={{ fontSize: 26, lineHeight: "32px", fontWeight: 700, letterSpacing: -0.3 }}>{day.title}</span>

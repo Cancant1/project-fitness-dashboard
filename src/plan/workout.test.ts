@@ -4,7 +4,7 @@ import { LocalStore } from "../data/local";
 import type { Exercise, Program } from "../data/types";
 import { prescribeDay } from "./engine";
 import { PLAN, ensurePlanExercises } from "./bridge";
-import { addExerciseToSession, maxUpdates, nextExercisePosition, planRef, startFreeWorkout, startWorkout } from "./workout";
+import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef, startFreeWorkout, startWorkout } from "./workout";
 
 let n = 0;
 async function store(): Promise<LocalStore> {
@@ -100,5 +100,35 @@ describe("startWorkout (still works)", () => {
     expect(sets).toHaveLength(day.exercises.reduce((k, e) => k + e.sets.length, 0));
     expect(sets.every((s) => planRef(s) !== undefined)).toBe(true);
     expect(local.get("sessions", id)).toMatchObject({ program_id: program!.id, program_week_no: 1, title: "Lower A" });
+  });
+});
+
+describe("provisional training max (§6.2)", () => {
+  async function calibrationSquat(reps: number) {
+    const local = await store();
+    const ids = await ensurePlanExercises(local);
+    const [program] = await local.save("programs", {
+      name: "Strength Return Plan", start_date: "2026-10-12", weeks: 20, status: "active", rules: { key: "strength-return-2026" }, goals: [], notes: null
+    });
+    const day = prescribeDay(PLAN, 0, "lower_a", { trainingMaxes: {}, currentLoads: {} });
+    const id = await startWorkout(local, program as Program, day, ids, "2026-10-12");
+    const sets = local.all("sets").filter((s) => s.session_id === id).map((s) => ({ ...s, completed: true, reps: s.kind === "rep_out" ? reps : s.reps }));
+    return { local, ids, program: program as Program, session: local.get("sessions", id)!, sets };
+  }
+  const EQ = { barKg: 20, platesKg: [20, 10, 5, 2.5, 1.25], dumbbellRackKg: [20, 22.5, 25], cableStepLb: 5, cableStepKg: 2.5, beltStepKg: 2.5, barbellStepKg: 2.5 };
+
+  it("100 × 15 in week 0 → TM 140 from 12 reps, provisional, and the note reaches the training_maxes row", async () => {
+    const { local, ids, program, session, sets } = await calibrationSquat(15);
+    const updates = maxUpdates(session, sets, ids, [], EQ);
+    expect(updates).toEqual([expect.objectContaining({ lift: "squat", to: 140, reason: "calibration", provisional: true, note: "provisional (>12 reps)" })]);
+    await finishWorkout(local, session, sets, updates, ids, program);
+    expect(local.all("training_maxes")).toEqual([expect.objectContaining({ value_kg: 140, reason: "calibration", note: "provisional (>12 reps)" })]);
+  });
+
+  it("12 clean reps or fewer is a normal calibration", async () => {
+    const { ids, session, sets } = await calibrationSquat(12);
+    const [u] = maxUpdates(session, sets, ids, [], EQ);
+    expect(u).toMatchObject({ to: 140, reason: "calibration" });
+    expect(u!.provisional).toBeUndefined();
   });
 });

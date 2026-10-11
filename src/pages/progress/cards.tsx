@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { REFERENCE } from "../../coach/reference";
 import type { TrainingMax } from "../../data/types";
 import { fractionalVolume, linearFit, monthlyAverages, monthlyBests, normMuscle, pearson, sessionBests, weeklyCounts } from "../../lib/analysis";
 import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, mondayOf } from "../../lib/format";
-import { PLAN, latestMaxes } from "../../plan/bridge";
+import { PLAN, latestMaxes, usePlan } from "../../plan/bridge";
 import { Bar, Card, Delta, Label, Pill, Radar, Ring, Sparkline, Stat, WeekHeat } from "../../ui/kit";
 import { Sheet } from "../../ui/Sheet";
 import { Scatter, type ScatterSeries } from "./charts";
@@ -44,7 +45,8 @@ export function LiftTile({ t, on, onSelect }: { t: LiftTrend; on: boolean; onSel
 export const PLAN_END = addDays(PLAN.weeks[PLAN.weeks.length - 1]!.startDate, 6);
 
 export function ProgrammeCard({ idx, maxes, today }: { idx: TrainingIndex; maxes: TrainingMax[]; today: string }) {
-  const weeks = PLAN.weeks;
+  const plan = usePlan();
+  const weeks = plan.weeks;
   const current = weeks.find((w) => today >= w.startDate && daysBetween(w.startDate, today) < 7) ?? null;
   const daysIn = Math.max(0, daysBetween(PLAN.startDate, today) + 1);
   const until = daysBetween(today, PLAN.startDate);
@@ -83,19 +85,6 @@ export function ProgrammeCard({ idx, maxes, today }: { idx: TrainingIndex; maxes
 }
 
 // ------------------------------------------------------------------ muscles
-
-// Weekly fractional sets: average of the good weeks (5+ sessions) and the Strength Return Plan (from the plan page).
-const REFERENCE: { muscle: string; short: string; good: number; plan: number }[] = [
-  { muscle: "Chest", short: "Chest", good: 15.8, plan: 11 },
-  { muscle: "Back", short: "Back", good: 16.9, plan: 11.5 },
-  { muscle: "Quads", short: "Quads", good: 11.3, plan: 10 },
-  { muscle: "Hamstrings", short: "Hams", good: 6.6, plan: 6.0 },
-  { muscle: "Calves", short: "Calves", good: 6.0, plan: 4 },
-  { muscle: "Rear delts", short: "Rear delt", good: 3.3, plan: 2 },
-  { muscle: "Side delts", short: "Side delt", good: 12.5, plan: 10 },
-  { muscle: "Triceps", short: "Triceps", good: 17.6, plan: 9.5 },
-  { muscle: "Biceps", short: "Biceps", good: 20.0, plan: 11.5 }
-];
 
 export function MusclesCard({ idx, today }: { idx: TrainingIndex; today: string }) {
   const [open, setOpen] = useState(false);

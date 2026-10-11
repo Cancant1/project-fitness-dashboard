@@ -1,7 +1,13 @@
 import { STRENGTH_RETURN_PLAN as P } from './strengthReturn';
 import {
   DEFAULT_EQUIPMENT,
+  PROVISIONAL_NOTE,
+  apreNextLoad,
   bodyweightRateCheck,
+  ceilLoad,
+  failureProgression,
+  stepLoad,
+  trainingMaxAfterRepOut,
   checkpointStatus,
   dayForDate,
   doubleProgression,
@@ -450,5 +456,82 @@ describe('conditioning and food', () => {
     expect(bodyweightRateCheck(74.5, 74.0)).toBe('keep');
     expect(bodyweightRateCheck(74.6, 74.0)).toBe('-100 kcal');
     expect(bodyweightRateCheck(73.8, 74.0)).toBe('+100 kcal');
+  });
+});
+
+describe('§6.1 APRE jumps for rep-out-last accessories', () => {
+  const rack = DEFAULT_EQUIPMENT.dumbbellRackKg;
+
+  it('RDL example from the spec: 80 × 20 → 87.5; × 16 → 92.5; × 14 → 97.5; × 12 → 102.5; × 10 → +2.5', () => {
+    const chain: Array<[number, number, number, string]> = [
+      [80, 20, 87.5, 'plus7_5'],
+      [87.5, 16, 92.5, 'plus5'],
+      [92.5, 14, 97.5, 'plus5'],
+      [97.5, 12, 102.5, 'plus5'],
+      [102.5, 10, 105, 'plus1'],
+    ];
+    for (const [load, reps, next, jump] of chain) {
+      expect(apreNextLoad(load, reps, [10, 10], [6, 10], 2.5)).toEqual({ load: next, jump });
+    }
+  });
+
+  it('table edges: hi + 7, hi + 2 … hi + 6, hi … hi + 1 with normals at hi, below lo, otherwise same', () => {
+    const next = (reps: number, normals: (number | null)[] = [10, 10]) => apreNextLoad(100, reps, normals, [6, 10], 2.5);
+    expect(next(17)).toEqual({ load: 107.5, jump: 'plus7_5' });
+    expect(next(16)).toEqual({ load: 105, jump: 'plus5' });
+    expect(next(12)).toEqual({ load: 105, jump: 'plus5' });
+    expect(next(11)).toEqual({ load: 102.5, jump: 'plus1' });
+    expect(next(10)).toEqual({ load: 102.5, jump: 'plus1' });
+    expect(next(11, [10, 9])).toEqual({ load: 100, jump: 'same' }); // a normal set short of hi: double progression says hold
+    expect(next(8)).toEqual({ load: 100, jump: 'same' });
+    expect(next(6)).toEqual({ load: 100, jump: 'same' });
+    expect(next(5)).toEqual({ load: 97.5, jump: 'minus1' });
+  });
+
+  it('percent jumps round up to the next available load, at least one step', () => {
+    // Bulgarian split squat 14 kg/hand, range 8–12: 15.05 → 16; 14.7 → 16 (the next dumbbell).
+    expect(apreNextLoad(14, 20, [12, 12], [8, 12], rack)).toEqual({ load: 16, jump: 'plus7_5' });
+    expect(apreNextLoad(14, 14, [12, 12], [8, 12], rack)).toEqual({ load: 16, jump: 'plus5' });
+    // DB bench 25 kg/hand, range 6–10: 26.875 → 27.5.
+    expect(apreNextLoad(25, 17, [10, 10], [6, 10], rack)).toEqual({ load: 27.5, jump: 'plus7_5' });
+    // Seated row stack (10 lb pins), range 8–12: 107.5 → 110.
+    expect(apreNextLoad(100, 19, [12], [8, 12], [90, 100, 110, 120, 130])).toEqual({ load: 110, jump: 'plus7_5' });
+    expect(apreNextLoad(100, 4, [12], [8, 12], [90, 100, 110])).toEqual({ load: 90, jump: 'minus1' });
+  });
+
+  it('stepLoad and ceilLoad', () => {
+    expect(stepLoad(80, 2.5, 1)).toBe(82.5);
+    expect(stepLoad(20, [10, 20, 30, 40], 1, 2)).toBe(40);
+    expect(stepLoad(10, [10, 20], -1)).toBe(10);
+    expect(stepLoad(1, 2.5, -1)).toBe(0);
+    expect(ceilLoad(86, 2.5)).toBe(87.5);
+    expect(ceilLoad(85, 2.5)).toBe(85);
+    expect(ceilLoad(15.05, rack)).toBe(16);
+    expect(ceilLoad(60, [10, 20])).toBe(20);
+  });
+});
+
+describe('§6.3 isolation overshoot', () => {
+  const pins = [10, 20, 30, 40, 50];
+  it('every failure set ≥ hi + 5 → +2 steps; all at hi → +1; otherwise hold', () => {
+    expect(failureProgression([{ load: 20, reps: 25 }, { load: 20, reps: 26 }], [12, 20], pins)).toEqual({ load: 40, steps: 2 });
+    expect(failureProgression([{ load: 20, reps: 25 }, { load: 20, reps: 24 }], [12, 20], pins)).toEqual({ load: 30, steps: 1 });
+    expect(failureProgression([{ load: 20, reps: 25 }, { load: 20, reps: 19 }], [12, 20], pins)).toEqual({ load: 20, steps: 0 });
+    expect(failureProgression([{ load: 25, reps: 15 }, { load: 25, reps: 15 }], [10, 15], 2.5)).toEqual({ load: 27.5, steps: 1 });
+    expect(failureProgression([], [10, 15], 2.5)).toBeNull();
+  });
+});
+
+describe('§6.2 provisional training max', () => {
+  it('calibration (or first) rep-out past 12 reps: TM from 12 reps, marked provisional', () => {
+    expect(trainingMaxAfterRepOut(100, 15, { calibration: true })).toEqual({ tm: 140, reason: 'calibration', provisional: true });
+    expect(trainingMaxAfterRepOut(100, 13, { previous: null })).toEqual({ tm: 140, reason: 'calibration', provisional: true });
+    expect(trainingMaxAfterRepOut(100, 12, { calibration: true })).toEqual({ tm: 140, reason: 'calibration', provisional: false });
+    expect(trainingMaxAfterRepOut(140, 8, { calibration: true })).toEqual({ tm: 175, reason: 'calibration', provisional: false });
+    expect(PROVISIONAL_NOTE).toBe('provisional (>12 reps)');
+  });
+
+  it('later rep-outs move the TM by the table (nearest 2.5), however many reps', () => {
+    expect(trainingMaxAfterRepOut(100, 15, { previous: 140, target: 10 })).toEqual({ tm: nextTrainingMax(140, 15, 10, 'nearest'), reason: 'rep_out', provisional: false });
   });
 });
