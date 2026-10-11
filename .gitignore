@@ -12,3 +12,10 @@ dist/data/
 dist/assets/*.map
 .vite/
 coverage/
+
+# Rebuild (v3)
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/

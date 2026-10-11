@@ -1,31 +1,25 @@
 {
-  "name": "reps-2026",
+  "name": "reps",
   "private": true,
-  "version": "2.0.0",
+  "version": "3.0.0",
   "type": "module",
-  "packageManager": "pnpm@11.19.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/copy-site-assets.mjs",
+    "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify": "pnpm typecheck && pnpm test && pnpm build",
-    "audit:data": "node scripts/audit-legacy-data.mjs"
+    "verify": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "2.117.2",
     "idb": "8.0.3",
-    "lucide-react": "1.34.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router-dom": "7.18.2",
-    "zod": "4.4.3"
+    "react-router-dom": "7.18.2"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "7.0.1",
-    "@testing-library/react": "16.3.2",
-    "@testing-library/user-event": "14.6.6",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.1.0",
