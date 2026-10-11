@@ -5,6 +5,7 @@ import type { LocalStore } from "../data/local";
 import type { Exercise, Profile, Program, SetRow, Session, TrainingMax } from "../data/types";
 import { buildDumbbellRack, doubleProgression, DEFAULT_EQUIPMENT, progressionStep } from "./engine";
 import { STRENGTH_RETURN_PLAN } from "./strengthReturn";
+import { GYM, weightsFor } from "./equipment";
 import type { EquipmentProfile, PlanState, PrescribedDay, ProgramDefinition, ProgramSlot } from "./types";
 
 export const PLAN: ProgramDefinition = STRENGTH_RETURN_PLAN;
@@ -99,7 +100,7 @@ export function equipmentFrom(profile: Profile | undefined): EquipmentProfile {
     ...DEFAULT_EQUIPMENT,
     barKg: Number(profile.bar_kg) || DEFAULT_EQUIPMENT.barKg,
     platesKg: profile.plates_kg?.length ? profile.plates_kg.map(Number) : DEFAULT_EQUIPMENT.platesKg,
-    dumbbellRackKg: profile.dumbbells_kg?.length ? profile.dumbbells_kg.map(Number) : buildDumbbellRack(),
+    dumbbellRackKg: profile.dumbbells_kg?.length ? profile.dumbbells_kg.map(Number) : [...GYM.dumbbellsKg],
     cableStepLb: Number(profile.cable_step_lb) || DEFAULT_EQUIPMENT.cableStepLb
   };
 }
@@ -146,7 +147,8 @@ export function planState(args: {
     const last = mine.filter((s) => sessionDate.get(s.session_id) === lastDate);
     const range = slot.scheme?.repRange;
     const def = PLAN.exercises[key];
-    const step = def ? progressionStep(def.equipment, slot.unit, equipment) : 2.5;
+    // Cables: the next real pin on that machine's stack; dumbbells: the rack; barbell: 2.5 kg.
+    const step = weightsFor(key) ?? (def ? progressionStep(def.equipment, slot.unit, equipment) : 2.5);
     const next = range ? doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step) : null;
     currentLoads[key] = next?.load ?? Math.max(...last.map((s) => Number(s.load)));
   }

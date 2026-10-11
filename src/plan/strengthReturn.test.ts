@@ -1,3 +1,4 @@
+import { GYM, weightsFor } from './equipment';
 import { STRENGTH_RETURN_PLAN as P } from './strengthReturn';
 import { addDays, countWorkingSets, isoWeekday, prescribeDay } from './engine';
 import type { LiftingDayKey, PlanState, WeekType } from './types';
@@ -79,21 +80,32 @@ describe('days', () => {
     P.days.flatMap((d) => d.slots).forEach((s) => expect(P.exercises[s.exerciseKey]?.key).toBe(s.exerciseKey));
   });
 
-  it('keeps the plan units and start loads', () => {
+  it('puts every start load on equipment that exists in the gym', () => {
+    for (const day of P.days) for (const slot of day.slots) {
+      if (slot.role === 'main') continue;
+      const stack = weightsFor(slot.exerciseKey);
+      const def = P.exercises[slot.exerciseKey]!;
+      if (stack) expect(stack, `${slot.exerciseKey} ${slot.startLoad} ${slot.unit}`).toContain(slot.startLoad);
+      else if (def.equipment === 'dumbbell') expect(GYM.dumbbellsKg, slot.exerciseKey).toContain(slot.startLoad);
+      else if (def.equipment === 'barbell') expect(slot.startLoad % 2.5, slot.exerciseKey).toBe(0);
+    }
+  });
+
+  it('keeps the plan units and start loads (snapped to real pins)', () => {
     const slot = (day: string, key: string) => P.days.find((d) => d.key === day)!.slots.find((s) => s.exerciseKey === key)!;
     const pick = (day: string, key: string) => { const s = slot(day, key); return [s.startLoad, s.unit]; };
     expect(pick('lower_a', 'romanian_deadlift')).toEqual([80, 'kg']);
-    expect(pick('lower_a', 'cable_leg_extension')).toEqual([35, 'lb']);
-    expect(pick('lower_a', 'cable_calf_raise')).toEqual([120, 'kg']);
-    expect(pick('lower_a', 'kneeling_cable_crunch')).toEqual([40, 'kg']);
+    expect(pick('lower_a', 'cable_leg_extension')).toEqual([30, 'lb']);
+    expect(pick('lower_a', 'cable_calf_raise')).toEqual([250, 'lb']);
+    expect(pick('lower_a', 'kneeling_cable_crunch')).toEqual([90, 'lb']);
     expect(pick('lower_a', 'cable_lateral_raise')).toEqual([20, 'lb']);
     expect(pick('upper_a', 'seated_cable_row')).toEqual([100, 'lb']);
-    expect(pick('upper_a', 'chest_cable_flye')).toEqual([23, 'kg']);
-    expect(pick('upper_a', 'bayesian_curl')).toEqual([23, 'kg']);
+    expect(pick('upper_a', 'chest_cable_flye')).toEqual([50, 'lb']);
+    expect(pick('upper_a', 'bayesian_curl')).toEqual([50, 'lb']);
     expect(pick('upper_a', 'overhead_cable_triceps_extension')).toEqual([20, 'lb']);
     expect(pick('lower_b', 'bulgarian_split_squat')).toEqual([14, 'kg']);
     expect(pick('lower_b', 'hanging_knee_raise')).toEqual([0, 'bodyweight']);
-    expect(pick('lower_b', 'preacher_curl')).toEqual([45, 'lb']);
+    expect(pick('lower_b', 'preacher_curl')).toEqual([40, 'lb']);
     expect(pick('upper_b', 'barbell_row')).toEqual([70, 'kg']);
     expect(pick('upper_b', 'lat_pulldown')).toEqual([120, 'lb']);
     expect(pick('upper_b', 'reverse_grip_pushdown')).toEqual([80, 'lb']);

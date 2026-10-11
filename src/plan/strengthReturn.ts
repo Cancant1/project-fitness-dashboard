@@ -77,7 +77,7 @@ const repOutLast = (sets: number, min: number, max: number) => scheme(sets, min,
 // Shoulder care block, Tue and Sat before the first main lift: not failure sets, 45–60 s rest, 3 s down.
 const SHOULDER_BLOCK: ProgramSlot[] = [
   { exerciseKey: 'cable_external_rotation', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 12, 15),
-    startLoad: 5, unit: 'lb', loadBasis: 'per_arm',
+    startLoad: 10, unit: 'lb', loadBasis: 'per_arm', // plan said 5 lb; the lightest pin is 10
     notes: ['Single pulley at elbow height, towel between elbow and ribs.', '3 s back. Not to failure.'] },
   { exerciseKey: 'prone_y_raise', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 10, 12),
     startLoad: 2, unit: 'kg', loadBasis: 'per_hand',
@@ -92,11 +92,11 @@ const SHOULDER_BLOCK: ProgramSlot[] = [
 
 const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
   ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.']);
-const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 35, 'lb', 'per_leg',
+const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
   ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.']);
-const CALF_RAISE: ProgramSlot = isolation('cable_calf_raise', failure(2, 10, 15), 120, 'kg', 'total',
+const CALF_RAISE: ProgramSlot = isolation('cable_calf_raise', failure(2, 10, 15), 250, 'lb', 'total', // 125 + 125 lb ≈ 113 kg (plan 120 kg; no pin for it)
   ['Bar between the two pulleys; knees straight; pause 1–2 s in the stretch. Half reps in the bottom after failure.']);
-const FLYE: ProgramSlot = isolation('chest_cable_flye', failure(2, 10, 15), 23, 'kg', 'total',
+const FLYE: ProgramSlot = isolation('chest_cable_flye', failure(2, 10, 15), 50, 'lb', 'per_arm', // 50 lb per side = the plan's 23 kg
   ['Pulleys at chest height, 1 s pause in the stretch. Right shoulder: stop the stretch a little earlier.']);
 
 // ---------- days ----------
@@ -112,7 +112,7 @@ const DAYS: ProgramDay[] = [
         ['Bench inclined ~30°, face down, dumbbell between your feet. Unstable: use the seated cable curl.']),
       LEG_EXTENSION(2),
       CALF_RAISE,
-      isolation('kneeling_cable_crunch', failure(2, 10, 15), 40, 'kg', 'total', ['Curl ribs to pelvis; hips stay still.']),
+      isolation('kneeling_cable_crunch', failure(2, 10, 15), 90, 'lb', 'total', ['Single pulley: 90 lb ≈ 41 kg, the plan’s 40 kg.','Curl ribs to pelvis; hips stay still.']),
       LATERAL(2),
       isolation('cross_body_triceps_extension', failure(2, 10, 15), 40, 'lb', 'per_arm',
         ['Soft lockout.', 'Front of shoulder/collarbone hurts: switch to rope pushdowns.']),
@@ -130,7 +130,8 @@ const DAYS: ProgramDay[] = [
       compound('seated_cable_row', repOutLast(2, 8, 12), 100, 'lb', 'total', ['Neutral handle.'], { restSec: 120 }),
       FLYE,
       LATERAL(3),
-      isolation('bayesian_curl', failure(2, 8, 12), 23, 'kg', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.']),
+      // 50 lb = the plan's 23 kg
+      isolation('bayesian_curl', failure(2, 8, 12), 50, 'lb', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.']),
       isolation('overhead_cable_triceps_extension', failure(2, 10, 15), 20, 'lb', 'per_arm',
         ['Rope or wrist cuff, no bar grip. Soft lockout.']),
     ],
@@ -154,13 +155,15 @@ const DAYS: ProgramDay[] = [
         ['Low-rep ramp, then one top set. Straps are fine; no mixed grip.', 'Reset every rep from a dead stop, no bounce.']),
         restSec: 150 },
       compound('bulgarian_split_squat', repOutLast(3, 8, 12), 14, 'kg', 'per_hand', ['Straps if grip limits.', '90 s between legs.']),
-      isolation('seated_cable_leg_curl', failure(2, 10, 15), 25, 'lb', 'per_leg', ['Torso leaning slightly forward, hips bent.']),
+      // June 30 lb −10% → 20 (no 25 pin)
+      isolation('seated_cable_leg_curl', failure(2, 10, 15), 20, 'lb', 'per_leg', ['Torso leaning slightly forward, hips bent.']),
       LEG_EXTENSION(1),
       CALF_RAISE,
       isolation('hanging_knee_raise', failure(2, 10, 15), 0, 'bodyweight', 'total',
         ['Curl the pelvis up. Dip handles if grip or elbow bothers you.']),
       LATERAL(2),
-      isolation('preacher_curl', failure(2, 8, 12), 45, 'lb', 'total', ['No bouncing out of the bottom.']),
+      // June 50 lb −10% → 40 (no 45 pin)
+      isolation('preacher_curl', failure(2, 8, 12), 40, 'lb', 'total', ['No bouncing out of the bottom.']),
       isolation('wrist_extension', scheme(2, 15, 15), 4, 'kg', 'per_hand',
         ['Elbow care: start 4–6 kg, 3 s down. Right arm is the priority; do both. Pain rule.'], { restSec: 60, rehab: true }),
     ],
@@ -175,7 +178,8 @@ const DAYS: ProgramDay[] = [
       compound('lat_pulldown', failure(2, 8, 12), 120, 'lb', 'total', ['Neutral handle, full stretch overhead.'], { restSec: 120 }),
       FLYE,
       LATERAL(3),
-      isolation('cable_rear_delt_fly', failure(2, 12, 20), 35, 'lb', 'total', ['Cables crossed; keep it in the shoulders.']),
+      // June 40 lb −10% → 30 (no 35 pin)
+      isolation('cable_rear_delt_fly', failure(2, 12, 20), 30, 'lb', 'per_arm', ['Cables crossed; keep it in the shoulders.']),
       isolation('underhand_cable_curl', failure(2, 8, 12), 40, 'lb', 'total', ['Replaces hammer curl.']),
       isolation('reverse_grip_pushdown', failure(2, 8, 12), 80, 'lb', 'total', ['Replaces overhand pushdown. Soft lockout.']),
     ],

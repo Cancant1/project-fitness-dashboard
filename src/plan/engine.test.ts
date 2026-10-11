@@ -295,7 +295,7 @@ describe('week shapes', () => {
 
   it('training week: compounds end with a rep-out, isolation goes to failure', () => {
     expect(shape(ex(1, 'lower_a', 'romanian_deadlift').sets)).toEqual([['working', 80, 10], ['working', 80, 10], ['rep_out', 80, null]]);
-    expect(shape(ex(1, 'lower_a', 'cable_leg_extension').sets)).toEqual([['failure', 35, null], ['failure', 35, null]]);
+    expect(shape(ex(1, 'lower_a', 'cable_leg_extension').sets)).toEqual([['failure', 30, null], ['failure', 30, null]]);
     expect(ex(1, 'lower_a', 'cable_leg_extension').unit).toBe('lb');
     expect(shape(ex(1, 'lower_b', 'wrist_extension').sets)).toEqual([['working', 4, 15], ['working', 4, 15]]);
   });

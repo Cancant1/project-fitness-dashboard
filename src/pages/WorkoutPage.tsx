@@ -4,6 +4,7 @@ import { useRows, useStore } from "../data/store";
 import type { Exercise, SetRow } from "../data/types";
 import { fmtNum, parseDecimal, toKg } from "../lib/format";
 import { platesPerSide, trainingMaxFromSet, nextTrainingMax } from "../plan/engine";
+import { STACK_LABEL, STACK_OF, pinLabel, weightsFor } from "../plan/equipment";
 import { PLAN, activeProgram, equipmentFrom, latestMaxes, usePlanIds } from "../plan/bridge";
 import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef } from "../plan/workout";
 import { Sheet } from "../ui/Sheet";
@@ -253,6 +254,8 @@ function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }
 
       {repOut && <RepOutCard s={repOut} calibration={calibration} latest={latest} onUpdate={onUpdate} onToggle={onToggle} />}
 
+      <PinPicker block={block} onUpdate={onUpdate} />
+
       {isBarbell && work[0]?.load != null && (
         <p className="row-sub" style={{ margin: "0 4px" }}>{plates(Number((repOut ?? work[work.length - 1]!).load), equipment)}</p>
       )}
@@ -477,5 +480,33 @@ function AddExerciseSheet({ onClose, onPick }: { onClose: () => void; onPick: (e
         <p className="muted">No exercise matches. Add new ones under Workouts.</p>
       )}
     </Sheet>
+  );
+}
+
+/** Cable exercises: the real pins on that machine's stack around the current load. Tap one to load every open set. */
+function PinPicker({ block, onUpdate }: { block: Block; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void> }) {
+  const key = planRef(block.sets[0]!)?.exerciseKey ?? "";
+  const weights = weightsFor(key);
+  const open = block.sets.filter((s) => s.kind !== "warmup" && !s.completed);
+  const current = Number((open[0] ?? block.sets[block.sets.length - 1])?.load ?? 0);
+  if (!weights || !open.length) return null;
+  const at = weights.findIndex((w) => w >= current - 1e-9);
+  const i = at < 0 ? weights.length - 1 : at;
+  const shown = weights.slice(Math.max(0, i - 2), i + 4);
+  const stack = STACK_OF[key]!;
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: 6 }} aria-label="Weight stack">
+      <span className="row-sub" style={{ margin: "0 4px" }}>Pins on {STACK_LABEL[stack]}</span>
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
+        {shown.map((w) => (
+          <button key={w} className={`btn btn-sm ${Math.abs(w - current) < 1e-9 ? "btn-primary" : "btn-glass"}`}
+            style={{ flex: "none", minWidth: 64, height: 40 }}
+            aria-pressed={Math.abs(w - current) < 1e-9}
+            onClick={() => void Promise.all(open.map((s) => onUpdate(s, { load: w, unit: "lb" })))}>
+            {pinLabel(key, w)}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
