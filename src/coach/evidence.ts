@@ -24,7 +24,7 @@ export const EVIDENCE = {
   // Nutrition
   "N-SURPLUS": "Lean bulk at 2,800 kcal, about 5–8% over a maintenance of ≈2,600.",
   "N-RATE": "Aim for +0.1–0.25 kg a week on the 7-day average; change calories by 100 kcal at most every 2 weeks.",
-  "N-PROTEIN": "Protein about 2.0 g/kg (≈180 g); benefits level off near 1.6 g/kg.",
+  "N-PROTEIN": "Protein 2.0 g per kg of bodyweight (≈150 g now; the fixed day gives ≈180 g); benefits level off near 1.6 g/kg.",
   "N-CARBS": "Extra calories come from carbs: they fuel the sessions.",
   "N-TDEE": "Maintenance measured from your own intake and weight trend (7,700 kcal per kg).",
   "N-WAIST": "Waist at the navel every 2 weeks: rising >1 cm a month while lifts stall means too much surplus.",
@@ -43,7 +43,7 @@ export const EVIDENCE = {
   "J-REDFLAGS": "Numbness, swelling, night pain, weakness or a pop: see a GP or fysiotherapeut sooner.",
   // Model
   "M-E1RM": "Estimated 1RM = load × (1 + reps/30), trustworthy up to about 12 reps.",
-  "M-REGAIN": "Regaining old strength runs at ≈3% a week, slowing towards the old best.",
+  "M-REGAIN": "Regaining old strength runs at ≈3% a week, slowing towards the old best; past it, ≈0.1–0.2% a week.",
   "M-STRENGTH-BW": "About +4 kg squat e1RM per kg of bodyweight in your history.",
   "M-INDIVIDUAL": "Your own log beats population averages; the rules adapt to your numbers.",
 } as const;
