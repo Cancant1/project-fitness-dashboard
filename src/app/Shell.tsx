@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useSyncState } from "../data/store";
 import { supabase } from "../data/supabase";
 import { ThemeSwitch } from "../ui/theme";
-import { FoodIcon, HistoryIcon, PlanIcon, ProgressIcon, RecordsIcon, TodayIcon, TrainIcon, WeightIcon } from "../ui/icons";
+import { CheckinIcon, FoodIcon, HistoryIcon, PlanIcon, ProgressIcon, RecordsIcon, TodayIcon, TrainIcon, WeightIcon } from "../ui/icons";
 
 const TABS = [
   { to: "/", label: "Today", Icon: TodayIcon, end: true },
@@ -33,6 +33,7 @@ export function Shell({ email }: { email: string }) {
         <SideLink to="/progress" Icon={ProgressIcon}>Progress</SideLink>
         <SideLink to="/records" Icon={RecordsIcon}>Records</SideLink>
         <SideLink to="/plan" Icon={PlanIcon}>Plan</SideLink>
+        <SideLink to="/checkin" Icon={CheckinIcon}>Check-in</SideLink>
         <span className="side-group">Body</span>
         <SideLink to="/food" Icon={FoodIcon}>Food</SideLink>
         <SideLink to="/weight" Icon={WeightIcon}>Weight &amp; energy</SideLink>

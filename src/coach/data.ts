@@ -75,6 +75,11 @@ export function coachData(t: CoachTables): CoachData {
   const ids = planIds(exercisesList);
   const keyOf = new Map<string, string>();
   for (const [key, id] of ids) if (!keyOf.has(id)) keyOf.set(id, key);
+  // Duplicates of a plan exercise (same plan_key, another id) still map back to their key.
+  for (const e of exercisesList) {
+    const k = (e.legacy_ref as { plan_key?: string } | null)?.plan_key;
+    if (k && !keyOf.has(e.id)) keyOf.set(e.id, k);
+  }
   const program = activeProgram(live(t.programs)) ?? null;
   const adjustments = program ? adjustmentsOf(program.rules) : [];
   const plan = planFor(program);

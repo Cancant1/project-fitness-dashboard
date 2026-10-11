@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { daysBetween, fmtShortDateYear, todayIso } from "../lib/format";
 import { PLAN } from "../plan/bridge";
 import type { ProgramDefinition } from "../plan/types";
 import { Card, Label, Pill, Stat } from "../ui/kit";
-import { ChevronLeft, ChevronRight } from "../ui/icons";
+import { CheckinIcon, ChevronLeft, ChevronRight } from "../ui/icons";
 import { MaxesPanel, SetMaxSheet, type Lift } from "./plan/MaxesPanel";
 import { HowItWorks } from "./plan/Overview";
 import { StartPlanSheet } from "./plan/StartPlanSheet";
@@ -52,6 +52,7 @@ export function PlanPage() {
         </div>
         <div className="k-head-actions">
           <Pill tone={now?.status === "during" ? "accent" : "plain"}>{status}</Pill>
+          <Link to="/checkin" className="k-pill k-pill-plain pl-checkin"><CheckinIcon size={15} /> Check-in</Link>
           {!ctx.program && <button type="button" className="btn btn-primary pl-head-btn" onClick={() => setConfirm(true)}>Start</button>}
         </div>
       </header>

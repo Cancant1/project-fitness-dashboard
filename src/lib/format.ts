@@ -1,7 +1,14 @@
 // Dates are local calendar dates as "YYYY-MM-DD" strings; never shift through UTC.
 
-export function todayIso(now = new Date()): string {
-  return toIso(now);
+export function todayIso(now?: Date): string {
+  return toIso(now ?? devToday() ?? new Date());
+}
+
+/** Dev only: `?today=YYYY-MM-DD` in the URL pretends it is that day (for previewing later plan weeks in ?demo). */
+function devToday(): Date | null {
+  if (!import.meta.env?.DEV || typeof window === "undefined") return null;
+  const t = new URLSearchParams(window.location.search).get("today");
+  return t && /^\d{4}-\d{2}-\d{2}$/.test(t) ? new Date(`${t}T12:00:00`) : null;
 }
 
 export function toIso(d: Date): string {

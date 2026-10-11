@@ -5,7 +5,7 @@ import type { Program } from "../data/types";
 import { adjustmentState, adjustmentsOf, applyAdjustments, type Adjustment, type CoachAction } from "../plan/adjustments";
 import { PLAN, activeProgram, ensurePlanExercises, planFor } from "../plan/bridge";
 import { prescribeWeek } from "../plan/engine";
-import { answerPainCheck, applyCoachAction, removeAdjustment, saveSessionEnergy, saveSleep, saveWaist } from "./apply";
+import { answerPainCheck, applyCoachAction, ensurePlanProteinPerKg, removeAdjustment, saveSessionEnergy, saveSleep, saveWaist } from "./apply";
 import { STATE } from "./testkit";
 
 let n = 0;
@@ -102,6 +102,41 @@ describe("applying through the LocalStore", () => {
     expect(adjustmentsOf(activeProgram(local.all("programs"))!.rules)).toEqual([expect.objectContaining({ kind: "kcal", signalId: "body.rate" })]);
     expect((await applyCoachAction(local, { kind: "kcal", delta: 100, from: "2026-11-09" }, { signalId: "strength.misses", today: "2026-11-08" })).ok).toBe(false);
     expect(local.all("nutrition_targets")).toHaveLength(2);
+  });
+
+  it("undo takes back what kcal and tm_reduce wrote", async () => {
+    const { local, ids, program } = await setup();
+    await local.save("nutrition_targets", {
+      effective_from: "2026-10-12", phase: "lean bulk", kcal: 2800, protein: 150, protein_per_kg: 2, carbs: 310, fat: 80,
+      per_weekday: null, target_weight: 77, note: null
+    });
+    const r = await applyCoachAction(local, { kind: "kcal", delta: 100, from: "2026-11-09" }, { signalId: "body.rate", today: "2026-11-08" });
+    expect(local.all("nutrition_targets")).toHaveLength(2);
+    expect(await removeAdjustment(local, r.adjustment!.id)).toBe(true);
+    expect(local.all("nutrition_targets").map((t) => t.kcal)).toEqual([2800]);
+    // re-applying after an undo starts from the original row again
+    await applyCoachAction(local, { kind: "kcal", delta: 100, from: "2026-11-09" }, { signalId: "body.rate", today: "2026-11-08" });
+    expect(local.all("nutrition_targets").map((t) => t.kcal).sort()).toEqual([2800, 2900]);
+
+    // an update of an existing row on the same date is restored, not removed
+    const same = await applyCoachAction(local, { kind: "kcal", delta: -100, from: "2026-11-09" }, { signalId: "body.waist", today: "2026-11-08" });
+    expect(local.all("nutrition_targets").find((t) => t.effective_from === "2026-11-09")!.kcal).toBe(2800);
+    await removeAdjustment(local, same.adjustment!.id);
+    expect(local.all("nutrition_targets").find((t) => t.effective_from === "2026-11-09")!.kcal).toBe(2900);
+
+    await local.save("training_maxes", { exercise_id: ids.get("squat")!, program_id: program.id, effective_date: "2026-10-26", value_kg: 150, reason: "rep_out", source_set_id: null, note: null });
+    const tm = await applyCoachAction(local, { kind: "tm_reduce", percent: 5 }, { signalId: "consistency.long_break", today: "2026-11-16" });
+    expect(local.all("training_maxes")).toHaveLength(2);
+    await removeAdjustment(local, tm.adjustment!.id);
+    expect(local.all("training_maxes").map((m) => m.value_kg)).toEqual([150]);
+  });
+
+  it("ensurePlanProteinPerKg upgrades only the untouched plan row", async () => {
+    const { local } = await setup();
+    await local.save("nutrition_targets", { effective_from: "2026-10-12", phase: null, kcal: 2800, protein: 150, carbs: 310, fat: 80, per_weekday: null, target_weight: null, note: null });
+    expect(await ensurePlanProteinPerKg(local, "2026-10-12")).toBe(true);
+    expect(local.all("nutrition_targets")[0]!.protein_per_kg).toBe(2);
+    expect(await ensurePlanProteinPerKg(local, "2026-10-12")).toBe(false);
   });
 
   it("kcal without a target row starts from the plan's row", async () => {

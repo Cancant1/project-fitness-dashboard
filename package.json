@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm test && npm run build"
+    "verify": "npm run typecheck && npm test && npm run build",
+    "checkin": "tsx scripts/checkin.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.2",
@@ -25,6 +26,7 @@
     "@vitejs/plugin-react": "6.1.0",
     "fake-indexeddb": "6.2.5",
     "jsdom": "30.0.1",
+    "tsx": "4.19.2",
     "typescript": "7.0.2",
     "vite": "8.2.2",
     "vitest": "4.1.11"

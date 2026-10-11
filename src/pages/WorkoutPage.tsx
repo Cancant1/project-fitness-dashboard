@@ -7,8 +7,11 @@ import { platesPerSide, trainingMaxAfterRepOut } from "../plan/engine";
 import { STACK_LABEL, STACK_OF, pinLabel, weightsFor } from "../plan/equipment";
 import { activeProgram, equipmentFrom, latestMaxes, usePlan, usePlanIds } from "../plan/bridge";
 import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef } from "../plan/workout";
+import { saveSessionEnergy } from "../coach";
 import { Sheet } from "../ui/Sheet";
 import { CheckIcon, ChevronDown, ChevronLeft, ChevronRight, MinusIcon, PlusIcon } from "../ui/icons";
+import "../ui/kit.css";
+import "./workout.css";
 
 interface Block { position: number; exerciseId: string; name: string; sets: SetRow[] }
 
@@ -102,6 +105,7 @@ export function WorkoutPage() {
                 <span className="row-sub" style={{ flex: "none", paddingBottom: 6 }}>{i + 1} of {blocks.length}</span>
               </div>
               <ExerciseSubtitle block={block} />
+              <SwapNote block={block} />
             </div>
 
             <BlockSets block={block} calibration={calibration} latest={latest} equipment={equipment} onUpdate={update} onToggle={toggle} />
@@ -150,9 +154,10 @@ export function WorkoutPage() {
           blocks={blocks}
           updates={maxUpdates(session, blocks.flatMap((b) => b.sets), ids, maxes, equipment)}
           onClose={() => setFinishing(false)}
-          onFinish={async (notes) => {
+          onFinish={async (notes, energy) => {
             const sets = blocks.flatMap((b) => b.sets);
             if (notes) await local.save("sessions", { id: session.id, notes });
+            if (energy) await saveSessionEnergy(local, session.id, energy);
             await finishWorkout(local, session, sets, maxUpdates(session, sets, ids, maxes, equipment), ids, program);
             navigate(`/session/${session.id}`, { replace: true });
           }}
@@ -200,6 +205,14 @@ function ExerciseSubtitle({ block }: { block: Block }) {
   else if (work.length && !ref && work[0]!.target_reps == null) text = work[0]!.kind === "timed" ? "Timed · minutes" : `${work.length} ${work.length === 1 ? "set" : "sets"} · ${unitLabel(work[0]!.unit)}`;
   else if (work.length) text = `${work.length} × ${work[0]!.target_reps ?? ""} · ${fmtNum(work[0]!.load)} ${unitLabel(work[0]!.unit)}${work.some((s) => s.kind === "failure") ? " · to failure" : ""}${work.some((s) => s.kind === "rep_out") ? " · last set rep-out" : ""}`;
   return <p style={{ fontSize: 15, lineHeight: "20px", color: "var(--fg2)" }}>{text}</p>;
+}
+
+/** A coach swap running for this exercise (pain rule): "Swap: … until 3 Nov", always visible. */
+function SwapNote({ block }: { block: Block }) {
+  const key = planRef(block.sets[0]!)?.exerciseKey;
+  const plan = usePlan();
+  const note = key ? plan.days.flatMap((d) => d.slots).find((s) => s.exerciseKey === key)?.notes.find((n) => n.startsWith("Swap:")) : undefined;
+  return note ? <span className="k-pill k-pill-warm k-pill-wrap wk-swap">{note}</span> : null;
 }
 
 function ExerciseNotes({ block }: { block: Block }) {
@@ -390,6 +403,7 @@ function PainSheet({ sessionId, exerciseId, date, onClose }: { sessionId: string
   const { local } = useStore();
   const [site, setSite] = useState("right_elbow");
   const [during, setDuring] = useState<"none" | "ache" | "sharp">("none");
+  const [worse, setWorse] = useState<boolean | null>(null);
   const [saved, setSaved] = useState(false);
   return (
     <Sheet title="Pain check" onClose={onClose}>
@@ -410,8 +424,20 @@ function PainSheet({ sessionId, exerciseId, date, onClose }: { sessionId: string
             ? "Some ache is fine. Check tomorrow morning: back to normal means the load was fine."
             : "Good. Keep going."}
       </p>
+      {during !== "none" && (
+        <div className="wk-worse">
+          <span>Worse than last time?</span>
+          <div className="wk-yn" role="group" aria-label="Worse than last time?">
+            <button type="button" aria-pressed={worse === false} onClick={() => setWorse(worse === false ? null : false)}>No</button>
+            <button type="button" aria-pressed={worse === true} onClick={() => setWorse(worse === true ? null : true)}>Yes</button>
+          </div>
+        </div>
+      )}
       <button className="btn btn-primary" disabled={saved} onClick={async () => {
-        await local.save("pain_checks", { date, site, exercise_id: exerciseId, session_id: sessionId, during_set: during, next_morning: null, worse_than_last: null, note: null });
+        await local.save("pain_checks", {
+          date, site, exercise_id: exerciseId, session_id: sessionId, during_set: during, next_morning: null,
+          worse_than_last: during === "none" ? null : worse, note: null
+        });
         setSaved(true);
         window.setTimeout(onClose, 500);
       }}>{saved ? "Saved" : "Save"}</button>
@@ -419,10 +445,13 @@ function PainSheet({ sessionId, exerciseId, date, onClose }: { sessionId: string
   );
 }
 
+type Energy = 1 | 2 | 3 | 4 | 5;
+
 function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
-  blocks: Block[]; updates: ReturnType<typeof maxUpdates>; onClose: () => void; onFinish: (notes: string) => Promise<void>; onDiscard: () => Promise<void>;
+  blocks: Block[]; updates: ReturnType<typeof maxUpdates>; onClose: () => void; onFinish: (notes: string, energy: Energy | null) => Promise<void>; onDiscard: () => Promise<void>;
 }) {
   const [notes, setNotes] = useState("");
+  const [energy, setEnergy] = useState<Energy | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const sets = blocks.flatMap((b) => b.sets).filter((s) => s.kind !== "warmup");
   const done = sets.filter((s) => s.completed).length;
@@ -431,16 +460,33 @@ function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
       <div className="list">
         <div className="row"><span>Working sets done</span><span className="num" style={{ fontWeight: 600 }}>{done} of {sets.length}</span></div>
         {updates.map((u) => (
-          <div className="row" key={u.lift}><span>{u.label}</span><span className="num" style={{ fontWeight: 600 }}>{u.from != null ? `${fmtNum(u.from)} → ` : ""}{fmtNum(u.to)} kg</span></div>
+          <div className="wk-update" key={u.lift}>
+            <div className="row"><span>{u.label}</span><span className="num" style={{ fontWeight: 600 }}>{u.from != null ? `${fmtNum(u.from)} → ` : ""}{fmtNum(u.to)} kg</span></div>
+            {u.provisional && (
+              <div className="wk-prov">
+                <span className="k-pill k-pill-warm">{u.note ?? "provisional (>12 reps)"}</span>
+                <p className="row-sub">Over 12 reps the estimate is rough; the next rep-outs correct it.</p>
+              </div>
+            )}
+          </div>
         ))}
       </div>
       {done < sets.length && <p className="row-sub">Unticked sets stay in the log as not done.</p>}
+      <section className="wk-feel" aria-label="How did it feel?">
+        <span className="wk-feel-q">How did it feel?</span>
+        <div className="wk-feel-btns" role="group" aria-label="Session energy, 1 to 5">
+          {([1, 2, 3, 4, 5] as const).map((n) => (
+            <button key={n} type="button" aria-pressed={energy === n} onClick={() => setEnergy(energy === n ? null : n)}>{n}</button>
+          ))}
+        </div>
+        <div className="wk-feel-ends" aria-hidden="true"><span>Drained</span><span>Strong</span></div>
+      </section>
       <label className="field" style={{ height: "auto", padding: 12 }}>
         <span className="sr-only">Notes</span>
         <textarea rows={3} placeholder="How did it go? (optional)" value={notes} onChange={(e) => setNotes(e.target.value)}
           style={{ border: 0, background: "transparent", width: "100%", resize: "vertical", outline: "none" }} />
       </label>
-      <button className="btn btn-primary" onClick={() => void onFinish(notes.trim())}>Save Workout</button>
+      <button className="btn btn-primary" onClick={() => void onFinish(notes.trim(), energy)}>Save Workout</button>
       {confirmDiscard
         ? <button className="btn btn-glass" style={{ color: "var(--bad)" }} onClick={() => void onDiscard()}>Discard — this removes the workout</button>
         : <button className="btn btn-plain" style={{ color: "var(--bad)" }} onClick={() => setConfirmDiscard(true)}>Discard workout…</button>}

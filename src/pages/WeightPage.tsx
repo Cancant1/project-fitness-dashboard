@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRows, useStore } from "../data/store";
 import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal, todayIso } from "../lib/format";
 import { adaptiveTdee, type Weigh } from "../lib/energy";
+import { saveSleep, saveWaist } from "../coach";
 import { AreaChart, Card, Delta, Label, PageHead, Pill, Segmented, Stat } from "../ui/kit";
 import { Sheet } from "../ui/Sheet";
 import { CheckIcon, ChevronDown, ChevronRight } from "../ui/icons";
@@ -91,7 +92,11 @@ export function WeightPage() {
                 <Pill tone="warm">Goal {GOAL.lo}–{GOAL.hi}</Pill>
               </div>
             </div>
-            <WeighInput weights={weights} today={today} onSave={(d, v) => save(d, v)} />
+            <WeighInput weights={weights} today={today} onSave={async (d, kg, sleep) => {
+              if (kg != null) await save(d, kg);
+              if (sleep != null) await saveSleep(local, d, sleep);
+              if (kg == null && sleep != null) toast.show(`Sleep saved · ${fmtShortDate(d)}`);
+            }} />
           </Card>
 
           <Card className="w-chart">
@@ -120,6 +125,7 @@ export function WeightPage() {
         </div>
 
         <div className="k-col">
+          <WaistCard today={today} />
           <TdeeCard weights={weights.map((w) => ({ date: w.date, kg: w.value }))} />
           <AllWeighIns weights={weights} onOpen={setOpen} />
         </div>
@@ -134,28 +140,87 @@ export function WeightPage() {
   );
 }
 
-/** Compact weigh-in: date pill (default today, never in the future), kg field, save. */
-function WeighInput({ weights, today, onSave }: { weights: WeighIn[]; today: string; onSave: (date: string, value: number) => Promise<void> }) {
+/** Compact weigh-in: date pill (default today, never in the future), kg field, optional hours slept, save. */
+function WeighInput({ weights, today, onSave }: { weights: WeighIn[]; today: string; onSave: (date: string, kg: number | null, sleepHours: number | null) => Promise<void> }) {
+  const health = useRows("health_daily");
   const [date, setDate] = useState(today);
   const [text, setText] = useState("");
+  const [sleep, setSleep] = useState("");
   const existing = weights.find((w) => w.date === date);
+  const slept = health.find((h) => h.date === date)?.sleep_total_min;
   async function save() {
     const v = parseDecimal(text);
-    if (v == null || v < 30 || v > 250 || date > today) return;
-    await onSave(date, Math.round(v * 100) / 100);
+    const h = parseDecimal(sleep);
+    const kg = v != null && v >= 30 && v <= 250 ? Math.round(v * 100) / 100 : null;
+    const hours = h != null && h > 0 && h <= 16 ? h : null;
+    if ((kg == null && hours == null) || date > today) return;
+    await onSave(date, kg, hours);
     setText("");
+    setSleep("");
   }
   return (
     <div className="w-input">
       <DateButton value={date} max={today} onChange={setDate} label="Weigh-in date">{date === today ? "Today" : fmtShortDate(date)}<ChevronDown size={14} /></DateButton>
-      <label className="field" style={{ flex: 1 }}>
+      <label className="field">
         <span className="sr-only">Weight in kg</span>
         <input inputMode="decimal" className="num" placeholder={existing ? fmtNum(existing.value, 1).replace(".", ",") : "kg"}
           value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
         <span className="field-suffix">kg</span>
       </label>
-      <button className="btn btn-primary btn-icon" aria-label="Save weight" onClick={() => void save()}><CheckIcon /></button>
+      <label className="field">
+        <span className="sr-only">Hours slept the night before (optional)</span>
+        <input inputMode="decimal" className="num" placeholder={slept ? fmtNum(slept / 60, 1).replace(".", ",") : "Slept"}
+          value={sleep} onChange={(e) => setSleep(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
+        <span className="field-suffix">h</span>
+      </label>
+      <button className="btn btn-primary btn-icon" aria-label="Save weight and sleep" onClick={() => void save()}><CheckIcon /></button>
     </div>
+  );
+}
+
+/** Waist at the navel every 2 weeks: the last value, its change, and a date + cm entry. */
+function WaistCard({ today }: { today: string }) {
+  const { local } = useStore();
+  const rows = useRows("body_measurements");
+  const [date, setDate] = useState(today);
+  const [text, setText] = useState("");
+  const waists = useMemo(
+    () => rows.filter((r) => r.kind === "waist").map((r) => ({ date: r.date, cm: r.unit === "in" ? Number(r.value) * 2.54 : Number(r.value) })).sort((a, b) => a.date.localeCompare(b.date)),
+    [rows]
+  );
+  const last = waists[waists.length - 1];
+  const prev = waists[waists.length - 2];
+  const onDate = waists.find((w) => w.date === date);
+  async function save() {
+    const v = parseDecimal(text);
+    if (v == null || v < 40 || v > 200 || date > today) return;
+    await saveWaist(local, date, Math.round(v * 10) / 10);
+    setText("");
+  }
+  return (
+    <Card className="w-waist">
+      <div className="w-chart-head">
+        <Label>Waist</Label>
+        {last && <span className="k-muted w-waist-date">{fmtShortDate(last.date)}</span>}
+      </div>
+      <div className="w-waist-top">
+        <Stat size="md" value={last ? fmtNum(last.cm, 1) : "—"} unit="cm" />
+        {last && prev && (
+          // Neutral on purpose: a rising waist is not "good" the way a rising lift is.
+          <span className="w-rate"><span className="k-delta">{signedCm(last.cm - prev.cm)}</span><small>since {fmtShortDate(prev.date)}</small></span>
+        )}
+      </div>
+      <div className="w-input w-input-waist">
+        <DateButton value={date} max={today} onChange={setDate} label="Waist date">{date === today ? "Today" : fmtShortDate(date)}<ChevronDown size={14} /></DateButton>
+        <label className="field">
+          <span className="sr-only">Waist at the navel in cm</span>
+          <input inputMode="decimal" className="num" placeholder={onDate ? fmtNum(onDate.cm, 1).replace(".", ",") : "At the navel"}
+            value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
+          <span className="field-suffix">cm</span>
+        </label>
+        <button className="btn btn-tinted btn-icon" aria-label="Save waist" onClick={() => void save()}><CheckIcon /></button>
+      </div>
+    </Card>
   );
 }
 
@@ -217,6 +282,8 @@ function AllWeighIns({ weights, onOpen }: { weights: WeighIn[]; onOpen: (w: Weig
     </Card>
   );
 }
+
+const signedCm = (d: number) => `${d > 0.04 ? "+" : d < -0.04 ? "−" : "±"}${fmtNum(Math.abs(d), 1)} cm`;
 
 const WINDOWS = [14, 28, 42, 56] as const;
 

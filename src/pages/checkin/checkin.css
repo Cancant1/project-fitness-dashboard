@@ -1,0 +1,115 @@
+/* Check-in page and the coach pieces Today reuses. Tokens only; light and dark follow src/styles.css. */
+
+/* ---------------------------------------------------------------- status dot */
+
+.ci-dot { display: inline-block; flex: none; border-radius: 50%; background: color-mix(in srgb, var(--chart-3) 55%, transparent); }
+.ci-dot[data-tone="good"] { background: var(--good); }
+.ci-dot[data-tone="watch"] { background: color-mix(in srgb, var(--warm) 48%, var(--surface)); }
+.ci-dot[data-tone="act"], .ci-dot[data-tone="warm"] { background: var(--warm); box-shadow: 0 0 0 3px var(--warm-tint); }
+
+/* ---------------------------------------------------------------- buttons */
+
+.ci-btn { height: 44px; padding: 0 18px; border-radius: 22px; font-size: 15px; }
+.ci-confirm { display: flex; flex-direction: column; gap: 8px; }
+.ci-confirm-what { font-size: 14px; font-weight: 600; color: var(--fg); }
+.ci-confirm-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.ci-applied { display: flex; align-items: center; gap: 6px; min-height: 44px; }
+
+/* ---------------------------------------------------------------- hero */
+
+.ci-hero { padding: 22px; display: flex; flex-direction: column; gap: 10px; min-height: 236px; }
+.ci-hero-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: auto; }
+.ci-hero-pills { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.ci-hero-nav { display: flex; gap: 6px; flex: none; }
+.ci-hero-nav button {
+  width: 44px; height: 44px; border-radius: 22px; border: 0; padding: 0; cursor: pointer;
+  display: grid; place-items: center; background: rgba(255, 255, 255, 0.18); color: #FFFFFF;
+}
+.ci-hero-nav button:disabled { opacity: 0.35; cursor: default; }
+.ci-verdict { margin-top: 18px; font-family: var(--num); font-size: 56px; line-height: 1; font-weight: 750; letter-spacing: -0.04em; }
+.ci-headline { font-size: 17px; line-height: 23px; color: rgba(255, 255, 255, 0.86); max-width: 36ch; text-wrap: pretty; }
+
+/* ---------------------------------------------------------------- this week's actions */
+
+.ci-acts { padding: 0 18px; }
+.ci-act { display: flex; flex-direction: column; gap: 8px; padding: 12px 0; }
+.ci-act-open {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; min-height: 44px; padding: 0;
+  border: 0; background: none; color: var(--fg); font: inherit; text-align: left; cursor: pointer;
+}
+.ci-act-open > .ci-dot { margin-top: 6px; }
+.ci-act-open > svg { margin-top: 4px; color: var(--fg2); flex: none; }
+.ci-act-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ci-act-title { font-size: 16px; font-weight: 600; }
+.ci-act-msg { font-size: 14px; line-height: 19px; color: var(--fg2); text-wrap: pretty; }
+.ci-act-ctrl { padding-left: 22px; }
+.ci-act-static { cursor: default; align-items: center; }
+.ci-act-static > .ci-dot { margin-top: 0; }
+.ci-act-none { flex-direction: row; align-items: center; gap: 12px; min-height: 60px; font-size: 16px; font-weight: 600; }
+.ci-none-icon { width: 28px; height: 28px; border-radius: 14px; display: grid; place-items: center; background: var(--good-tint); color: var(--good); flex: none; }
+
+/* ---------------------------------------------------------------- area tiles: 2 columns, 4 when there is room */
+
+.ci-areas { container-type: inline-size; }
+.ci-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@container (min-width: 600px) { .ci-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ci-tile {
+  width: 100%; min-height: 128px; padding: 16px; border: 0; font: inherit; color: var(--fg); text-align: left; cursor: pointer;
+  display: flex; flex-direction: column; gap: 10px; transition: transform 120ms ease;
+}
+.ci-tile:active { transform: scale(0.98); }
+.ci-tile[data-status="act"] { box-shadow: 0 0 0 1.5px var(--warm-ring), var(--elev); }
+.ci-tile-head { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--fg2); }
+.ci-tile-num {
+  font-family: var(--num); font-size: 28px; line-height: 1; font-weight: 700; letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ci-tile-num small { font-size: 13px; font-weight: 600; opacity: 0.6; margin-left: 4px; letter-spacing: 0; }
+.ci-tile-foot { margin-top: auto; height: 24px; display: flex; align-items: center; min-width: 0; }
+.ci-tile-foot > * { width: 100%; }
+.ci-tile-cap { font-size: 12px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ci-pips { display: flex; gap: 4px; }
+.ci-pips i { flex: 1; height: 6px; border-radius: 3px; background: var(--track); }
+.ci-pips i.on { background: var(--chart-1); }
+
+/* ---------------------------------------------------------------- charts */
+
+.ci-chart { display: flex; flex-direction: column; gap: 14px; }
+.ci-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ci-chart-head .k-label { margin: 0; }
+.ci-chart-stat { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.ci-big { font-family: var(--num); font-size: 40px; line-height: 1; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.ci-big small { font-size: 0.45em; font-weight: 600; opacity: 0.6; margin-left: 3px; letter-spacing: 0; }
+.ci-rate { display: inline-flex; align-items: baseline; gap: 6px; }
+.ci-rate .k-delta { font-size: 15px; }
+.ci-rate small, .ci-cap { font-size: 13px; color: var(--fg2); }
+.ci-chart-empty { height: 120px; border-radius: 16px; background: var(--field); font-size: 15px; }
+
+/* ---------------------------------------------------------------- area sheet */
+
+.ci-sig { background: var(--surface); border-radius: 20px; box-shadow: var(--elev); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.ci-sig.is-plain { background: transparent; box-shadow: inset 0 0 0 1px var(--sep); }
+.ci-sig-head { display: flex; align-items: center; gap: 10px; }
+.ci-sig-title { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.1px; }
+.ci-sig-metric { flex: none; font-size: 17px; font-weight: 700; }
+.ci-sig-metric small { font-size: 13px; font-weight: 600; color: var(--fg2); }
+.ci-sig-msg { font-size: 15px; line-height: 21px; color: var(--fg2); text-wrap: pretty; }
+.ci-sheet-empty { padding: 12px 4px; font-size: 15px; }
+
+.ci-why > summary {
+  list-style: none; cursor: pointer; min-height: 32px; display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 600; color: var(--accent-text);
+}
+.ci-why > summary::-webkit-details-marker { display: none; }
+.ci-why > summary svg { transition: transform 150ms ease; }
+.ci-why[open] > summary svg { transform: rotate(180deg); }
+.ci-why ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 18px; color: var(--fg2); }
+.ci-why b {
+  display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 6px;
+  font-family: var(--num); font-size: 11px; font-weight: 700; color: var(--accent-text); background: var(--accent-tint);
+}
+
+.ci-muscles { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.ci-muscle { display: grid; grid-template-columns: 84px minmax(0, 1fr) 76px; align-items: center; gap: 12px; font-size: 14px; }
+.ci-muscle .k-num { text-align: right; font-size: 14px; }
+.ci-muscle .k-num small { color: var(--fg2); font-weight: 500; }

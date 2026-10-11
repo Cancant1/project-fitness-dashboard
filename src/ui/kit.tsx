@@ -135,11 +135,13 @@ export interface Series { points: Pt[]; color?: string; area?: boolean; dashed?:
  * Smooth area chart, drawn at its real width so text stays crisp, with a hover/tap crosshair.
  * x is numeric (e.g. a day index); `formatX` turns it into a label.
  */
-export function AreaChart({ series, height = 240, formatX, formatY = (v) => String(Math.round(v)), yLines, bands = [], yBands = [], refs = [], markers = [], onPick, label }: {
+export function AreaChart({ series, height = 240, formatX, formatY = (v) => String(Math.round(v)), yLines, bands = [], yBands = [], ribbons = [], refs = [], markers = [], onPick, label }: {
   series: Series[]; height?: number; formatX: (x: number) => string; formatY?: (y: number) => string;
   yLines?: number; bands?: { from: number; to: number; label?: string }[];
   /** Horizontal value ranges, e.g. a 76–78 kg goal band. */
   yBands?: { from: number; to: number; label?: string; color?: string }[];
+  /** Value ranges that move along x (e.g. the plan's expected bodyweight path), filled from lo to hi. */
+  ribbons?: { points: { x: number; lo: number; hi: number }[]; label?: string; color?: string }[];
   refs?: { y: number; label: string; color?: string }[];
   markers?: { x: number; y: number; color?: string; label: string }[];
   /** Tap/click: the nearest point of the first series. */
@@ -152,7 +154,9 @@ export function AreaChart({ series, height = 240, formatX, formatY = (v) => Stri
   useResize(wrap, setW);
 
   const all = series.flatMap((s) => s.points).concat(markers);
-  const xs = all.map((p) => p.x), ys = all.map((p) => p.y).concat(refs.map((r) => r.y), yBands.flatMap((b) => [b.from, b.to]));
+  const ribbonPts = ribbons.flatMap((r) => r.points);
+  const xs = all.map((p) => p.x).concat(ribbonPts.map((p) => p.x));
+  const ys = all.map((p) => p.y).concat(refs.map((r) => r.y), yBands.flatMap((b) => [b.from, b.to]), ribbonPts.flatMap((p) => [p.lo, p.hi]));
   if (!all.length) return <div className="k-empty" style={{ height }}>No data yet</div>;
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   let y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -199,6 +203,18 @@ export function AreaChart({ series, height = 240, formatX, formatY = (v) => Stri
             {b.label && <text x={w - R - 4} y={sy(b.to) + 13} textAnchor="end" className="k-axis k-axis-strong">{b.label}</text>}
           </g>
         ))}
+        {ribbons.map((r, i) => {
+          if (r.points.length < 2) return null;
+          const top = r.points.map((p) => `${sx(p.x).toFixed(1)},${sy(p.hi).toFixed(1)}`);
+          const bottom = [...r.points].reverse().map((p) => `${sx(p.x).toFixed(1)},${sy(p.lo).toFixed(1)}`);
+          const end = r.points[r.points.length - 1]!;
+          return (
+            <g key={`rb${i}`}>
+              <path d={`M${top.join(" L")} L${bottom.join(" L")} Z`} fill={r.color ?? "var(--warm)"} opacity="0.12" />
+              {r.label && <text x={sx(end.x) - 4} y={sy(end.hi) - 6} textAnchor="end" className="k-axis k-axis-strong">{r.label}</text>}
+            </g>
+          );
+        })}
         {ticks.map((t) => (
           <g key={t}>
             <line x1={L} x2={w - R} y1={sy(t)} y2={sy(t)} stroke="var(--grid)" />

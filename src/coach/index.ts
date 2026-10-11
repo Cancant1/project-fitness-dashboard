@@ -5,7 +5,7 @@ export {
   weeklyReport, dailyCues, currentWeekNo, lastCompleteWeekNo, verdictOf, headlineOf, findApplied, priorityOf, PRIORITY
 } from "./report";
 export {
-  applyCoachAction, removeAdjustment, answerPainCheck, saveSessionEnergy, saveWaist, saveSleep, type ApplyResult
+  applyCoachAction, removeAdjustment, ensurePlanProteinPerKg, answerPainCheck, saveSessionEnergy, saveWaist, saveSleep, type ApplyResult
 } from "./apply";
 export { applyAdjustments, adjustmentState, adjustmentsOf, swapNote } from "../plan/adjustments";
 export { nextSwap, swapLabel, SWAP_CHAINS } from "../plan/swaps";

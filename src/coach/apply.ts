@@ -51,7 +51,7 @@ export async function applyCoachAction(local: LocalStore, action: CoachAction,
   };
 
   if (action.kind === "kcal") {
-    await writeKcalTarget(local, action, opts.signalId, opts.today);
+    adj.writes = [await writeKcalTarget(local, action, opts.signalId, opts.today)];
     await recordAdjustment(local, adj);
     return { ok: true, message: `Calories ${sign(action.delta)} from ${action.from}.`, adjustment: adj };
   }
@@ -68,7 +68,8 @@ export async function applyCoachAction(local: LocalStore, action: CoachAction,
       }] : [];
     });
     if (!rows.length) return { ok: false, message: "No training max to lower yet." };
-    await local.save("training_maxes", rows);
+    const saved = await local.save("training_maxes", rows);
+    adj.writes = saved.map((r) => ({ table: "training_maxes" as const, id: r.id }));
     await recordAdjustment(local, adj);
     return { ok: true, message: `Training maxes −${action.percent}%.`, adjustment: adj };
   }
@@ -78,7 +79,7 @@ export async function applyCoachAction(local: LocalStore, action: CoachAction,
   return { ok: true, message: "Plan updated.", adjustment: adj };
 }
 
-async function writeKcalTarget(local: LocalStore, action: Extract<CoachAction, { kind: "kcal" }>, signalId: string, today: string) {
+async function writeKcalTarget(local: LocalStore, action: Extract<CoachAction, { kind: "kcal" }>, signalId: string, today: string): Promise<NonNullable<Adjustment["writes"]>[number]> {
   const targets = local.all("nutrition_targets")
     .filter((t) => t.effective_from <= action.from)
     .sort((a, b) => b.effective_from.localeCompare(a.effective_from) || b.created_at.localeCompare(a.created_at));
@@ -89,7 +90,8 @@ async function writeKcalTarget(local: LocalStore, action: Extract<CoachAction, {
     : null;
   const note = `Coach ${sign(d)} kcal (${signalId}), applied ${today}.`;
   const sameDay = targets[0]?.effective_from === action.from ? targets[0] : undefined;
-  await local.save("nutrition_targets", {
+  const restore = sameDay ? { kcal: sameDay.kcal, carbs: sameDay.carbs, per_weekday: sameDay.per_weekday, note: sameDay.note } : undefined;
+  const [row] = await local.save("nutrition_targets", {
     ...(sameDay ? { id: sameDay.id } : {}),
     effective_from: action.from,
     phase: current.phase,
@@ -102,15 +104,37 @@ async function writeKcalTarget(local: LocalStore, action: Extract<CoachAction, {
     target_weight: current.target_weight,
     note: sameDay?.note ? `${sameDay.note} ${note}` : note
   });
+  return { table: "nutrition_targets", id: row!.id, ...(restore ? { restore } : {}) };
 }
 
-/** Undo: removes an adjustment from the programme (kcal and TM rows it wrote stay; edit them directly). */
+/**
+ * Undo: removes an adjustment from the programme and takes back the rows it wrote (a new calorie target or
+ * training-max row is removed; an updated target row gets its previous values back).
+ */
 export async function removeAdjustment(local: LocalStore, adjustmentId: string): Promise<boolean> {
   const program = activeProgram(local.all("programs"));
   if (!program) return false;
   const list = adjustmentsOf(program.rules);
-  if (!list.some((a) => a.id === adjustmentId)) return false;
+  const adj = list.find((a) => a.id === adjustmentId);
+  if (!adj) return false;
+  for (const w of adj.writes ?? []) {
+    if (w.restore) await local.save(w.table, { id: w.id, ...w.restore } as never);
+    else await local.remove(w.table, [w.id]);
+  }
   await local.save("programs", { id: program.id, rules: { ...program.rules, adjustments: list.filter((a) => a.id !== adjustmentId) } });
+  return true;
+}
+
+/**
+ * One-time upgrade: the plan's default target row created before protein_per_kg existed (2,800 kcal, 150 g
+ * from the plan start) gets protein_per_kg = 2.0, so protein follows bodyweight (playbook N-PROTEIN). Rows he
+ * edited (other numbers) are left alone. Returns true when it wrote.
+ */
+export async function ensurePlanProteinPerKg(local: LocalStore, planStart: string): Promise<boolean> {
+  const row = local.all("nutrition_targets").find((t) => t.effective_from === planStart && t.protein_per_kg == null
+    && Number(t.kcal) === 2800 && Number(t.protein) === 150);
+  if (!row) return false;
+  await local.save("nutrition_targets", { id: row.id, protein_per_kg: 2 });
   return true;
 }
 

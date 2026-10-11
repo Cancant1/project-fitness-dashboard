@@ -49,5 +49,22 @@
 .today-weigh { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
 .today-weigh-top { display: flex; align-items: flex-end; gap: 16px; }
 .today-weigh-input { display: flex; gap: 8px; }
+.today-sleep { flex: none; width: 92px; }
+
+/* Coach: today's cues and the check-in verdict, one quiet card under the hero. */
+.t-coach { padding: 0 18px; }
+.t-cue { display: flex; flex-direction: column; gap: 8px; padding: 8px 0; }
+.t-cue-line { display: flex; align-items: center; gap: 12px; min-height: 44px; color: var(--fg); font-size: 15px; line-height: 20px; }
+.t-cue-text { flex: 1; min-width: 0; text-wrap: pretty; }
+.t-cue-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 0 4px 22px; }
+.t-cue-act { padding: 0 0 4px 22px; }
+.t-checkin { display: flex; align-items: center; gap: 12px; min-height: 60px; color: var(--fg); }
+.t-checkin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.t-checkin-label { font-size: 15px; font-weight: 600; }
+.t-checkin-sub { font-size: 13px; color: var(--fg2); }
+.t-checkin-verdict { font-family: var(--num); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+.t-checkin-verdict[data-verdict="on_track"] { color: var(--good); }
+.t-checkin-verdict[data-verdict="adjust"] { color: var(--warm-text); }
+.t-checkin-verdict[data-verdict="too_early"] { color: var(--fg2); }
 
 .today-goal { display: flex; align-items: center; gap: 16px; color: var(--fg); }

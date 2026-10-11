@@ -18,6 +18,7 @@ export const FoodIcon = (p: P) => <Svg {...p}><circle cx="12" cy="12" r="8.5" />
 export const PlanIcon = (p: P) => <Svg {...p}><rect x="3.5" y="5" width="17" height="15" rx="4" /><path d="M3.5 10h17M8.5 3v4M15.5 3v4" /></Svg>;
 export const RecordsIcon = (p: P) => <Svg {...p}><path d="M12 3.5l2.5 5.2 5.7.7-4.2 3.9 1.1 5.6L12 16.1l-5.1 2.8 1.1-5.6-4.2-3.9 5.7-.7z" /></Svg>;
 export const WeightIcon = (p: P) => <Svg {...p}><path d="M5 20h14l-1.6-10H6.6z" /><path d="M9.5 10a2.5 2.5 0 015 0" /></Svg>;
+export const CheckinIcon = (p: P) => <Svg {...p}><rect x="4.5" y="4.5" width="15" height="16" rx="4" /><path d="M9.5 3h5a1 1 0 011 1v1.5h-7V4a1 1 0 011-1z" /><path d="M8.8 13.2l2.3 2.3 4.2-4.6" /></Svg>;
 export const HistoryIcon = (p: P) => <Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></Svg>;
 export const ChevronRight = (p: P) => <Svg size={14} {...p}><path d="M9 5l7 7-7 7" /></Svg>;
 export const ChevronLeft = (p: P) => <Svg size={18} {...p}><path d="M15 5l-7 7 7 7" /></Svg>;

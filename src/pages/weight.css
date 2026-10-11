@@ -5,9 +5,16 @@
 .w-rate { display: inline-flex; align-items: baseline; gap: 6px; }
 .w-rate .k-delta { font-size: 17px; }
 .w-rate small { font-size: 13px; color: var(--fg2); }
-.w-input { display: flex; gap: 8px; align-items: center; }
+/* Date · kg · slept (h) · save. The two fields share the row (kg a little wider). */
+.w-input { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 0.85fr) 44px; gap: 8px; align-items: center; }
+.w-input .field { padding: 0 10px; }
 .w-input .date-btn { background: var(--field); border-radius: 14px; padding: 0 12px; flex: none; }
 .w-input .btn-icon { border-radius: 14px; flex: none; }
+.w-input-waist { grid-template-columns: auto minmax(0, 1fr) 44px; }
+
+.w-waist { display: flex; flex-direction: column; gap: 16px; }
+.w-waist-date { font-size: 13px; }
+.w-waist-top { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 
 .w-chart, .w-tdee { display: flex; flex-direction: column; gap: 16px; }
 .w-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }

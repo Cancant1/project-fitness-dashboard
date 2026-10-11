@@ -133,6 +133,7 @@ function MainBlock({ ex, ctx, weekType }: { ex: PrescribedExercise; ctx: PlanCon
         <span className="pl-main-scheme">
           {s.scheme}{s.scheme && s.repOut ? " · " : ""}{s.repOut && <b>{s.repOut}</b>}
         </span>
+        <SwapPill ex={ex} />
       </div>
       <div className="pl-main-r">
         <span className="pl-main-load">{s.loadText}<small>kg</small></span>
@@ -152,8 +153,15 @@ function Row({ ex }: { ex: PrescribedExercise }) {
       <span className="pl-row-name">{shortName(ex)}</span>
       <span className="pl-row-scheme">{r.repOut && <i className="pl-ro-dot" title="Last set is a rep-out" />}{r.scheme}</span>
       <span className="pl-row-load">{r.load}</span>
+      <SwapPill ex={ex} />
     </div>
   );
+}
+
+/** A running coach swap (pain rule) on this exercise: "Swap: … until 3 Nov". Phase 1 is advisory: the slot stays. */
+function SwapPill({ ex }: { ex: PrescribedExercise }) {
+  const note = ex.notes.find((n) => n.startsWith("Swap:"));
+  return note ? <span className="k-pill k-pill-warm k-pill-wrap pl-swap">{note}</span> : null;
 }
 
 function CardioChip({ day, isToday }: { day: PrescribedDay; isToday: boolean }) {

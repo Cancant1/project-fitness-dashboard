@@ -33,6 +33,11 @@ export interface Adjustment {
   /** The signal that suggested it, e.g. "body.rate". */
   signalId: string;
   data: CoachAction;
+  /**
+   * Rows the action wrote outside the programme (kcal → nutrition_targets, tm_reduce → training_maxes), so Undo
+   * can take them back: `restore` = the row's previous values when an existing row was updated, else it is removed.
+   */
+  writes?: { table: 'nutrition_targets' | 'training_maxes'; id: string; restore?: Record<string, unknown> }[];
 }
 
 const KINDS: readonly AdjustmentKind[] = ['kcal', 'deload_now', 'extra_sets', 'main_lift_set', 'repeat_week', 'tm_reduce', 'swap'];

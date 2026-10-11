@@ -49,8 +49,10 @@ export function fuelRules(ctx: WeekCtx): AreaResult {
   const bw = bwFor(data, ctx.asOf);
   let avgKcal: number | null = null;
   let avgProtein: number | null = null;
-  let targetKcal: number | null = null;
-  let targetProtein: number | null = null;
+  // The day's target is always known (shown even before there are 3 days to average).
+  const nowTarget = targetOn(data, ctx.asOf, bw);
+  let targetKcal: number | null = nowTarget.kcal;
+  let targetProtein: number | null = nowTarget.protein;
   if (full.length >= 3) {
     const targets = full.map((d) => targetOn(data, d.date, bw));
     avgKcal = full.reduce((s, d) => s + d.t.kcal, 0) / full.length;

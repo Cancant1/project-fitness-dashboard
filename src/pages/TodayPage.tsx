@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, parseDecimal, todayIso } from "../lib/format";
@@ -10,8 +10,12 @@ import { startWorkout } from "../plan/workout";
 import type { PrescribedDay } from "../plan/types";
 import { Card, Label, Pill, Ring, Sparkline, Stat } from "../ui/kit";
 import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
+import { answerPainCheck, currentWeekNo, dailyCues, ensurePlanProteinPerKg, saveSleep, weeklyReport, type DailyCue, type WeeklyReport } from "../coach";
+import { useCoachData } from "../coach/hooks";
 import { ConditioningCard } from "./ConditioningCard";
 import { SetMaxes } from "./SetMaxes";
+import { ApplyButton, Dot, VERDICT_TONE, VERDICT_WORD } from "./checkin/coachUi";
+import { useToast } from "./food/ui";
 import "./today.css";
 import { ThemeSwitch } from "../ui/theme";
 
@@ -32,10 +36,16 @@ export function TodayPage() {
   const days = useRows("nutrition_days");
   const targets = useRows("nutrition_targets");
   const conditioning = useRows("conditioning");
+  const health = useRows("health_daily");
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   const today = todayIso();
   const program = activeProgram(programs);
+  // Protein follows bodyweight (2.0 g/kg) on the plan's default target row; a no-op once done.
+  useEffect(() => {
+    if (program) void ensurePlanProteinPerKg(local, program.start_date);
+  }, [local, program, targets]);
   const equipment = equipmentFrom(profiles[0]);
   const ids = usePlanIds(exercises);
   const inProgress = sessions.find((s) => s.status === "in_progress");
@@ -61,6 +71,16 @@ export function TodayPage() {
   const totals = dayTotals(today, entries, days);
   const weighIns = useMemo(() => weights.filter((w) => w.kind === "weight").sort((a, b) => a.date.localeCompare(b.date)), [weights]);
   const weightToday = weighIns.find((w) => w.date === today);
+  const sleptToday = health.find((h) => h.date === today)?.sleep_total_min;
+
+  // The coach: today's cues and this week's verdict (week 0 before the plan, the last week after it).
+  const coach = useCoachData();
+  const hour = new Date().getHours();
+  const cues = useMemo(() => dailyCues(coach, today, hour).filter((c) => c.id !== "checkin.ready"), [coach, today, hour]);
+  const report = useMemo((): WeeklyReport | null => {
+    const n = currentWeekNo(coach, today) ?? (today < coach.start ? 0 : coach.plan.weeks[coach.plan.weeks.length - 1]!.weekNo);
+    try { return weeklyReport(coach, n, today); } catch { return null; }
+  }, [coach, today]);
 
   // Squat towards the goal: training max if set, else the best e1RM of the last 8 weeks.
   const squat = useMemo(() => {
@@ -154,6 +174,8 @@ export function TodayPage() {
             <Card><Stat label="Rest day" value="Recover" size="md" /></Card>
           )}
 
+          <CoachCard cues={cues} report={report} today={today} onDone={toast.show} />
+
           {slot && (
             <section>
               <Label action={<Link to="/plan">Plan</Link>}>This week</Label>
@@ -209,8 +231,9 @@ export function TodayPage() {
             </Card>
           </section>
 
-          <WeighIn weighIns={weighIns} todayValue={weightToday?.value} bw7={bw} onSave={async (v) => {
-            await local.save("body_measurements", { id: weightToday?.id, date: today, kind: "weight", value: v, unit: "kg", source: "app", note: null });
+          <WeighIn weighIns={weighIns} todayValue={weightToday?.value} sleptMin={sleptToday ?? null} bw7={bw} onSave={async (kg, sleep) => {
+            if (kg != null) await local.save("body_measurements", { id: weightToday?.id, date: today, kind: "weight", value: kg, unit: "kg", source: "app", note: null });
+            if (sleep != null) await saveSleep(local, today, sleep);
           }} />
 
           {squat && (
@@ -228,19 +251,82 @@ export function TodayPage() {
           )}
         </div>
       </div>
+      {toast.node}
     </main>
   );
 }
 
-function WeighIn({ weighIns, todayValue, bw7, onSave }: { weighIns: { date: string; value: number }[]; todayValue?: number; bw7: number | null; onSave: (v: number) => Promise<void> }) {
+/** Today's coach notes (at most 3) and this week's check-in verdict. With no cues it is just the check-in row. */
+function CoachCard({ cues, report, today, onDone }: { cues: DailyCue[]; report: WeeklyReport | null; today: string; onDone: (m: string) => void }) {
+  if (!cues.length && !report) return null;
+  return (
+    <Card pad={false} className="t-coach k-rows" aria-label="Coach">
+      {cues.map((c) => <CueRow key={c.id} cue={c} today={today} onDone={onDone} />)}
+      {report && (
+        <Link to="/checkin" className="t-checkin">
+          <Dot tone={VERDICT_TONE[report.verdict]} />
+          <span className="t-checkin-main">
+            <span className="t-checkin-label">Check-in</span>
+            <span className="t-checkin-sub">{report.complete ? `Week ${report.weekNo} · ready` : report.label}</span>
+          </span>
+          <span className="t-checkin-verdict" data-verdict={report.verdict}>{VERDICT_WORD[report.verdict]}</span>
+          <ChevronRight style={{ color: "var(--fg2)", flex: "none" }} />
+        </Link>
+      )}
+    </Card>
+  );
+}
+
+function CueRow({ cue, today, onDone }: { cue: DailyCue; today: string; onDone: (m: string) => void }) {
+  const { local } = useStore();
+  const [busy, setBusy] = useState(false);
+  const line = (
+    <>
+      <Dot tone={cue.tone} />
+      <span className="t-cue-text">{cue.text}</span>
+      {cue.to && <ChevronRight style={{ color: "var(--fg2)", flex: "none" }} />}
+    </>
+  );
+  const prompt = cue.prompt;
+  return (
+    <div className="t-cue">
+      {cue.to ? <Link to={cue.to} className="t-cue-line">{line}</Link> : <div className="t-cue-line">{line}</div>}
+      {prompt && (
+        <div className="t-cue-btns" role="group" aria-label="How is it this morning?">
+          {prompt.options.map((o) => (
+            <button key={o} type="button" className="btn btn-tinted ci-btn" disabled={busy} onClick={async () => {
+              setBusy(true);
+              await answerPainCheck(local, prompt.painCheckId, o);
+              setBusy(false);
+              onDone(o === "sore" ? "Saved. The check-in suggests a swap." : "Saved. Good.");
+            }}>{o === "normal" ? "Normal" : "Sore"}</button>
+          ))}
+        </div>
+      )}
+      {cue.action && cue.signalId && (
+        <div className="t-cue-act"><ApplyButton action={cue.action} signalId={cue.signalId} today={today} onDone={onDone} /></div>
+      )}
+    </div>
+  );
+}
+
+function WeighIn({ weighIns, todayValue, sleptMin, bw7, onSave }: {
+  weighIns: { date: string; value: number }[]; todayValue?: number; sleptMin: number | null; bw7: number | null;
+  onSave: (kg: number | null, sleepHours: number | null) => Promise<void>;
+}) {
   const [text, setText] = useState("");
+  const [sleep, setSleep] = useState("");
   const recent = weighIns.slice(-30).map((w) => Number(w.value));
   const last = weighIns[weighIns.length - 1];
   async function save() {
     const v = parseDecimal(text);
-    if (v == null || v < 30 || v > 250) return;
-    await onSave(v);
+    const h = parseDecimal(sleep);
+    const kg = v != null && v >= 30 && v <= 250 ? v : null;
+    const hours = h != null && h > 0 && h <= 16 ? h : null;
+    if (kg == null && hours == null) return;
+    await onSave(kg, hours);
     setText("");
+    setSleep("");
   }
   return (
     <section>
@@ -259,7 +345,13 @@ function WeighIn({ weighIns, todayValue, bw7, onSave }: { weighIns: { date: stri
             <input inputMode="decimal" className="num" placeholder={todayValue ? `${String(todayValue).replace(".", ",")} today` : "This morning, kg"}
               value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
           </label>
-          <button className="btn btn-tinted btn-icon" style={{ borderRadius: 14 }} aria-label="Save weight" onClick={() => void save()}><CheckIcon /></button>
+          <label className="field today-sleep">
+            <span className="sr-only">Hours slept last night (optional)</span>
+            <input inputMode="decimal" className="num" placeholder={sleptMin ? fmtNum(sleptMin / 60, 1).replace(".", ",") : "Slept"}
+              value={sleep} onChange={(e) => setSleep(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
+            <span className="field-suffix">h</span>
+          </label>
+          <button className="btn btn-tinted btn-icon" style={{ borderRadius: 14 }} aria-label="Save weight and sleep" onClick={() => void save()}><CheckIcon /></button>
         </div>
       </Card>
     </section>

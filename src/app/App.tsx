@@ -9,6 +9,7 @@ import { TodayPage } from "../pages/TodayPage";
 import { WorkoutPage } from "../pages/WorkoutPage";
 import { TrainPage } from "../pages/TrainPage";
 import { PlanPage } from "../pages/PlanPage";
+import { CheckinPage } from "../pages/CheckinPage";
 import { ProgressPage } from "../pages/ProgressPage";
 import { RecordsPage } from "../pages/RecordsPage";
 import { FoodPage } from "../pages/FoodPage";
@@ -43,6 +44,7 @@ export function App() {
             <Route index element={<TodayPage />} />
             <Route path="train" element={<TrainPage />} />
             <Route path="plan" element={<PlanPage />} />
+            <Route path="checkin" element={<CheckinPage />} />
             <Route path="progress" element={<ProgressPage />} />
             <Route path="records" element={<RecordsPage />} />
             <Route path="food" element={<FoodPage />} />
