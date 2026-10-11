@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
-import type { SetRow } from "../data/types";
+import type { Exercise, SetRow } from "../data/types";
 import { fmtNum, parseDecimal, toKg } from "../lib/format";
 import { platesPerSide, trainingMaxFromSet, nextTrainingMax } from "../plan/engine";
 import { PLAN, activeProgram, equipmentFrom, latestMaxes, usePlanIds } from "../plan/bridge";
-import { finishWorkout, maxUpdates, planRef } from "../plan/workout";
+import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef } from "../plan/workout";
 import { Sheet } from "../ui/Sheet";
 import { CheckIcon, ChevronDown, ChevronLeft, ChevronRight, MinusIcon, PlusIcon } from "../ui/icons";
 
@@ -45,6 +45,7 @@ export function WorkoutPage() {
   const [rest, setRest] = useState<{ until: number; total: number } | null>(null);
   const [pain, setPain] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [adding, setAdding] = useState(false);
   const now = useNow(1000);
 
   if (!session) return <main className="page"><p className="muted">This workout isn't on this device.</p></main>;
@@ -55,7 +56,12 @@ export function WorkoutPage() {
 
   async function update(s: SetRow, patch: Partial<SetRow>) {
     const next = { ...s, ...patch };
-    await local.save("sets", { id: s.id, ...patch, load_kg: toKg(next.load, next.unit) });
+    // Timed sets keep minutes in load (as SessionPage shows them) and seconds in duration_s; no load_kg.
+    const timed = next.unit === "min";
+    await local.save("sets", {
+      id: s.id, ...patch, load_kg: timed || next.unit === "reps" ? null : toKg(next.load, next.unit),
+      ...(timed ? { duration_s: next.load != null ? Math.round(next.load * 60) : null } : {})
+    });
   }
 
   async function toggle(s: SetRow) {
@@ -102,6 +108,7 @@ export function WorkoutPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="btn btn-glass btn-sm" onClick={() => void addSet(block)}><PlusIcon /> Add set</button>
               <ExerciseNotes block={block} />
+              <button className="btn btn-glass btn-sm" onClick={() => setAdding(true)}><PlusIcon /> Add exercise</button>
             </div>
 
             {rest && rest.until > now && <RestTimer rest={rest} now={now} onAdd={() => setRest({ until: rest.until + 30_000, total: rest.total + 30 })} onSkip={() => setRest(null)} />}
@@ -114,7 +121,10 @@ export function WorkoutPage() {
             </div>
           </>
         ) : (
-          <p className="muted">No exercises in this workout.</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "flex-start" }}>
+            <p className="muted">No exercises in this workout yet.</p>
+            <button className="btn btn-primary" onClick={() => setAdding(true)}><PlusIcon /> Add exercise</button>
+          </div>
         )}
       </main>
 
@@ -123,6 +133,16 @@ export function WorkoutPage() {
         {block && <PrimaryAction block={block} onToggle={toggle} onNext={() => i < blocks.length - 1 ? setIndex(i + 1) : setFinishing(true)} />}
       </div>
 
+      {adding && (
+        <AddExerciseSheet
+          onClose={() => setAdding(false)}
+          onPick={async (ex) => {
+            await addExerciseToSession(local, session.id, ex, nextExercisePosition(allSets, session.id));
+            setIndex(blocks.length);
+            setAdding(false);
+          }}
+        />
+      )}
       {pain && <PainSheet sessionId={session.id} exerciseId={block?.exerciseId ?? null} date={session.date} onClose={() => setPain(false)} />}
       {finishing && (
         <FinishSheet
@@ -176,6 +196,7 @@ function ExerciseSubtitle({ block }: { block: Block }) {
   const ref = planRef(block.sets[0]!);
   let text = "";
   if (rep && ref?.mainLift) text = `Rep-out at ${fmtNum(rep.load)} ${unitLabel(rep.unit)}. Count clean reps only.`;
+  else if (work.length && !ref && work[0]!.target_reps == null) text = work[0]!.kind === "timed" ? "Timed · minutes" : `${work.length} ${work.length === 1 ? "set" : "sets"} · ${unitLabel(work[0]!.unit)}`;
   else if (work.length) text = `${work.length} × ${work[0]!.target_reps ?? ""} · ${fmtNum(work[0]!.load)} ${unitLabel(work[0]!.unit)}${work.some((s) => s.kind === "failure") ? " · to failure" : ""}${work.some((s) => s.kind === "rep_out") ? " · last set rep-out" : ""}`;
   return <p style={{ fontSize: 15, lineHeight: "20px", color: "var(--fg2)" }}>{text}</p>;
 }
@@ -336,7 +357,7 @@ function PrimaryAction({ block, onToggle, onNext }: { block: Block; onToggle: (s
   if (!next) return <button className="btn btn-glass" style={{ flex: 1 }} disabled>Log the rep-out above</button>;
   return (
     <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => void onToggle(next)}>
-      Done: {next.kind === "warmup" ? "warm-up" : `set ${next.set_no}`} · {fmtNum(next.load)} {unitLabel(next.unit)} × {next.reps ?? next.target_reps ?? "?"}
+      Done: {next.kind === "warmup" ? "warm-up" : `set ${next.set_no}`}{next.load != null ? ` · ${fmtNum(next.load)} ${unitLabel(next.unit)}` : ""}{next.kind === "timed" ? "" : ` × ${next.reps ?? next.target_reps ?? "?"}`}
     </button>
   );
 }
@@ -419,6 +440,42 @@ function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
       {confirmDiscard
         ? <button className="btn btn-glass" style={{ color: "var(--bad)" }} onClick={() => void onDiscard()}>Discard — this removes the workout</button>
         : <button className="btn btn-plain" style={{ color: "var(--bad)" }} onClick={() => setConfirmDiscard(true)}>Discard workout…</button>}
+    </Sheet>
+  );
+}
+
+function AddExerciseSheet({ onClose, onPick }: { onClose: () => void; onPick: (e: Exercise) => Promise<void> }) {
+  const exercises = useRows("exercises");
+  const [query, setQuery] = useState("");
+  const [busy, setBusy] = useState(false);
+  const q = query.trim().toLowerCase();
+  const list = exercises
+    .filter((e) => !e.archived)
+    .filter((e) => !q || `${e.name} ${e.aliases.join(" ")} ${e.muscle_direct ?? ""}`.toLowerCase().includes(q))
+    .sort((a, b) => Number(b.available) - Number(a.available) || a.name.localeCompare(b.name));
+  return (
+    <Sheet title="Add exercise" onClose={onClose}>
+      <label className="field" htmlFor="add-ex-q">
+        <span className="sr-only">Search exercises</span>
+        <input id="add-ex-q" type="search" autoFocus placeholder="Search" value={query} onChange={(e) => setQuery(e.target.value)} />
+      </label>
+      {list.length ? (
+        <div className="list">
+          {list.map((e) => (
+            <button key={e.id} className="row" disabled={busy}
+              style={{ width: "100%", border: 0, background: "transparent", padding: "8px 0", textAlign: "left", cursor: "pointer" }}
+              onClick={async () => { setBusy(true); await onPick(e); }}>
+              <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span style={{ fontWeight: 500 }}>{e.name}</span>
+                <span className="row-sub">{[e.equipment, e.default_unit === "min" ? "timed, min" : e.default_unit, e.muscle_direct, !e.available && "not at this gym"].filter(Boolean).join(" · ")}</span>
+              </span>
+              <PlusIcon style={{ color: "var(--accent-text)", flex: "none" }} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="muted">No exercise matches. Add new ones under Workouts.</p>
+      )}
     </Sheet>
   );
 }

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useRows, useStore } from "../data/store";
 import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal, todayIso } from "../lib/format";
 import { LineChart } from "../ui/LineChart";
+import { adaptiveTdee, type Weigh } from "../lib/energy";
 import { CheckIcon } from "../ui/icons";
 
 /** 7-day trailing average for each date that has a weigh-in. */
@@ -79,6 +80,8 @@ export function WeightPage() {
         </div>
       </section>
 
+      <TdeeCard weights={weights.map((w) => ({ date: w.date, kg: w.value }))} />
+
       <section className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <h2 style={{ fontSize: 17, fontWeight: 600 }}>Trend</h2>
@@ -108,5 +111,53 @@ export function WeightPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+const WINDOWS = [14, 28, 42, 56] as const;
+
+/** Maintenance estimated from what you logged and how your weight moved. */
+function TdeeCard({ weights }: { weights: Weigh[] }) {
+  const entries = useRows("food_entries");
+  const days = useRows("nutrition_days");
+  const [win, setWin] = useState<(typeof WINDOWS)[number]>(28);
+
+  const intake = useMemo(() => {
+    const byDate = new Map<string, number>();
+    for (const e of entries) byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.kcal);
+    for (const d of days) if (!byDate.has(d.date) && d.kcal != null) byDate.set(d.date, d.kcal);
+    return [...byDate].map(([date, kcal]) => ({ date, kcal }));
+  }, [entries, days]);
+
+  // The window ends where both food and weigh-ins still exist.
+  const lastIntake = intake.reduce((d, x) => (x.date > d ? x.date : d), "");
+  const lastWeigh = weights.reduce((d, x) => (x.date > d ? x.date : d), "");
+  const asOf = lastIntake && lastWeigh ? (lastIntake < lastWeigh ? lastIntake : lastWeigh) : "";
+  const result = asOf ? adaptiveTdee(intake, weights, asOf, win) : null;
+
+  return (
+    <section className="card card-pad" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <h2 style={{ fontSize: 17, fontWeight: 600 }}>Maintenance estimate</h2>
+        <div className="segmented" role="group" aria-label="Window">
+          {WINDOWS.map((w) => <button key={w} aria-pressed={win === w} onClick={() => setWin(w)}>{w} d</button>)}
+        </div>
+      </div>
+      {result ? (
+        <>
+          <span className="stat-value">{fmtNum(result.tdee, 0)}<small> kcal/day</small></span>
+          <p className="row-sub" style={{ fontSize: 15 }}>
+            {fmtShortDate(result.from)} – {fmtShortDate(result.to)}: you ate {fmtNum(result.avgIntake, 0)} kcal on average ({result.intakeDays} logged days)
+            and your weight trend ({result.weighIns} weigh-ins) moved {result.weightChangeKg >= 0 ? "+" : ""}{fmtNum(result.weightChangeKg, 2)} kg.
+            Maintenance = intake − weight change × 7,700 kcal ÷ days.
+          </p>
+        </>
+      ) : (
+        <p className="row-sub" style={{ fontSize: 15 }}>
+          Needs food logged on at least half of the {win} days and 4+ weigh-ins spread over the window.{win < 56 ? " Try a longer window." : " It fills in once you log food and weigh in most days."}
+          {lastIntake ? ` Food was last logged on ${fmtShortDateYear(lastIntake)}.` : ""}
+        </p>
+      )}
+    </section>
   );
 }

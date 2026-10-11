@@ -46,9 +46,13 @@ export const HISTORY_NAME: Record<string, string> = {
 
 const norm = (s: string) => s.trim().toLowerCase();
 
+/** Exact name first, then an exercise this plan created, and only then aliases (old renames can collide:
+ *  "Leg Press (Machine)" carries the alias "Squat"). */
 export function findExercise(exercises: Exercise[], key: string): Exercise | undefined {
   const name = norm(HISTORY_NAME[key] ?? key);
-  return exercises.find((e) => norm(e.name) === name || e.aliases.some((a) => norm(a) === name) || e.legacy_ref?.plan_key === key);
+  return exercises.find((e) => norm(e.name) === name)
+    ?? exercises.find((e) => e.legacy_ref?.plan_key === key)
+    ?? exercises.find((e) => e.aliases.some((a) => norm(a) === name));
 }
 
 /** Plan exercise key → exercise id, for the exercises that exist. */

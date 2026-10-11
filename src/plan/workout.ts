@@ -1,5 +1,5 @@
 import type { LocalStore } from "../data/local";
-import type { Program, SetRow, Session } from "../data/types";
+import type { Exercise, Program, SetRow, Session } from "../data/types";
 import { toKg } from "../lib/format";
 import { incrementAfterRepOut, nextTrainingMax, trainingMaxFromSet } from "./engine";
 import { PLAN, latestMaxes } from "./bridge";
@@ -102,4 +102,40 @@ export async function finishWorkout(local: LocalStore, session: Session, sets: S
       reason: u.reason, source_set_id: sourceSet(u.lift), note: u.from != null ? `from ${u.from}` : null
     })));
   }
+}
+
+// ---------- free workouts (no plan) ----------
+
+/** A workout outside the plan: an in-progress session titled "Workout" with no sets yet. */
+export async function startFreeWorkout(local: LocalStore, date: string): Promise<string> {
+  const [session] = await local.save("sessions", {
+    date, title: "Workout", status: "in_progress", started_at: new Date().toISOString(), ended_at: null, duration_min: null,
+    program_id: null, program_week_no: null, program_day_id: null, energy: null, notes: null,
+    date_confidence: "exact", date_basis: null, source: "app", legacy_ref: {}
+  });
+  return session!.id;
+}
+
+/** Position for an exercise added after everything already in the session. */
+export function nextExercisePosition(sets: Pick<SetRow, "session_id" | "exercise_position">[], sessionId: string): number {
+  return sets.filter((s) => s.session_id === sessionId).reduce((max, s) => Math.max(max, s.exercise_position), 0) + 1;
+}
+
+/**
+ * Adds an exercise as a new block: `sets` empty working sets in its default unit,
+ * or one timed set when the exercise is logged in minutes. Bodyweight sets start at 0 (= no added weight).
+ */
+export async function addExerciseToSession(local: LocalStore, sessionId: string,
+  exercise: Pick<Exercise, "id" | "name" | "default_unit">, position: number, sets = 3): Promise<SetRow[]> {
+  const unit = exercise.default_unit;
+  const timed = unit === "min";
+  const n = timed ? 1 : Math.max(1, Math.round(sets));
+  const load = unit === "bodyweight" ? 0 : null;
+  const rows: Partial<SetRow>[] = Array.from({ length: n }, (_, i) => ({
+    session_id: sessionId, exercise_id: exercise.id, exercise_position: position, set_no: i + 1,
+    kind: timed ? "timed" : "working", load, unit, load_kg: timed || unit === "reps" ? null : toKg(load, unit),
+    reps: null, duration_s: null, rpe: null, target_reps: null, target_load: null, completed: false,
+    flags: [], note: null, exercise_as_logged: exercise.name, legacy_ref: {}
+  }));
+  return local.save("sets", rows);
 }
