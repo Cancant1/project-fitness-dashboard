@@ -27,7 +27,7 @@ export function SignIn() {
   return (
     <main className="page" style={{ maxWidth: 420, justifyContent: "center", minHeight: "100dvh", paddingBottom: 48 }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        <div className="side-logo" style={{ width: 52, height: 52, borderRadius: 15, fontSize: 24 }}>R</div>
+        <img className="side-logo" src="./icon.svg" alt="" style={{ width: 64, height: 64, borderRadius: 15 }} />
         <h1 className="large-title" style={{ marginTop: 16 }}>Reps</h1>
         <p className="muted">Training, food and weight — synced across your devices.</p>
       </div>

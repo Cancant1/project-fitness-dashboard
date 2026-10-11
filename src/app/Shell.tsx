@@ -16,7 +16,7 @@ export function Shell({ email }: { email: string }) {
     <div className="shell">
       <nav className="sidebar" aria-label="Main">
         <div className="side-brand">
-          <div className="side-logo">R</div>
+          <img className="side-logo" src="./icon.svg" alt="" />
           <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>Reps</span>
             <span style={{ fontSize: 12, color: "var(--fg2)", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</span>
