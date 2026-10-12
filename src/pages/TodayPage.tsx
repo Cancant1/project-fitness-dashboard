@@ -6,7 +6,8 @@ import { bodyweight7d, dayTotals, targetFor } from "../lib/nutrition";
 import { countsForStrength, e1rm } from "../lib/analysis";
 import { dayForDate, prescribeDay, prescribeMinimum } from "../plan/engine";
 import { PLAN, PLAN_KEY, activeProgram, ensurePlanExercises, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../plan/bridge";
-import { startWorkout } from "../plan/workout";
+import { planRef, startWorkout } from "../plan/workout";
+import { nextPlanned } from "./plan/planView";
 import type { PlanState, PrescribedDay } from "../plan/types";
 import { Card, Label, Pill, Ring, Sparkline, Stat } from "../ui/kit";
 import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
@@ -121,6 +122,25 @@ export function TodayPage() {
 
   const day = prescription.day;
   const lifts = day?.exercises.filter((e) => e.group !== "shoulder_care") ?? [];
+
+  // Today's session finished: the hero shows what was logged, and "Up next" moves on to the next planned session
+  // (otherwise it would show today's day again with next week's loads, already progressed by today's results).
+  const doneSession = doneToday ? sessions.find((s) => s.date === today && s.status === "completed" && s.program_id === program?.id) : undefined;
+  const doneMain = useMemo(() => {
+    if (!doneSession) return null;
+    const top = sets.filter((x) => x.session_id === doneSession.id && x.completed && (x.kind === "rep_out" || x.kind === "top") && planRef(x)?.mainLift)
+      .sort((a, b) => a.exercise_position - b.exercise_position)[0];
+    return top ? { load: Number(top.load), reps: top.reps, added: planRef(top)?.mainLift === "weighted_pullup" } : null;
+  }, [doneSession, sets]);
+  const next = useMemo(() => {
+    if (!doneToday || !program || !prescription.state) return null;
+    const n = nextPlanned(sessions, program, addDays(today, 1), plan);
+    if (!n) return null;
+    try { return { date: n.date, day: prescribeDay(plan, n.week.weekNo, n.day.key, prescription.state, equipment) }; } catch { return null; }
+  }, [doneToday, program, prescription.state, sessions, today, plan, equipment]);
+  const listDay = next?.day ?? day;
+  const listLifts = listDay?.exercises.filter((e) => e.group !== "shoulder_care") ?? [];
+  const listLabel = next ? `Up next · ${next.date === addDays(today, 1) ? "Tomorrow" : fmtShortDate(next.date)} · ${next.day.title}` : "Up next";
   const main = lifts[0];
   const mainSet = main?.sets.find((s) => s.kind === "rep_out" || s.kind === "top") ?? main?.sets.find((s) => s.kind !== "warmup");
   const workSets = lifts.reduce((n, e) => n + e.sets.filter((s) => s.kind !== "warmup").length, 0);
@@ -157,7 +177,13 @@ export function TodayPage() {
                 {doneToday && <Pill tone="plain"><CheckIcon /> Done</Pill>}
               </div>
               <h2 className="today-hero-title">{day.title}</h2>
-              {main && mainSet && (
+              {doneToday && doneMain ? (
+                <div className="today-hero-main">
+                  <span className="k-muted">{main?.name.split(",")[0] ?? "Main lift"} · done</span>
+                  <span className="today-hero-load">{doneMain.added ? "+" : ""}{fmtNum(doneMain.load)}<small>kg</small></span>
+                  <span className="k-muted">× {doneMain.reps ?? "—"} clean reps</span>
+                </div>
+              ) : main && mainSet && (
                 <div className="today-hero-main">
                   <span className="k-muted">{main.name.split(",")[0]}</span>
                   <span className="today-hero-load">{main.mainLift === "weighted_pullup" ? "+" : ""}{fmtNum(mainSet.load)}<small>kg</small></span>
@@ -169,6 +195,11 @@ export function TodayPage() {
                 <span><b>{workSets}</b> sets</span>
                 {day.minutes && <span><b>{day.minutes}</b> min</span>}
               </div>
+              {doneSession && (
+                <div className="today-hero-starts">
+                  <Link to={`/session/${doneSession.id}`} className="btn today-hero-btn">View session</Link>
+                </div>
+              )}
               {program ? (
                 !doneToday && (
                   <div className="today-hero-starts">
@@ -207,18 +238,18 @@ export function TodayPage() {
             </section>
           )}
 
-          {lifts.length > 1 && !inProgress && (
+          {listLifts.length > 1 && !inProgress && (
             <section>
-              <Label action={slot ? <Link to={`/plan?week=${slot.week.weekNo}`}>All</Link> : undefined}>Up next</Label>
+              <Label action={slot ? <Link to={`/plan?week=${next?.day.weekNo ?? slot.week.weekNo}`}>All</Link> : undefined}>{listLabel}</Label>
               <Card pad={false} className="today-list k-rows">
-                {lifts.slice(0, 5).map((e) => {
+                {listLifts.slice(0, 5).map((e) => {
                   const w = e.sets.filter((s) => s.kind !== "warmup");
                   const top = w[w.length - 1];
                   const reps = w[0]?.repRange ? `${w[0].repRange[0]}–${w[0].repRange[1]}` : w[0]?.reps ?? "max";
                   return (
                     <div key={e.exerciseKey} className="k-row today-row">
                       <span className="k-row-main"><span>{e.name.split(",")[0]}</span></span>
-                      <span className="k-num">{w.length} × {reps} <span className="k-muted">· {top ? `${fmtNum(top.load)} ${top.unit === "bodyweight" ? "" : top.unit}` : ""}</span></span>
+                      <span className="k-num">{w.length} × {reps} <span className="k-muted">· {top ? `${e.loadBasis === "added" ? "+" : ""}${fmtNum(top.load)} ${top.unit === "bodyweight" ? "" : top.unit}` : ""}</span></span>
                     </div>
                   );
                 })}
