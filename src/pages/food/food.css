@@ -118,3 +118,24 @@
 .food-lib-num small { font-size: 11px; color: var(--fg2); }
 .food-dot { display: inline-block; width: 7px; height: 7px; border-radius: 4px; background: var(--warm); margin-left: 7px; vertical-align: 2px; }
 .food-lib .btn-restore { height: 36px; border-radius: 18px; flex: none; margin-left: 6px; }
+
+/* Macros on every row: "45 P · 21 C · 1 F", small and grey; the letter is lighter than the number. */
+.food-mline { display: inline-flex; gap: 8px; font-family: var(--num); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--fg2); white-space: nowrap; }
+.food-mline i { font-style: normal; opacity: 0.6; margin-left: 1px; }
+.food-meal-total { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; line-height: 1.15; }
+.food-meal-total > span:first-child { white-space: nowrap; }
+.food-entry-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.food-entry-main .food-entry-name { flex: none; white-space: normal; overflow-wrap: anywhere; line-height: 1.3; }
+.food-entry-sub { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.food-entry-sub .food-entry-qty { max-width: none; flex: 0 1 auto; font-size: 12px; }
+.food-macro .food-ring-cap, .food-macro > small { font-size: 12px; color: var(--fg2); font-family: var(--num); }
+.food-macro > small.over { color: var(--warm-text); }
+
+/* Fits what's left: up to three foods he eats, one tap to log. */
+.food-left-k { font-size: 13px; color: var(--fg2); }
+.food-left-k b { font-family: var(--num); font-weight: 650; color: var(--fg); }
+.food-suggest { padding: 2px 6px 2px 18px; }
+.food-sg { display: flex; align-items: center; gap: 10px; min-height: 56px; }
+.food-sg + .food-sg { border-top: 1px solid var(--sep); }
+.food-sg-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.food-sg-name { font-size: 15px; overflow-wrap: anywhere; }

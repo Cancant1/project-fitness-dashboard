@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToday } from "../lib/useToday";
+import { suggestFoods } from "../lib/suggest";
 import { Link } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { FoodEntry, Meal, SavedMeal } from "../data/types";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, todayIso } from "../lib/format";
 import {
-  PLAN_DAY_NAME, bodyweight7d, dayTotals, foodSetupDone, hasPlanTarget, mealForHour, planDaySavedMeal, planTargetRow, servingText, sumEntries, targetFor,
+  PLAN_DAY_NAME, bodyweight7d, dayTotals, entryFromFood, foodSetupDone, hasPlanTarget, mealForHour, planDaySavedMeal, planTargetRow, servingText, sumEntries, targetFor,
   type EntryDraft
 } from "../lib/nutrition";
 import { Bar, Card, Label, PageHead, Pill, Ring } from "../ui/kit";
@@ -104,6 +105,19 @@ export function FoodPage() {
     });
   }
 
+  const suggestions = useMemo(() => (isToday && target && totals.source !== "day"
+    ? suggestFoods({ foods, entries, today, left: {
+      kcal: target.kcal - totals.kcal, protein: target.protein - totals.protein,
+      carbs: target.carbs != null && totals.carbs != null ? target.carbs - totals.carbs : target.carbs,
+      fat: target.fat != null && totals.fat != null ? target.fat - totals.fat : target.fat
+    } })
+    : []), [isToday, target, totals.kcal, totals.protein, totals.carbs, totals.fat, totals.source, foods, entries, today]);
+
+  async function addSuggestion(food: (typeof foods)[number], quantity: number) {
+    const rows = await log([entryFromFood(food, quantity, mealForHour(new Date().getHours()))]);
+    toast.show(`Logged ${food.name}`, () => void local.remove("food_entries", rows.map((r) => r.id)));
+  }
+
   const removing = editMode && mine.length > 0;
   const visibleMeals = MEALS.filter((m) => MAIN_MEALS.includes(m.key) || mine.some((e) => (e.meal ?? "other") === m.key));
   const copyBefore = !mine.length && dayBefore.length > 0;
@@ -156,6 +170,24 @@ export function FoodPage() {
             <PlusIcon /> {dayName ? `Add to ${dayName}` : "Add food"}
           </button>
 
+          {suggestions.length > 0 && target && (
+            <section aria-label="Fits what's left">
+              <Label action={<span className="food-left-k"><b>{fmtNum(target.kcal - totals.kcal, 0)}</b> kcal left</span>}>Fits what's left</Label>
+              <Card pad={false} className="food-suggest">
+                {suggestions.map((x) => (
+                  <div className="food-sg" key={x.food.id}>
+                    <span className="food-sg-main">
+                      <span className="food-sg-name">{x.quantity !== 1 ? `${fmtQty(x.quantity)} × ` : ""}{x.food.name}</span>
+                      <MacroLine p={x.protein} c={x.carbs} f={x.fat} />
+                    </span>
+                    <span className="food-entry-kcal">{fmtNum(x.kcal, 0)}</span>
+                    <button className="food-icon-btn add" aria-label={`Log ${x.food.name}`} onClick={() => void addSuggestion(x.food, x.quantity)}><PlusIcon /></button>
+                  </div>
+                ))}
+              </Card>
+            </section>
+          )}
+
           <section>
             <Label action={<Link to="/food/library">Foods</Link>}>Quick log</Label>
             {(savedSorted.length > 0 || copyBefore) && (
@@ -207,7 +239,9 @@ export function FoodPage() {
               <Card pad={false} key={key} className={`food-meal ${items.length ? "" : "empty"}`}>
                 <div className="food-meal-head">
                   <h2>{label}</h2>
-                  {items.length > 0 && <span className="food-meal-total"><b>{fmtNum(sum.kcal, 0)}</b> kcal · <span className="num">{fmtNum(sum.protein, 0)}</span> g</span>}
+                  {items.length > 0 && (
+                    <span className="food-meal-total"><span><b>{fmtNum(sum.kcal, 0)}</b> kcal</span><MacroLine p={sum.protein} c={sum.carbs} f={sum.fat} /></span>
+                  )}
                   {!removing && <button className="food-icon-btn add" aria-label={`Add to ${label}`} onClick={() => setAdding(key)}><PlusIcon /></button>}
                 </div>
                 {items.length > 0 && (
@@ -218,8 +252,15 @@ export function FoodPage() {
                           <button className="food-icon-btn danger" aria-label={`Remove ${e.name}`} onClick={() => void remove([e])}><RemoveIcon /></button>
                         )}
                         <button className="food-entry" onClick={() => setEditing(e)}>
-                          <span className="food-entry-name">{e.name}</span>
-                          <span className="food-entry-qty">{e.quantity !== 1 ? `${fmtQty(e.quantity)} × ` : ""}{servingText(e.serving_label)}</span>
+                          <span className="food-entry-main">
+                            <span className="food-entry-name">{e.name}</span>
+                            <span className="food-entry-sub">
+                              {(e.quantity !== 1 || !plainServing(e.serving_label)) && (
+                                <span className="food-entry-qty">{e.quantity !== 1 ? `${fmtQty(e.quantity)} × ` : ""}{servingText(e.serving_label)}</span>
+                              )}
+                              <MacroLine p={e.protein} c={e.carbs} f={e.fat} />
+                            </span>
+                          </span>
                           <span className="food-entry-kcal">{fmtNum(e.kcal, 0)}</span>
                         </button>
                       </div>
@@ -269,6 +310,20 @@ function Macro({ label, value, target }: { label: string; value: number | null; 
         <span><b>{value == null ? "—" : fmtNum(value, 0)}</b>{target ? ` / ${fmtNum(target, 0)}` : ""} g</span>
       </span>
       <Bar value={target && value ? value / target : 0} color={target && value && value > target ? "var(--warm)" : "var(--chart-3)"} height={5} />
+      {target != null && value != null && <Left value={value} target={target} unit="g" />}
     </div>
+  );
+}
+
+/** "1 serving" says nothing: only a real serving ("pot (450 g)") or a quantity other than 1 is shown. */
+const plainServing = (label: string | null) => !label || /^(1\s*)?serving$/i.test(label.trim());
+
+/** "45 P · 21 C · 1 F": protein, carbs, fat in grams; untracked ones are left out. */
+function MacroLine({ p, c, f }: { p: number; c: number | null; f: number | null }) {
+  const parts: [number, string][] = [[p, "P"], ...(c != null ? [[c, "C"] as [number, string]] : []), ...(f != null ? [[f, "F"] as [number, string]] : [])];
+  return (
+    <span className="food-mline" aria-label={`Protein ${fmtNum(p, 0)} g${c != null ? `, carbs ${fmtNum(c, 0)} g` : ""}${f != null ? `, fat ${fmtNum(f, 0)} g` : ""}`}>
+      {parts.map(([v, k]) => <span key={k}>{fmtNum(v, 0)}<i>{k}</i></span>)}
+    </span>
   );
 }

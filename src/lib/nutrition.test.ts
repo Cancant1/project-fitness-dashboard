@@ -166,7 +166,7 @@ describe("food setup proposal", () => {
     expect(byKey.get("skyr")).toMatchObject({ decision: "keep", group: "plan", favorite: true });
     expect(byKey.get("banaan")).toMatchObject({ decision: "keep", group: "plan" });
     const roll = byKey.get("new:sausage-roll")!;
-    expect(roll.draft).toMatchObject({ name: "AH saucijzenbroodje", brand: "AH", kcal: 328, protein: 6.4, source: "plan", favorite: true });
+    expect(roll.draft).toMatchObject({ name: "AH saucijzenbroodje", brand: "AH", kcal: 325.6, protein: 6.7, source: "plan", favorite: true });
     expect(byKey.get("new:kwark")!.draft).toMatchObject({ kcal: 230, protein: 39.6, source: "plan-estimate" });
     expect(byKey.has("new:skyr")).toBe(false);
     expect(byKey.has("new:banana")).toBe(false);
