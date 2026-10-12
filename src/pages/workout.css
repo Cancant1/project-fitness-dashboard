@@ -98,3 +98,17 @@
 
 .wk-timed-load { font-size: 15px; font-weight: 600; color: var(--fg2); }
 .wk-timer-btn { height: 40px; padding: 0 12px; border-radius: 12px; font-family: var(--num); font-size: 17px; gap: 6px; }
+
+/* Tempo guide (wrist ladder): metronome needle, 3 s each way, for ever */
+.wk-tempo { display: flex; align-items: center; gap: 14px; margin-top: 10px; padding: 10px 14px; border-radius: 16px; background: var(--seg); width: fit-content; max-width: 100%; }
+.wk-tempo-dial { position: relative; width: 72px; height: 42px; flex: none; overflow: hidden; }
+.wk-tempo-arc { position: absolute; left: 4px; right: 4px; top: 4px; height: 68px; border-radius: 50%; border: 2px solid var(--track); border-bottom-color: transparent; border-left-color: transparent; border-right-color: transparent; }
+.wk-tempo-needle { position: absolute; left: 50%; bottom: 2px; width: 3px; height: 36px; margin-left: -1.5px; border-radius: 3px; background: var(--warm); transform-origin: 50% 100%; animation: wk-swing 6s linear infinite; }
+.wk-tempo-pivot { position: absolute; left: 50%; bottom: 0; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--warm); }
+@keyframes wk-swing { 0% { transform: rotate(-50deg); } 50% { transform: rotate(50deg); } 100% { transform: rotate(-50deg); } }
+.wk-tempo-text { display: flex; flex-direction: column; gap: 2px; min-width: 72px; }
+.wk-tempo-text b { font-size: 17px; }
+.wk-tempo-text .num { display: flex; gap: 8px; font-size: 15px; }
+.wk-tempo-text i { font-style: normal; color: var(--fg2); opacity: 0.45; }
+.wk-tempo-text i[data-on="true"] { color: var(--warm-text); opacity: 1; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .wk-tempo-needle { animation-duration: 6s; } }

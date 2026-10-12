@@ -129,6 +129,7 @@ export function WorkoutPage() {
               </div>
               <ExerciseSubtitle block={block} dayKey={planInfo?.dayKey} />
               <EffortLine block={block} />
+              {block.effort === "care" && <TempoPendulum />}
               <SwapNote block={block} />
             </div>
 
@@ -309,6 +310,34 @@ function EffortLine({ block }: { block: Block }) {
       <EffortTag effort={block.effort} text={effortLabel(block.effort, reps, ref?.capReps)} />
       {other && <EffortTag effort={other} text={`Last set · ${effortLabel(other)}`} />}
     </>
+  );
+}
+
+/**
+ * Slow-tempo guide for the wrist ladder (3 s up, 3 s down): a metronome needle that swings for ever, with the phase
+ * and the second counted beside it. Pure CSS swing; the label follows the same clock.
+ */
+function TempoPendulum() {
+  const [start] = useState(() => performance.now());
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setT(performance.now() - start), 100);
+    return () => window.clearInterval(id);
+  }, [start]);
+  const phase = (t % 6000) < 3000 ? "up" : "down";
+  const sec = Math.floor((t % 3000) / 1000) + 1;
+  return (
+    <div className="wk-tempo" role="timer" aria-label="Tempo: 3 seconds up, 3 seconds down">
+      <div className="wk-tempo-dial" aria-hidden="true">
+        <span className="wk-tempo-arc" />
+        <span className="wk-tempo-needle" />
+        <span className="wk-tempo-pivot" />
+      </div>
+      <div className="wk-tempo-text">
+        <b>{phase === "up" ? "Lift" : "Lower"}</b>
+        <span className="num">{[1, 2, 3].map((n) => <i key={n} data-on={n <= sec}>{n}</i>)}</span>
+      </div>
+    </div>
   );
 }
 
