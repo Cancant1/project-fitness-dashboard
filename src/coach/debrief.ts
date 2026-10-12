@@ -1,27 +1,49 @@
 // Post-session debrief (Today, after finishing): what the session changed and what the same day looks like next
-// time. Pure: the page passes the finished session's sets and the next prescription of that day.
+// time. Pure and structured (numbers, not sentences): the card lays it out (docs/DESIGN.md: words are a cost).
 
 import type { SetRow, TrainingMax } from "../data/types";
 import { planRef } from "../plan/workout";
 import type { PrescribedDay, PrescribedExercise } from "../plan/types";
 
-export interface DebriefChange {
+export interface DebriefMax {
+  /** "Squat". */
+  lift: string;
+  value: number;
+  /** The set it came from: "100 × 10". */
+  from: string | null;
+}
+
+export interface DebriefNext {
+  /** "Lower A". */
+  title: string;
+  /** "Mon 19 Oct". */
+  date: string;
+  /** "Squat". */
+  lift: string;
+  load: number;
+  added: boolean;
+  /** "3 × 5 · max set 10". */
+  scheme: string;
+}
+
+export interface DebriefRow {
   name: string;
-  /** What was logged (heaviest completed working load) and what is prescribed next time. */
+  /** Heaviest completed working load this session, and next time's prescription. */
   from: number;
   to: number;
   unit: string;
   added?: boolean;
+  dir: "up" | "same" | "down";
+  /** ≤ 4 words, only when this row holds for its own reason: "up at 20 reps", "up when reps drop". */
+  hint: string | null;
 }
 
 export interface Debrief {
-  /** "Squat training max 132.5 kg (100 × 10)". */
-  maxes: string[];
-  /** "Next Lower A · Mon 19 Oct: squat 3 × 5 at 95 kg, then a max set (target 10)". */
-  nextMain: string | null;
-  up: DebriefChange[];
-  same: { name: string; why: string }[];
-  down: DebriefChange[];
+  maxes: DebriefMax[];
+  next: DebriefNext | null;
+  rows: DebriefRow[];
+  /** Week 0: sets stopped at the range top, so the loads carry into week 1 (the card explains it behind "Why"). */
+  held: boolean;
 }
 
 const LIFT_NAME: Record<string, string> = { squat: "Squat", deadlift: "Deadlift", incline_db_press: "Incline DB", weighted_pullup: "Pull-up" };
@@ -34,16 +56,19 @@ function nextLoad(ex: PrescribedExercise): number | null {
   return s ? s.load : null;
 }
 
-/** How the next session's main lift reads: "3 × 5 at 95 kg, then a max set (target 10)". */
-function mainText(ex: PrescribedExercise): string {
+function nextMain(ex: PrescribedExercise, title: string, date: string): DebriefNext | null {
   const work = ex.sets.filter((s) => s.kind !== "warmup");
   const normal = work.filter((s) => s.kind === "working");
   const ro = work.find((s) => s.kind === "rep_out" || s.kind === "top");
-  const plus = ex.loadBasis === "added" ? "+" : "";
+  const first = normal[0] ?? ro;
+  if (!first) return null;
   const parts: string[] = [];
-  if (normal.length) parts.push(`${normal.length} × ${normal[0]!.reps ?? ""} at ${plus}${fmt(normal[0]!.load)} kg`);
-  if (ro) parts.push(`${parts.length ? "then " : ""}a max set at ${plus}${fmt(ro.load)} kg${ro.target != null ? ` (target ${ro.target})` : ""}`);
-  return `${shortName(ex.name)} ${parts.join(", ")}`;
+  if (normal.length) parts.push(`${normal.length} × ${normal[0]!.reps ?? ""}`);
+  if (ro) parts.push(ro.target != null ? `max set ${ro.target}` : "max set");
+  return {
+    title, date, lift: LIFT_NAME[ex.mainLift ?? ""] ?? shortName(ex.name), load: first.load,
+    added: ex.loadBasis === "added", scheme: parts.join(" · ")
+  };
 }
 
 export function sessionDebrief(args: {
@@ -59,19 +84,17 @@ export function sessionDebrief(args: {
   calibration?: boolean;
 }): Debrief {
   const { sets, maxes, keyOf, next, nextDateLabel, calibration } = args;
-  const out: Debrief = { maxes: [], nextMain: null, up: [], same: [], down: [] };
+  const out: Debrief = { maxes: [], next: null, rows: [], held: false };
 
   for (const m of maxes) {
     const key = keyOf.get(m.exercise_id) ?? "";
     const src = sets.find((s) => s.id === m.source_set_id);
-    const how = src && src.reps != null ? ` (${fmt(Number(src.load))} × ${src.reps})` : "";
-    const was = m.note?.startsWith("from ") ? `, was ${m.note.slice(5)}` : "";
-    out.maxes.push(`${LIFT_NAME[key] ?? "Training max"} training max ${fmt(m.value_kg)} kg${how}${was}`);
+    out.maxes.push({ lift: LIFT_NAME[key] ?? "Training max", value: m.value_kg, from: src && src.reps != null ? `${fmt(Number(src.load))} × ${src.reps}` : null });
   }
 
   if (!next) return out;
-  const mains = next.exercises.filter((e) => e.role === "main" && e.mainLift);
-  if (mains.length) out.nextMain = `Next ${next.title} · ${nextDateLabel}: ${mains.map(mainText).join("; ")}.`;
+  const main = next.exercises.find((e) => e.role === "main" && e.mainLift);
+  if (main) out.next = nextMain(main, next.title, nextDateLabel);
 
   // Accessories: logged load vs the next prescription, per plan exercise key.
   const byKey = new Map<string, SetRow[]>();
@@ -87,20 +110,16 @@ export function sessionDebrief(args: {
     const to = nextLoad(ex);
     if (to == null) continue;
     const unit = logged[0]!.unit === "lb" ? "lb" : "kg";
-    const row = { name: shortName(ex.name), from, to, unit, ...(ex.loadBasis === "added" ? { added: true } : {}) };
-    if (to > from + 1e-9) out.up.push(row);
-    else if (to < from - 1e-9) out.down.push(row);
-    else {
+    const dir = to > from + 1e-9 ? "up" : to < from - 1e-9 ? "down" : "same";
+    let hint: string | null = null;
+    if (dir === "same") {
       const range = ex.sets.find((s) => s.repRange)?.repRange;
-      const reps = logged.map((s) => s.reps ?? 0);
-      const why = ex.rehab ? "same dumbbell until the reps drop to the next rung"
-        : calibration && range && reps.every((r) => r >= range[1])
-          ? ex.sets.some((x) => x.kind === "rep_out") ? "week 0 stopped at the top; the max set next time sets the jump"
-            : ex.effort === "failure" ? "week 0 stopped at the top; go to failure next time and the load follows"
-              : "week 0 stopped at the top"
-          : range && reps.some((r) => r < range[1]) ? `reach ${range[1]} reps on every set to go up` : "same load";
-      out.same.push({ name: shortName(ex.name), why });
+      const allTop = !!range && logged.every((s) => (s.reps ?? 0) >= range[1]);
+      if (ex.rehab) hint = "up when reps drop";
+      else if (calibration && allTop) out.held = true;
+      else if (range && !allTop) hint = `up at ${range[1]} reps`;
     }
+    out.rows.push({ name: shortName(ex.name), from, to, unit, ...(ex.loadBasis === "added" ? { added: true } : {}), dir, hint });
   }
   return out;
 }

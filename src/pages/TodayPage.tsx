@@ -332,30 +332,43 @@ export function TodayPage() {
 /** Today's coach notes (at most 3) and this week's check-in verdict. With no cues it is just the check-in row. */
 /** After a finished session: training-max changes, next time's main lift, and every accessory's next step. */
 function DebriefCard({ debrief }: { debrief: Debrief }) {
-  const { maxes, nextMain, up, same, down } = debrief;
-  if (!maxes.length && !nextMain && !up.length && !same.length && !down.length) return null;
-  const load = (c: { from: number; to: number; unit: string; added?: boolean }) =>
-    `${c.added ? "+" : ""}${fmtNum(c.from)} → ${c.added ? "+" : ""}${fmtNum(c.to)} ${c.unit}`;
+  const { maxes, next, rows, held } = debrief;
+  if (!maxes.length && !next && !rows.length) return null;
+  const up = rows.filter((r) => r.dir === "up").length;
+  const plus = (r: { added?: boolean }) => (r.added ? "+" : "");
   return (
     <section>
       <Label>Debrief</Label>
       <Card className="t-debrief">
-        {maxes.map((m) => <p key={m} className="t-db-max">{m}</p>)}
-        {nextMain && <p className="t-db-next">{nextMain}</p>}
-        {up.length > 0 && (
-          <ul className="t-db-list">
-            {up.map((c) => <li key={c.name}><span className="t-db-up" aria-hidden="true">▲</span><span>{c.name}</span><span className="k-num">{load(c)}</span></li>)}
-          </ul>
-        )}
-        {down.length > 0 && (
-          <ul className="t-db-list">
-            {down.map((c) => <li key={c.name}><span className="t-db-down" aria-hidden="true">▼</span><span>{c.name}</span><span className="k-num">{load(c)}</span></li>)}
-          </ul>
-        )}
-        {same.length > 0 && (
-          <ul className="t-db-list t-db-same">
-            {same.map((c) => <li key={c.name}><span aria-hidden="true">=</span><span>{c.name}</span><span className="k-muted">{c.why}</span></li>)}
-          </ul>
+        <div className="t-db-top">
+          {maxes.map((m) => <Stat key={m.lift} size="lg" label={`${m.lift} training max`} value={fmtNum(m.value, 1)} unit="kg" sub={m.from ?? undefined} tone="warm" />)}
+          {next && <Stat size="lg" label={`${next.title} · ${next.date}`} value={`${next.added ? "+" : ""}${fmtNum(next.load, 1)}`} unit="kg" sub={`${next.lift} ${next.scheme}`} />}
+        </div>
+        {rows.length > 0 && (
+          <>
+            <div className="t-db-head">
+              <span>Next time</span>
+              <span>{held ? "Week 0 · held" : up ? `${up} up` : "Same loads"}</span>
+            </div>
+            <ul className="t-db-rows">
+              {rows.map((r) => (
+                <li key={r.name} data-dir={r.dir}>
+                  <span className="t-db-name">{r.name}{r.hint && <small>{r.hint}</small>}</span>
+                  <span className="t-db-load">
+                    {r.dir !== "same" && <span className="t-db-from">{plus(r)}{fmtNum(r.from, 1)} →</span>}
+                    {plus(r)}{fmtNum(r.to, 1)}<small>{r.unit}</small>
+                  </span>
+                  <span className="t-db-dir" aria-label={r.dir}>{r.dir === "up" ? "▲" : r.dir === "down" ? "▼" : "="}</span>
+                </li>
+              ))}
+            </ul>
+            {held && (
+              <details className="t-db-why">
+                <summary>Why held</summary>
+                <p>Week 0 sets stopped at the top of the range, so week 1 starts at the same weight. From now on, failure sets find the weight.</p>
+              </details>
+            )}
+          </>
         )}
       </Card>
     </section>
