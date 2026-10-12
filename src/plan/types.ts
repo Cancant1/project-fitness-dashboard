@@ -342,6 +342,11 @@ export interface PlanState {
     /** Isometric holds on days dated from … until (3–7 days after a morning flare). */
     isometricFrom?: string;
     isometricUntil?: string;
+    /**
+     * The last ladder session: its load, the rung's reps, whether every set reached them, and the next dumbbell.
+     * Heavy-slow loading: the load goes up when the rung's reps drop (15 → 12 → …), not within a rung.
+     */
+    last?: { load: number; reps: number; allHit: boolean; next: number };
   };
 }
 

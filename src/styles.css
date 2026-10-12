@@ -302,3 +302,6 @@ table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.data th { text-align: left; font-weight: 500; color: var(--fg2); padding: 6px 8px; }
 table.data td { padding: 7px 8px; border-top: 1px solid var(--sep); }
 table.data td.n, table.data th.n { text-align: right; font-family: var(--num); }
+
+/* New-version banner */
+.update-banner { position: sticky; top: calc(var(--safe-top) + 8px); z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px var(--gutter) 0; padding: 10px 12px 10px 16px; border-radius: 16px; background: var(--glass); backdrop-filter: blur(16px) saturate(180%); -webkit-backdrop-filter: blur(16px) saturate(180%); box-shadow: var(--glass-shadow); font-weight: 600; }

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useSyncState } from "../data/store";
 import { supabase } from "../data/supabase";
@@ -50,6 +50,7 @@ export function Shell({ email }: { email: string }) {
       </nav>
 
       <div className="main">
+        <UpdateBanner />
         <Outlet />
       </div>
 
@@ -83,4 +84,21 @@ export function SyncBadge() {
     s.pending ? `${s.pending} to sync` : "Synced";
   const color = s.kind === "error" ? "var(--bad)" : "var(--fg2)";
   return <span role="status" style={{ fontSize: 12, color }} title={s.kind === "error" ? s.message : undefined}>{text}</span>;
+}
+
+/** "New version" banner: shown when a newer app build has installed in the background; Reload switches to it. */
+function UpdateBanner() {
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const on = () => setReady(true);
+    window.addEventListener("reps-update", on);
+    return () => window.removeEventListener("reps-update", on);
+  }, []);
+  if (!ready) return null;
+  return (
+    <div className="update-banner" role="status">
+      <span>New version of Reps</span>
+      <button type="button" className="btn btn-primary btn-sm" onClick={() => location.reload()}>Reload</button>
+    </div>
+  );
 }

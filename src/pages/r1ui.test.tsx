@@ -113,16 +113,16 @@ describe("Logger (Part U)", () => {
   });
 
   it("pairs show A/B with the short rest, and switch on tap", async () => {
-    const id = await startDay(1, "upper_a", STATE, "2026-10-20");
+    const id = await startDay(1, "lower_b", STATE, "2026-10-23");
     await render(null, `/workout/${id}`);
-    await goTo("flye");
+    await goTo("Hanging knee raise");
     const pair = host.querySelector(".wk-pair")!;
     expect(pair).toBeTruthy();
     expect([...pair.querySelectorAll(".wk-pair-btn b")].map((b) => b.textContent)).toEqual(["A", "B"]);
     expect(pair.textContent).toMatch(/50 s/);
     expect(pair.textContent).toMatch(/75 s after/);
     await click(pair.querySelectorAll(".wk-pair-btn")[1]);
-    expect(host.querySelector("h1")?.textContent).toMatch(/Bayesian/i);
+    expect(host.querySelector("h1")?.textContent).toMatch(/lateral/i);
   });
 
   it("pain ≥ 6 shows the stop banner; 4–5 the hold note; the pain sheet saves a 0–10 score", async () => {

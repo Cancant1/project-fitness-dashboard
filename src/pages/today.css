@@ -96,3 +96,15 @@
 .t-elbow-v { text-align: right; font-size: 17px; }
 .t-elbow-q input { grid-column: 1 / -1; width: 100%; height: 36px; margin: 0; accent-color: var(--warm); }
 .t-elbow .ci-btn { align-self: flex-start; }
+
+/* Debrief after a finished session */
+.t-debrief { display: flex; flex-direction: column; gap: 10px; }
+.t-db-max { font-weight: 600; }
+.t-db-next { color: var(--fg2); }
+.t-db-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.t-db-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 8px; align-items: baseline; font-size: 15px; }
+.t-db-list li > span:nth-child(2) { min-width: 0; overflow-wrap: anywhere; }
+.t-db-up { color: var(--good); font-size: 11px; }
+.t-db-down { color: var(--warm-text); font-size: 11px; }
+.t-db-same li { color: var(--fg2); }
+.t-db-same li > span:first-child { text-align: center; }

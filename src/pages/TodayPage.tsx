@@ -8,6 +8,7 @@ import { dayForDate, prescribeDay, prescribeMinimum } from "../plan/engine";
 import { PLAN, PLAN_KEY, activeProgram, ensurePlanExercises, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../plan/bridge";
 import { planRef, startWorkout } from "../plan/workout";
 import { nextPlanned } from "./plan/planView";
+import { sessionDebrief, type Debrief } from "../coach/debrief";
 import type { PlanState, PrescribedDay } from "../plan/types";
 import { Card, Label, Pill, Ring, Sparkline, Stat } from "../ui/kit";
 import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
@@ -138,6 +139,32 @@ export function TodayPage() {
     if (!n) return null;
     try { return { date: n.date, day: prescribeDay(plan, n.week.weekNo, n.day.key, prescription.state, equipment) }; } catch { return null; }
   }, [doneToday, program, prescription.state, sessions, today, plan, equipment]);
+  // Debrief: what today's session changed, and the same day next time.
+  const debrief = useMemo((): Debrief | null => {
+    if (!doneSession || !prescription.state) return null;
+    const dayKey = (doneSession.legacy_ref as { plan?: { dayKey?: string } }).plan?.dayKey;
+    const weekNo = doneSession.program_week_no;
+    if (!dayKey || weekNo == null) return null;
+    const sessionSets = sets.filter((x) => x.session_id === doneSession.id);
+    const setIds = new Set(sessionSets.map((x) => x.id));
+    const keyOf = new Map([...ids].map(([k, id]) => [id, k] as const));
+    const tms = maxes.filter((m) => (m.source_set_id && setIds.has(m.source_set_id)) || (m.effective_date === today && m.program_id === program?.id));
+    const later = plan.weeks.filter((w) => w.weekNo > weekNo);
+    let nextDay: PrescribedDay | null = null;
+    let label = "";
+    for (const w of later) {
+      const d = plan.days.find((x) => x.key === dayKey);
+      if (!d) break;
+      try {
+        const p = prescribeDay(plan, w.weekNo, dayKey as PrescribedDay["dayKey"], prescription.state, equipment);
+        if (p.kind !== "lifting" || !p.exercises.length) continue;
+        nextDay = p;
+        label = fmtShortDate(addDays(w.startDate, d.weekday - 1));
+        break;
+      } catch { continue; }
+    }
+    return sessionDebrief({ sets: sessionSets, maxes: tms, keyOf, next: nextDay, nextDateLabel: label });
+  }, [doneSession, prescription.state, sets, ids, maxes, today, program, plan, equipment]);
   const listDay = next?.day ?? day;
   const listLifts = listDay?.exercises.filter((e) => e.group !== "shoulder_care") ?? [];
   const listLabel = next ? `Up next · ${next.date === addDays(today, 1) ? "Tomorrow" : fmtShortDate(next.date)} · ${next.day.title}` : "Up next";
@@ -215,6 +242,8 @@ export function TodayPage() {
             <Card><Stat label="Rest day" value="Recover" size="md" /></Card>
           )}
 
+          {debrief && <DebriefCard debrief={debrief} />}
+
           <CoachCard cues={cues} report={report} today={today} onDone={toast.show}
             onMinimum={program && day?.kind === "lifting" && planDate === today && !doneToday && !inProgress ? () => void start(day, true) : undefined} />
 
@@ -285,7 +314,7 @@ export function TodayPage() {
               </Ring>
               <div className="k-stat">
                 <span className="k-stat-label">Squat → 145 × 5</span>
-                <span className="k-stat-value" style={{ fontSize: 28 }}>{fmtNum(squat.value, 0)}<small>kg</small></span>
+                <span className="k-stat-value" style={{ fontSize: 28 }}>{fmtNum(squat.value, squat.source === "training max" ? 1 : 0)}<small>kg</small></span>
                 <span className="k-stat-sub">{squat.source}</span>
               </div>
               <ChevronRight style={{ color: "var(--fg2)", marginLeft: "auto" }} />
@@ -299,6 +328,38 @@ export function TodayPage() {
 }
 
 /** Today's coach notes (at most 3) and this week's check-in verdict. With no cues it is just the check-in row. */
+/** After a finished session: training-max changes, next time's main lift, and every accessory's next step. */
+function DebriefCard({ debrief }: { debrief: Debrief }) {
+  const { maxes, nextMain, up, same, down } = debrief;
+  if (!maxes.length && !nextMain && !up.length && !same.length && !down.length) return null;
+  const load = (c: { from: number; to: number; unit: string; added?: boolean }) =>
+    `${c.added ? "+" : ""}${fmtNum(c.from)} → ${c.added ? "+" : ""}${fmtNum(c.to)} ${c.unit}`;
+  return (
+    <section>
+      <Label>Debrief</Label>
+      <Card className="t-debrief">
+        {maxes.map((m) => <p key={m} className="t-db-max">{m}</p>)}
+        {nextMain && <p className="t-db-next">{nextMain}</p>}
+        {up.length > 0 && (
+          <ul className="t-db-list">
+            {up.map((c) => <li key={c.name}><span className="t-db-up" aria-hidden="true">▲</span><span>{c.name}</span><span className="k-num">{load(c)}</span></li>)}
+          </ul>
+        )}
+        {down.length > 0 && (
+          <ul className="t-db-list">
+            {down.map((c) => <li key={c.name}><span className="t-db-down" aria-hidden="true">▼</span><span>{c.name}</span><span className="k-num">{load(c)}</span></li>)}
+          </ul>
+        )}
+        {same.length > 0 && (
+          <ul className="t-db-list t-db-same">
+            {same.map((c) => <li key={c.name}><span aria-hidden="true">=</span><span>{c.name}</span><span className="k-muted">{c.why}</span></li>)}
+          </ul>
+        )}
+      </Card>
+    </section>
+  );
+}
+
 function CoachCard({ cues, report, today, onDone, onMinimum }: {
   cues: DailyCue[]; report: WeeklyReport | null; today: string; onDone: (m: string) => void; onMinimum?: () => void;
 }) {

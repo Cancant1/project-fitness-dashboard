@@ -81,7 +81,11 @@ describe("E1 effort per exercise and set", () => {
     const id = await startWorkout(local, program as Program, d, ids, "2026-10-20");
     const sets = local.all("sets").filter((s) => s.session_id === id);
     const flye = sets.filter((s) => planRef(s)?.exerciseKey === "chest_cable_flye");
-    expect(planRef(flye[0]!)).toMatchObject({ effort: "failure", pair: "tue_1", pairLabel: "A", restSec: 50 });
+    expect(planRef(flye[0]!)).toMatchObject({ effort: "failure" });
+    expect(planRef(flye[0]!)?.pair).toBeUndefined(); // 12 Oct: no cable+cable pairs
+    const monId = await startWorkout(local, program as Program, prescribeDay(PLAN, 1, "lower_a", STATE), ids, "2026-10-19");
+    const ham = local.all("sets").find((s) => s.session_id === monId && planRef(s)?.exerciseKey === "lying_db_hamstring_curl")!;
+    expect(planRef(ham)).toMatchObject({ effort: "failure", pair: "mon_1", pairLabel: "A", restSec: 50 });
     const repOut = sets.find((s) => planRef(s)?.exerciseKey === "incline_db_press" && s.kind === "rep_out")!;
     expect(planRef(repOut)).toMatchObject({ effort: "max", capReps: 10, target: 8 });
     expect(repOut.target_reps).toBe("8–10");
@@ -251,9 +255,7 @@ describe("E8 extra sets at checkpoint 1 (R1-08)", () => {
     const tue = day(8, "upper_a", both).exercises;
     const rear = tue.find((e) => e.exerciseKey === "cable_rear_delt_fly")!;
     expect(rear.sets).toHaveLength(1);
-    expect(tue.filter((e) => e.pair === "tue_1").map((e) => [e.exerciseKey, e.pairLabel])).toEqual([
-      ["chest_cable_flye", "A"], ["bayesian_curl", "B"], ["cable_rear_delt_fly", "C"]
-    ]);
+    expect(tue.some((e) => e.pair)).toBe(false); // straight sets: Upper A is all cables
     expect(total(both, 8)).toBe(77);
   });
 });
@@ -295,28 +297,32 @@ describe("E10 triceps ranges 12–20", () => {
 });
 
 describe("E11 pairs (P-TIMESAVE)", () => {
-  it("default pairs; never two elbow-loading moves in one pair", () => {
+  it("default pairs; never two elbow-loading moves or two cable stations in one pair", () => {
     expect(validatePairs(PLAN)).toEqual([]);
     const pairs = Object.fromEntries(PLAN.days.map((d) => [d.key, d.slots.filter((s) => s.pair).map((s) => `${s.pair}:${s.exerciseKey}`)]));
-    expect(pairs.upper_a).toEqual(["tue_1:chest_cable_flye", "tue_2:cable_lateral_raise", "tue_1:bayesian_curl", "tue_2:overhead_cable_triceps_extension", "tue_1:cable_rear_delt_fly"]);
-    expect(pairs.upper_b).toEqual(["sat_2:cable_lateral_raise", "sat_1:cable_rear_delt_fly", "sat_1:underhand_cable_curl", "sat_2:reverse_grip_pushdown"]);
+    expect(pairs.upper_a).toEqual([]);
+    expect(pairs.upper_b).toEqual([]);
     expect(pairs.lower_a).toEqual(["mon_1:lying_db_hamstring_curl", "mon_1:cross_body_triceps_extension"]);
-    expect(pairs.lower_b).toEqual(["fri_1:cable_lateral_raise", "fri_1:preacher_curl"]);
-    const elbowPair: ProgramDefinition = { ...PLAN, days: PLAN.days.map((d) => (d.key === "upper_a" ? { ...d, slots: d.slots.map((s) => (s.exerciseKey === "overhead_cable_triceps_extension" ? { ...s, pair: "tue_1" } : s)) } : d)) };
-    expect(validatePairs(elbowPair)).toContain("upper_a tue_1: bayesian_curl + overhead_cable_triceps_extension both load the elbow");
+    expect(pairs.lower_b).toEqual(["fri_1:hanging_knee_raise", "fri_1:cable_lateral_raise"]);
+    const withPair = (dayKey: string, keys: string[]): ProgramDefinition => ({ ...PLAN, days: PLAN.days.map((d) => (d.key === dayKey
+      ? { ...d, slots: d.slots.map((s) => (keys.includes(s.exerciseKey) ? { ...s, pair: "x" } : s)) } : d)) });
+    expect(validatePairs(withPair("upper_a", ["bayesian_curl", "overhead_cable_triceps_extension"])))
+      .toContain("upper_a x: bayesian_curl + overhead_cable_triceps_extension both load the elbow");
+    expect(validatePairs(withPair("upper_a", ["chest_cable_flye", "bayesian_curl"])))
+      .toEqual(["upper_a x: chest_cable_flye + bayesian_curl need more than one cable station"]);
+    expect(validatePairs(withPair("lower_a", ["cable_calf_raise", "lying_db_hamstring_curl"])).join(" ")).toContain("cable station");
   });
   it("members are adjacent, A rests 45–60 s (50), the last member 75 s", () => {
-    const tue = day(1, "upper_a").exercises;
-    expect(tue.slice(6).map((e) => [e.exerciseKey, e.pairLabel, e.restSec])).toEqual([
-      ["seated_cable_row", undefined, 120],
-      ["chest_cable_flye", "A", 50], ["bayesian_curl", "B", 75],
-      ["cable_lateral_raise", "A", 50], ["overhead_cable_triceps_extension", "B", 75]
+    const fri = day(1, "lower_b").exercises;
+    const k = fri.findIndex((e) => e.exerciseKey === "hanging_knee_raise");
+    expect(fri.slice(k, k + 2).map((e) => [e.exerciseKey, e.pairLabel, e.restSec])).toEqual([
+      ["hanging_knee_raise", "A", 50], ["cable_lateral_raise", "B", 75]
     ]);
-    expect(tue.map((e) => e.order)).toEqual(tue.map((_, i) => i + 1));
+    expect(fri.map((e) => e.order)).toEqual(fri.map((_, i) => i + 1));
     const mon = day(1, "lower_a").exercises.map((e) => e.exerciseKey);
     expect(mon.indexOf("cross_body_triceps_extension")).toBe(mon.indexOf("lying_db_hamstring_curl") + 1);
     // A pair with one member left that day is a straight set.
-    const solo = arrangePairs([{ ...tue[7]!, pair: "x" }]);
+    const solo = arrangePairs([{ ...fri[0]!, pair: "x" }]);
     expect(solo[0]!.pair).toBeUndefined();
   });
 });
@@ -362,6 +368,19 @@ describe("E13 wrist ladder", () => {
     expect(day(2, "lower_a").workingSetCount).toBe(19); // care work: not counted
     expect(shape(ex(14, "lower_b", "wrist_extension").sets)).toEqual([["working", 4, 8], ["working", 4, 8]]);
     expect(day(14, "lower_a").exercises.map((e) => e.exerciseKey)).not.toContain("wrist_extension");
+  });
+  it("load: same dumbbell while the rung holds; next dumbbell when the reps drop and the last rung was all hit", () => {
+    const w = new World();
+    w.session(dayIn(1, "lower_a"), "lower_a", { only: ["wrist_extension"], load: () => 5 });
+    const withLadder = (st: PlanState): PlanState => ({ ...STATE, wristLadder: st.wristLadder, currentLoads: { ...STATE.currentLoads, ...st.currentLoads } });
+    const s1 = withLadder(w.data().state);
+    expect(s1.wristLadder?.last).toMatchObject({ load: 5, reps: 15, allHit: true });
+    expect(ex(1, "lower_b", "wrist_extension", s1).sets[0]!.load).toBe(5); // same rung (15): same weight
+    const up = ex(2, "lower_a", "wrist_extension", s1).sets[0]!.load; // rung 12: next dumbbell
+    expect(up).toBeGreaterThan(5);
+    const w2 = new World();
+    w2.session(dayIn(1, "lower_a"), "lower_a", { only: ["wrist_extension"], load: () => 5, reps: (_e, _s, i) => (i === 2 ? 13 : undefined) });
+    expect(ex(2, "lower_a", "wrist_extension", withLadder(w2.data().state)).sets[0]!.load).toBe(5); // missed reps: stay
   });
   it("Wednesday: the home task on the ride card (none in maintenance)", () => {
     expect(day(1, "easy_ride").conditioning?.homeTasks).toEqual([

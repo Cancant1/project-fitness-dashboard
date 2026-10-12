@@ -696,7 +696,8 @@ export function arrangePairs(exercises: readonly PrescribedExercise[], rest = { 
   return out;
 }
 
-/** Pair problems in the plan data: two elbow-loading moves in one pair (never allowed, P-TIMESAVE). */
+/** Pair problems in the plan data (P-TIMESAVE): two elbow-loading moves in one pair, or a pair that needs more than
+ *  one cable station (his gym: a dual pulley and a single pulley; the cable-bar calf raise uses all of them). */
 export function validatePairs(program: ProgramDefinition): string[] {
   const errors: string[] = [];
   for (const day of program.days) {
@@ -705,6 +706,10 @@ export function validatePairs(program: ProgramDefinition): string[] {
     for (const [id, slots] of pairs) {
       const elbow = slots.filter((s) => s.elbowLoading);
       if (elbow.length > 1) errors.push(`${day.key} ${id}: ${elbow.map((s) => s.exerciseKey).join(' + ')} both load the elbow`);
+      const eq = (s: ProgramSlot) => program.exercises[s.exerciseKey]?.equipment;
+      const cable = slots.filter((s) => eq(s) === 'cable' || eq(s) === 'cable_pair');
+      if (cable.length > 1 || slots.some((s) => eq(s) === 'cable_pair'))
+        errors.push(`${day.key} ${id}: ${cable.map((s) => s.exerciseKey).join(' + ')} need more than one cable station`);
       if (slots.length < 2) errors.push(`${day.key} ${id}: only one member`);
     }
   }
@@ -978,7 +983,9 @@ function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): DraftExercise 
 function prescribeWristLadder(slot: ProgramSlot, ctx: SlotContext, ladder: WristLadder): DraftExercise | null {
   const dose = wristLadderDose(ladder, ctx.week.weekNo, ctx.dayKey, ctx.state.wristLadder?.rungOffset);
   if (!dose) return null;
-  const load = ctx.state.currentLoads[slot.exerciseKey] ?? slot.startLoad;
+  // Heavy-slow: the weight goes up when the rung's reps drop and the last rung was completed; within a rung it stays.
+  const last = ctx.state.wristLadder?.last;
+  const load = last && dose.reps < last.reps && last.allHit ? last.next : (ctx.state.currentLoads[slot.exerciseKey] ?? slot.startLoad);
   const shell = exerciseShell(slot, ctx);
   if (isometricOn(ctx.state, ctx.date)) {
     const [a, b] = ladder.isometric.holdSec;
@@ -996,7 +1003,7 @@ function prescribeWristLadder(slot: ProgramSlot, ctx: SlotContext, ladder: Wrist
     sets: Array.from({ length: dose.sets }, (): DraftSet => ({
       kind: 'working', load, unit: slot.unit, reps: dose.reps, repRange: [dose.reps, dose.reps], effort: 'care',
     })),
-    notes: [maintain ? `Maintenance: ${dose.sets} × ${dose.reps}, once a week.` : `Ladder: ${dose.sets} × ${dose.reps}. All sets at ${dose.reps}: next dumbbell up.`, ...shell.notes],
+    notes: [maintain ? `Maintenance: ${dose.sets} × ${dose.reps}, once a week.` : `Ladder: ${dose.sets} × ${dose.reps}. Same weight until the reps drop to the next rung; then the next dumbbell up.`, ...shell.notes],
   };
 }
 

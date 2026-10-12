@@ -92,7 +92,8 @@ export function MusclesCard({ idx, today }: { idx: TrainingIndex; today: string 
     let to = addDays(mondayOf(today), -1);
     let inWindow = idx.work.filter((s) => s.date > addDays(to, -28) && s.date <= to);
     if (!inWindow.length && idx.lastDate) {
-      to = addDays(mondayOf(idx.lastDate), 6);
+      const end = addDays(mondayOf(idx.lastDate), 6);
+      to = end > today ? today : end; // never a date in the future
       inWindow = idx.work.filter((s) => s.date > addDays(to, -28) && s.date <= to);
     }
     const vol = fractionalVolume(inWindow, idx.exerciseById);

@@ -166,7 +166,7 @@ export function AreaChart({ series, height = 240, formatX, formatY = (v) => Stri
   const sx = (x: number) => L + ((x - x0) / (x1 - x0 || 1)) * (w - L - R);
   const sy = (y: number) => T + (1 - (y - y0) / (y1 - y0 || 1)) * (height - T - B);
   const ticks = niceTicks(y0, y1, yLines ?? 3);
-  const xTicks = [x0, x0 + (x1 - x0) / 2, x1];
+  const xTicks = x1 > x0 ? [x0, x0 + (x1 - x0) / 2, x1] : [x0]; // one day of data: one label, not three copies
 
   const main = series[0]!;
   const nearest = hover == null ? null : main.points.reduce((b, p) => (Math.abs(p.x - hover) < Math.abs(b.x - hover) ? p : b), main.points[0]!);

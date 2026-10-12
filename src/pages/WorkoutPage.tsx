@@ -129,6 +129,7 @@ export function WorkoutPage() {
               </div>
               <ExerciseSubtitle block={block} dayKey={planInfo?.dayKey} />
               <EffortLine block={block} />
+              <LastTime exerciseId={block.exerciseId} sessionId={session.id} date={session.date} />
               {block.effort === "care" && <TempoPendulum />}
               <SwapNote block={block} />
             </div>
@@ -338,6 +339,32 @@ function TempoPendulum() {
         <span className="num">{[1, 2, 3].map((n) => <i key={n} data-on={n <= sec}>{n}</i>)}</span>
       </div>
     </div>
+  );
+}
+
+/** "Last time · 12 Oct: 80 × 10 · 80 × 10" for this exercise, from the latest earlier completed session (+ its note). */
+function LastTime({ exerciseId, sessionId, date }: { exerciseId: string; sessionId: string; date: string }) {
+  const sessions = useRows("sessions");
+  const sets = useRows("sets");
+  const annotations = useRows("annotations");
+  const info = useMemo(() => {
+    const done = new Map(sessions.filter((x) => x.status === "completed" && x.id !== sessionId && x.date <= date).map((x) => [x.id, x.date]));
+    const mine = sets.filter((x) => x.exercise_id === exerciseId && done.has(x.session_id) && x.completed && x.kind !== "warmup" && x.load != null);
+    if (!mine.length) return null;
+    const lastSession = mine.reduce((a, b) => (done.get(b.session_id)! > done.get(a.session_id)! ? b : a)).session_id;
+    const rows = mine.filter((x) => x.session_id === lastSession).sort((a, b) => a.set_no - b.set_no);
+    const unit = rows[0]!.unit === "lb" ? " lb" : "";
+    const text = rows.map((x) => `${fmtNum(Number(x.load))}${unit} × ${x.reps ?? "–"}`).join(" · ");
+    const note = annotations.find((a) => a.kind === "note" && a.session_id === lastSession && a.exercise_id === exerciseId)?.text;
+    return { date: done.get(lastSession)!, text, note };
+  }, [sessions, sets, annotations, exerciseId, sessionId, date]);
+  if (!info) return null;
+  const d = new Date(`${info.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return (
+    <p className="wk-last">
+      <span className="wk-last-label">Last time · {d}</span> {info.text}
+      {info.note && <span className="wk-last-note">“{info.note}”</span>}
+    </p>
   );
 }
 

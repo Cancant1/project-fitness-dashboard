@@ -204,6 +204,7 @@ export function planState(args: {
   const pain = (args.painChecks ?? []).filter((p) => !p.deleted_at);
   const hold = holdLoadState(pain, keyOf, completedPlan, sets);
   const wristKey = PLAN.wristLadder?.exerciseKey;
+  let ladderLast: NonNullable<PlanState["wristLadder"]>["last"];
 
   const slots = new Map<string, ProgramSlot>();
   for (const d of PLAN.days) for (const s of d.slots) if (s.role !== "main" && !slots.has(s.exerciseKey)) slots.set(s.exerciseKey, s);
@@ -226,6 +227,15 @@ export function planState(args: {
     const def = PLAN.exercises[key];
     // Cables: the next real pin on that machine's stack; dumbbells: the rack; barbell: 2.5 kg.
     const step = weightsFor(key) ?? (def ? progressionStep(def.equipment, slot.unit, equipment) : 2.5);
+    if (key === wristKey) {
+      // Heavy-slow ladder: same weight within a rung; the engine steps up when the rung's reps drop.
+      const reps = range[1];
+      const allHit = last.every((s) => s.reps != null && s.reps >= reps);
+      const stepped = doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), [reps, reps], step)?.load ?? lastLoad;
+      ladderLast = { load: lastLoad, reps, allHit, next: stepped };
+      currentLoads[key] = lastLoad;
+      continue;
+    }
     const repOut = slot.scheme?.lastSetRepOut ? last.find((s) => s.kind === "rep_out" && s.reps != null) : undefined;
     let next: number;
     if (repOut) {
@@ -260,7 +270,8 @@ export function planState(args: {
   const recalibrate = recalibrateState(adjustmentsOf(program.rules), maxes, ids);
   const restart = restartState(completedPlan.map((s) => s.date), plan, args.today);
   const effort = effortState(completedPlan, pain, plan);
-  const wristLadder = wristLadderState(pain, plan);
+  const wristLadderPain = wristLadderState(pain, plan);
+  const wristLadder = wristLadderPain || ladderLast ? { ...(wristLadderPain ?? {}), ...(ladderLast ? { last: ladderLast } : {}) } : undefined;
   const rounds = args.conditioning ? sundayRoundsFrom(args.conditioning, plan) : undefined;
   return {
     trainingMaxes: {
@@ -324,7 +335,8 @@ export function swapHistory(args: {
     }
   };
 }
-
+
+
 
 /**
  * This week's planned Sunday rounds from the rounds log, oldest first: after a normal week,

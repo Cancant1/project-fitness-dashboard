@@ -112,3 +112,8 @@
 .wk-tempo-text i { font-style: normal; color: var(--fg2); opacity: 0.45; }
 .wk-tempo-text i[data-on="true"] { color: var(--warm-text); opacity: 1; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .wk-tempo-needle { animation-duration: 6s; } }
+
+/* Last time this exercise was done */
+.wk-last { margin-top: 8px; font-size: 14px; color: var(--fg2); font-variant-numeric: tabular-nums; }
+.wk-last-label { color: var(--fg); font-weight: 600; margin-right: 4px; }
+.wk-last-note { display: block; margin-top: 2px; font-style: italic; }

@@ -13,5 +13,16 @@ createRoot(document.getElementById("root")!).render(
 );
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  void navigator.serviceWorker.register("./sw.js");
+  // A new version is waiting when a fresh service worker installs while an old one controls the page:
+  // tell the Shell (it shows "New version · Reload"). Also check for updates whenever the app comes back.
+  void navigator.serviceWorker.register("./sw.js").then((reg) => {
+    const announce = () => window.dispatchEvent(new CustomEvent("reps-update"));
+    reg.addEventListener("updatefound", () => {
+      const sw = reg.installing;
+      sw?.addEventListener("statechange", () => {
+        if (sw.state === "installed" && navigator.serviceWorker.controller) announce();
+      });
+    });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") void reg.update(); });
+  });
 }

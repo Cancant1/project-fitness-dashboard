@@ -191,7 +191,7 @@ function tileFor(area: Area, r: WeeklyReport, data: CoachData, today: string): T
     }
     case "fuel": {
       const { avgKcal, targetKcal } = n.food;
-      if (avgKcal == null) return { value: "—", unit: "kcal", foot: caption("Log food daily") };
+      if (avgKcal == null) return { value: "—", unit: "kcal", foot: caption(n.food.daysLogged ? "Average after 3 full days" : "Log food daily") };
       const scale = (targetKcal ?? avgKcal) * 1.25;
       return {
         value: fmtNum(Math.round(avgKcal / 10) * 10, 0), unit: "kcal",

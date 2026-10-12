@@ -108,7 +108,7 @@
 .pl-rows { padding: 0 2px; }
 .pl-row + .pl-row { border-top: 1px solid var(--sep); }
 .pl-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 62px; align-items: center; gap: 10px; min-height: 38px; font-size: 14px; }
-.pl-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-row-name { min-width: 0; overflow-wrap: anywhere; line-height: 1.3; padding-block: 8px; }
 .pl-row-scheme { display: inline-flex; align-items: center; gap: 5px; font-family: var(--num); font-size: 13px; color: var(--fg2); white-space: nowrap; }
 .pl-row-load { font-family: var(--num); font-weight: 600; text-align: right; white-space: nowrap; }
 .pl-ro-dot { width: 6px; height: 6px; border-radius: 3px; background: var(--warm); }
