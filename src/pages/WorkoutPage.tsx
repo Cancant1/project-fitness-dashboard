@@ -139,6 +139,7 @@ export function WorkoutPage() {
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="btn btn-glass btn-sm" onClick={() => void addSet(block)}><PlusIcon /> Add set</button>
               <ExerciseNotes block={block} />
+              <ExerciseNote sessionId={session.id} date={session.date} exerciseId={block.exerciseId} name={block.name} />
               <button className="btn btn-glass btn-sm" onClick={() => setAdding(true)}><PlusIcon /> Add exercise</button>
             </div>
 
@@ -665,6 +666,41 @@ function PainSheet({ sessionId, exerciseId, date, onClose }: { sessionId: string
 // ------------------------------------------------------------------ finish
 
 type Energy = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * A note per exercise in this session ("felt X", "ask Claude about Y"): one annotations row, kind "note", linked to the
+ * session and exercise. Shown on the session page and read at the weekly check-in.
+ */
+function ExerciseNote({ sessionId, date, exerciseId, name }: { sessionId: string; date: string; exerciseId: string; name: string }) {
+  const { local } = useStore();
+  const annotations = useRows("annotations");
+  const existing = annotations.find((a) => a.kind === "note" && a.session_id === sessionId && a.exercise_id === exerciseId);
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const close = () => setOpen(false);
+  return (
+    <>
+      <button className="btn btn-glass btn-sm" onClick={() => { setText(existing?.text ?? ""); setOpen(true); }}>
+        {existing ? "Note ✓" : "Note"}
+      </button>
+      {open && (
+        <Sheet title={`Note · ${name}`} onClose={close}>
+          <label className="field" style={{ height: "auto", padding: 12 }}>
+            <span className="sr-only">Note for {name}</span>
+            <textarea rows={4} placeholder="How it felt, setup, questions for the check-in…" value={text} onChange={(e) => setText(e.target.value)}
+              style={{ border: 0, background: "transparent", width: "100%", resize: "vertical", outline: "none" }} />
+          </label>
+          <button className="btn btn-primary" onClick={async () => {
+            const t = text.trim();
+            if (existing && !t) await local.remove("annotations", [existing.id]);
+            else if (t) await local.save("annotations", { ...(existing ? { id: existing.id } : {}), kind: "note", date, end_date: null, exercise_id: exerciseId, session_id: sessionId, text: t, status: "open" });
+            close();
+          }}>Save note</button>
+        </Sheet>
+      )}
+    </>
+  );
+}
 
 function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
   blocks: Block[]; updates: ReturnType<typeof maxUpdates>; onClose: () => void; onFinish: (notes: string, energy: Energy | null) => Promise<void>; onDiscard: () => Promise<void>;

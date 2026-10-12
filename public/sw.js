@@ -1,6 +1,6 @@
 // Offline shell: network first, cache as fallback, so the app opens in the gym without signal.
 // Data lives in IndexedDB (see src/data/local.ts); this only caches the app's own files.
-const CACHE = "reps-shell-v3.7";
+const CACHE = "reps-shell-v3.8";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon.svg"])));

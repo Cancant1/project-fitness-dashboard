@@ -90,6 +90,7 @@ Deno.serve(async (req: Request) => {
     resting_hr: patch.resting_hr ?? null,
     hrv_sdnn_ms: patch.hrv_sdnn_ms ?? null,
     night: sleep ? { start: sleep.start, end: sleep.end, samples: sleep.used, left_out: sleep.left_out } : null,
-    warnings
+    warnings,
+    stages_seen: ingest.stages_seen
   });
 });

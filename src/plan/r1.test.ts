@@ -300,7 +300,7 @@ describe("E11 pairs (P-TIMESAVE)", () => {
     const pairs = Object.fromEntries(PLAN.days.map((d) => [d.key, d.slots.filter((s) => s.pair).map((s) => `${s.pair}:${s.exerciseKey}`)]));
     expect(pairs.upper_a).toEqual(["tue_1:chest_cable_flye", "tue_2:cable_lateral_raise", "tue_1:bayesian_curl", "tue_2:overhead_cable_triceps_extension", "tue_1:cable_rear_delt_fly"]);
     expect(pairs.upper_b).toEqual(["sat_2:cable_lateral_raise", "sat_1:cable_rear_delt_fly", "sat_1:underhand_cable_curl", "sat_2:reverse_grip_pushdown"]);
-    expect(pairs.lower_a).toEqual(["mon_1:cable_calf_raise", "mon_1:cross_body_triceps_extension"]);
+    expect(pairs.lower_a).toEqual(["mon_1:lying_db_hamstring_curl", "mon_1:cross_body_triceps_extension"]);
     expect(pairs.lower_b).toEqual(["fri_1:cable_lateral_raise", "fri_1:preacher_curl"]);
     const elbowPair: ProgramDefinition = { ...PLAN, days: PLAN.days.map((d) => (d.key === "upper_a" ? { ...d, slots: d.slots.map((s) => (s.exerciseKey === "overhead_cable_triceps_extension" ? { ...s, pair: "tue_1" } : s)) } : d)) };
     expect(validatePairs(elbowPair)).toContain("upper_a tue_1: bayesian_curl + overhead_cable_triceps_extension both load the elbow");
@@ -314,7 +314,7 @@ describe("E11 pairs (P-TIMESAVE)", () => {
     ]);
     expect(tue.map((e) => e.order)).toEqual(tue.map((_, i) => i + 1));
     const mon = day(1, "lower_a").exercises.map((e) => e.exerciseKey);
-    expect(mon.indexOf("cross_body_triceps_extension")).toBe(mon.indexOf("cable_calf_raise") + 1);
+    expect(mon.indexOf("cross_body_triceps_extension")).toBe(mon.indexOf("lying_db_hamstring_curl") + 1);
     // A pair with one member left that day is a straight set.
     const solo = arrangePairs([{ ...tue[7]!, pair: "x" }]);
     expect(solo[0]!.pair).toBeUndefined();

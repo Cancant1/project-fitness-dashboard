@@ -50,6 +50,8 @@ export interface Ingest {
   resting_hr: number | null;
   hrv_sdnn_ms: number | null;
   warnings: string[];
+  /** Distinct raw stage labels as the phone sent them (diagnostics: shows whether stages come through at all). */
+  stages_seen: string[];
 }
 
 // ------------------------------------------------------------------ stage names
@@ -445,7 +447,9 @@ export function buildIngest(input: unknown, now = Date.now(), tz = TZ): Ingest {
   if (resting_hr != null) patch.resting_hr = resting_hr;
   if (hrv_sdnn_ms != null) patch.hrv_sdnn_ms = hrv_sdnn_ms;
 
-  return { date, patch, sleep, resting_hr, hrv_sdnn_ms, warnings };
+  const raw = typeof body.sleep_text === "string" ? body.sleep_text : Array.isArray(body.sleep_text) ? body.sleep_text.join("\n") : "";
+  const stages_seen = [...new Set(raw.split(/[\r\n]+/).map((l) => l.split(/[;\t|]/)[0]!.trim()).filter(Boolean))].slice(0, 12);
+  return { date, patch, sleep, resting_hr, hrv_sdnn_ms, warnings, stages_seen };
 }
 
 // ------------------------------------------------------------------ token hash

@@ -4,10 +4,14 @@ import { createPortal } from "react-dom";
 /** Bottom sheet on the phone, centred dialog on the desktop. Escape or backdrop tap closes it. */
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Keep the latest onClose without re-running the effect: pages re-render every second (workout timer) with a new
+  // inline onClose, and re-running would pull focus back to the sheet and kick the keyboard out of text fields.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     document.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -16,7 +20,7 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       document.body.style.overflow = overflow;
       prev?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   return createPortal(
     <div className="sheet-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

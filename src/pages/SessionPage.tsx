@@ -18,6 +18,7 @@ export function SessionPage() {
   const sessions = useRows("sessions");
   const sets = useRows("sets");
   const exercises = useRows("exercises");
+  const annotations = useRows("annotations");
   const session = sessions.find((s) => s.id === sessionId);
   const names = useMemo(() => new Map(exercises.map((e) => [e.id, e.name])), [exercises]);
 
@@ -98,6 +99,9 @@ export function SessionPage() {
                 ))}
               </div>
               {notes.length > 0 && <p className="s-note">{notes.join(" · ")}</p>}
+              {annotations.filter((a) => a.kind === "note" && a.session_id === sessionId && a.exercise_id === b.exerciseId).map((a) => (
+                <p key={a.id} className="s-note">Note: {a.text}</p>
+              ))}
             </Card>
           );
         })}

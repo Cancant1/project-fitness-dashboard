@@ -19,7 +19,7 @@ import type {
 const EXERCISES: ExerciseDefinition[] = [
   { key: 'squat', name: 'Back squat', equipment: 'barbell', muscles: ['quads', 'glutes', 'adductors'] },
   { key: 'romanian_deadlift', name: 'Romanian deadlift', equipment: 'barbell', muscles: ['hamstrings', 'glutes'] },
-  { key: 'lying_db_hamstring_curl', name: 'Lying DB hamstring curl, inclined bench', equipment: 'dumbbell', muscles: ['hamstrings'] },
+  { key: 'lying_db_hamstring_curl', name: 'Lying DB hamstring curl, flat bench', equipment: 'dumbbell', muscles: ['hamstrings'] },
   { key: 'cable_leg_extension', name: 'Cable leg extension, backrest reclined', equipment: 'cable', muscles: ['quads'] },
   { key: 'cable_calf_raise', name: 'Calf raise, cable bar', equipment: 'cable_pair', muscles: ['calves'] },
   { key: 'kneeling_cable_crunch', name: 'Kneeling cable crunch', equipment: 'cable', muscles: ['abs'] },
@@ -123,17 +123,19 @@ const DAYS: ProgramDay[] = [
     slots: [
       main('squat', 'squat', 100, 'total', ['Safety bars just below your bottom position.', 'About 2 s down, up fast.']),
       compound('romanian_deadlift', repOutLast(3, 6, 10), 80, 'kg', 'total', ['Straps.', '2–3 s down.'], { alternatives: ['db_romanian_deadlift'] }),
+      // 12 Oct 2026: his bench can't incline, so flat (prone). The Friday seated cable curl covers the stretched position.
       isolation('lying_db_hamstring_curl', failure(2, 10, 15), 25, 'kg', 'total',
-        ['Bench inclined ~30°, face down, dumbbell between your feet. Unstable: use the seated cable curl.'],
-        { alternatives: ['seated_cable_leg_curl'] }),
+        ['Face down on a flat bench, knees just past the end, dumbbell between your feet.', 'Curl up, 2 s down to a full stretch.'],
+        { alternatives: ['seated_cable_leg_curl'], pair: 'mon_1' }),
       LEG_EXTENSION(2),
-      CALF_RAISE('mon_1'),
+      // The calf raise uses all the cable stations, so it can't be paired.
+      CALF_RAISE(),
       isolation('kneeling_cable_crunch', failure(2, 10, 15), 90, 'lb', 'total', ['Single pulley: 90 lb ≈ 41 kg, the plan’s 40 kg.','Curl ribs to pelvis; hips stay still.'],
         { alternatives: ['hanging_knee_raise'] }),
       LATERAL(2),
       // R1-10: triceps 12–20 (kinder to the elbow, same growth).
-      isolation('cross_body_triceps_extension', failure(2, 12, 20), 40, 'lb', 'per_arm',
-        ['Soft lockout.', 'Front of shoulder/collarbone hurts: switch to rope pushdowns.'],
+      isolation('cross_body_triceps_extension', failure(2, 12, 20), 20, 'lb', 'per_arm',
+        ['One arm at a time: pulley on the opposite side at about head height, grab it across your body and extend the arm out to the side.', 'Soft lockout.', 'Front of shoulder/collarbone hurts: switch to rope pushdowns.'],
         { elbowLoading: true, pair: 'mon_1', alternatives: ['rope_pushdown'] }),
       WRIST_LADDER_SLOT,
     ],
