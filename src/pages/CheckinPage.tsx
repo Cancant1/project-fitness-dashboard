@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { useToday } from "../lib/useToday";
 import { useSearchParams } from "react-router-dom";
 import { AREAS, EVIDENCE, currentWeekNo, expectedBand, planLine, weeklyReport, type Area, type CoachData, type Signal, type WeeklyReport } from "../coach";
 import { useCoachData } from "../coach/hooks";
@@ -19,7 +20,7 @@ const AREA_NAME: Record<Area, string> = {
 /** Check-in: how is my week going against the plan, and what do I change? */
 export function CheckinPage() {
   const data = useCoachData();
-  const today = todayIso();
+  const today = useToday();
   const [params, setParams] = useSearchParams();
   const [area, setArea] = useState<Area | null>(null);
   const toast = useToast();

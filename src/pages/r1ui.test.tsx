@@ -84,6 +84,56 @@ async function startDay(weekNo: number, dayKey: Parameters<typeof prescribeDay>[
   return startWorkout(local, program, day, ids, date);
 }
 
+async function type(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+describe("Logger: saving what was typed (bug hunt 12 Oct)", () => {
+  it("a failure set needs its reps; typed values save without a blur and the tick keeps them", async () => {
+    const id = await startDay(1, "lower_a", STATE, "2026-10-19");
+    await render(null, `/workout/${id}`);
+    await goTo("lateral");
+    const row = host.querySelector(".set-grid")!;
+    const [loadIn, repsIn] = [...row.querySelectorAll("input")] as HTMLInputElement[];
+    const tick = row.querySelector("button.check")!;
+    await click(tick);
+    const setId = () => local.all("sets").find((x) => x.session_id === id && planRef(x)?.exerciseKey === "cable_lateral_raise" && x.set_no === 1)!;
+    expect(setId().completed).toBe(false); // no reps typed: asks for them instead of logging the range top
+    expect(document.activeElement).toBe(repsIn);
+    expect(button(/^Type the reps for set 1/, host)).toBeTruthy();
+    await type(loadIn!, "22,5");
+    await type(repsIn!, "14");
+    await click(tick);
+    expect(setId()).toMatchObject({ completed: true, reps: 14, load: 22.5 });
+  });
+
+  it("an unreadable load puts the old value back instead of clearing it", async () => {
+    const id = await startDay(1, "lower_a", STATE, "2026-10-19");
+    await render(null, `/workout/${id}`);
+    await goTo("lateral");
+    const loadIn = host.querySelector(".set-grid input") as HTMLInputElement;
+    const before = loadIn.value;
+    await type(loadIn, "82,,5");
+    await act(async () => { loadIn.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
+    expect(loadIn.value).toBe(before);
+    const s = local.all("sets").find((x) => x.session_id === id && planRef(x)?.exerciseKey === "cable_lateral_raise" && x.set_no === 1)!;
+    expect(s.load).toBe(Number(before.replace(",", ".")));
+  });
+
+  it("the rep-out card starts fresh for the next lift", async () => {
+    const id = await startDay(1, "upper_a", { ...STATE, currentLoads: { incline_db_press: 22.5, weighted_pullup: 5 } }, "2026-10-20");
+    await render(null, `/workout/${id}`);
+    await goTo("Incline");
+    for (let i = 0; i < 4; i++) await click(host.querySelector('[aria-label="One rep more"]'));
+    expect((host.querySelector(".repout-card .stepper input") as HTMLInputElement).value).toBe("12");
+    await goTo("Pull-up");
+    expect((host.querySelector(".repout-card .stepper input") as HTMLInputElement).value).toBe("8");
+  });
+});
+
 describe("Logger (Part U)", () => {
   it("shows how hard each exercise goes, tints set badges, and caps the rep-out", async () => {
     const id = await startDay(1, "lower_a", { ...STATE, restart: { capRepOutsFrom: "2026-10-19" } }, "2026-10-19");

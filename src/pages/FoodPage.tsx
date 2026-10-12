@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useToday } from "../lib/useToday";
 import { Link } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { FoodEntry, Meal, SavedMeal } from "../data/types";
@@ -27,8 +28,15 @@ export function FoodPage() {
   const foods = useRows("foods");
   const saved = useRows("saved_meals");
   const weights = useRows("body_measurements");
-  const today = todayIso();
+  const today = useToday();
   const [date, setDate] = useState(today);
+  // Viewing today when the date rolls over (app resumed the next morning): follow it to the new today.
+  const shownToday = useRef(today);
+  useEffect(() => {
+    if (shownToday.current === today) return;
+    setDate((d) => (d === shownToday.current ? today : d));
+    shownToday.current = today;
+  }, [today]);
   const [adding, setAdding] = useState<Meal | null>(null);
   const [editing, setEditing] = useState<FoodEntry | null>(null);
   const [openSaved, setOpenSaved] = useState<SavedMeal | null>(null);

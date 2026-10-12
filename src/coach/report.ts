@@ -118,8 +118,9 @@ function daysWithData(ctx: WeekCtx): number {
 }
 
 
-export function verdictOf(weekNo: number, daysOfData: number, signals: readonly Signal[]): Verdict {
-  if (weekNo === 0 || daysOfData < 3) return "too_early";
+/** `complete`: the week is over. A finished week with little logged is a missed week, not "too early". */
+export function verdictOf(weekNo: number, daysOfData: number, signals: readonly Signal[], complete = false): Verdict {
+  if (weekNo === 0 || (daysOfData < 3 && !complete)) return "too_early";
   if (signals.some((s) => s.status === "act")) return "adjust";
   if (signals.filter((s) => s.status === "watch").length >= 2) return "watch";
   return "on_track";
@@ -171,7 +172,7 @@ export function weeklyReport(data: CoachData, weekNo: number, today: string): We
     ...ranked.filter((s) => s.status === "watch")
   ];
   const numbers = Object.assign(emptyNumbers(), ...parts.map((p) => p.numbers)) as WeekNumbers;
-  const verdict = verdictOf(weekNo, daysWithData(ctx), settled);
+  const verdict = verdictOf(weekNo, daysWithData(ctx), settled, ctx.complete);
   return {
     weekNo, weekType: ctx.week.type, label: ctx.complete ? `Week ${weekNo}` : `Week ${weekNo} so far`,
     from: ctx.from, to: ctx.to, complete: ctx.complete,

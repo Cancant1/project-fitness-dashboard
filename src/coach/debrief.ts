@@ -55,8 +55,10 @@ export function sessionDebrief(args: {
   /** The next prescription of the same day (null after the plan). */
   next: PrescribedDay | null;
   nextDateLabel: string;
+  /** A week-0 session: its sets stopped at the range top, so the loads carry into week 1. */
+  calibration?: boolean;
 }): Debrief {
-  const { sets, maxes, keyOf, next, nextDateLabel } = args;
+  const { sets, maxes, keyOf, next, nextDateLabel, calibration } = args;
   const out: Debrief = { maxes: [], nextMain: null, up: [], same: [], down: [] };
 
   for (const m of maxes) {
@@ -91,7 +93,12 @@ export function sessionDebrief(args: {
     else {
       const range = ex.sets.find((s) => s.repRange)?.repRange;
       const reps = logged.map((s) => s.reps ?? 0);
-      const why = range && reps.some((r) => r < range[1]) ? `reach ${range[1]} reps on every set to go up` : "same load";
+      const why = ex.rehab ? "same dumbbell until the reps drop to the next rung"
+        : calibration && range && reps.every((r) => r >= range[1])
+          ? ex.sets.some((x) => x.kind === "rep_out") ? "week 0 stopped at the top; the max set next time sets the jump"
+            : ex.effort === "failure" ? "week 0 stopped at the top; go to failure next time and the load follows"
+              : "week 0 stopped at the top"
+          : range && reps.some((r) => r < range[1]) ? `reach ${range[1]} reps on every set to go up` : "same load";
       out.same.push({ name: shortName(ex.name), why });
     }
   }

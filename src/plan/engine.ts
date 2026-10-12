@@ -961,7 +961,9 @@ function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): DraftExercise 
     const repRange: [number, number] = [scheme.repRange[0], scheme.repRange[1]];
     if (lastRepOut && i === n - 1) return { kind: 'rep_out', load, unit, reps: null, repRange, note: 'Rep-out: stop at a stop sign.', effort: 'max' };
     if (toFailure) return { kind: 'failure', load, unit, reps: null, repRange, effort: failEffort };
-    return { kind: 'working', load, unit, reps: scheme.repRange[1], repRange, effort: plainEffort };
+    // Shoulder block: filled in at the range bottom, so a plain tick never claims the top (it steps up only when he
+    // types the top on every set; plan: "same load until every set reaches the top").
+    return { kind: 'working', load, unit, reps: isShoulder ? scheme.repRange[0] : scheme.repRange[1], repRange, effort: plainEffort };
   });
 
   const shell = exerciseShell(slot, ctx);

@@ -10,6 +10,8 @@ describe("verdict", () => {
   it("week 0 or fewer than 3 days of data → too_early, checked first", () => {
     expect(verdictOf(0, 7, [s("a", "act")])).toBe("too_early");
     expect(verdictOf(3, 2, [s("a", "act")])).toBe("too_early");
+    expect(verdictOf(3, 0, [s("a", "act")], true)).toBe("adjust"); // a missed week, once it's over
+    expect(verdictOf(3, 0, [], true)).toBe("on_track");
   });
   it("any act → adjust; two or more watch → watch; otherwise on_track", () => {
     expect(verdictOf(3, 5, [s("a", "act"), s("b", "good")])).toBe("adjust");

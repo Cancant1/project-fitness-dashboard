@@ -81,9 +81,10 @@ export function SyncBadge() {
     s.kind === "syncing" ? "Syncing…" :
     s.kind === "offline" ? (s.pending ? `Offline · ${s.pending} to sync` : "Offline · saved on this device") :
     s.kind === "error" ? `Not synced · retrying` :
-    s.pending ? `${s.pending} to sync` : "Synced";
-  const color = s.kind === "error" ? "var(--bad)" : "var(--fg2)";
-  return <span role="status" style={{ fontSize: 12, color }} title={s.kind === "error" ? s.message : undefined}>{text}</span>;
+    s.pending ? `${s.pending} to sync` : s.rejected?.length ? `Synced · ${s.rejected.length} not accepted` : "Synced";
+  const color = s.kind === "error" || (s.kind === "idle" && s.rejected?.length) ? "var(--bad)" : "var(--fg2)";
+  const title = s.kind === "error" ? s.message : s.kind === "idle" && s.rejected?.length ? s.rejected.map((r) => `${r.table}: ${r.message}`).join(" · ") : undefined;
+  return <span role="status" style={{ fontSize: 12, color }} title={title}>{text}</span>;
 }
 
 /** "New version" banner: shown when a newer app build has installed in the background; Reload switches to it. */

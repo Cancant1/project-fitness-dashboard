@@ -168,6 +168,7 @@ const weekTypeOf = (s: Session | undefined): string | undefined => (s?.legacy_re
  *   - failure isolation: double progression, +2 steps when every set overshoots the range top by ≥ 5 (§6.3);
  *   - otherwise double progression (top of the range on every set → one step up);
  *   - a deload or taper session carries its load forward (those sets are not a test);
+ *   - a week-0 (calibration) session steps up only when every set went past the range top;
  * - APRE taper (R1-05): once the rep-out load ≥ the last logged working load (12 months before the plan),
  *   the jumps are +5% / +2.5%;
  * - the wrist ladder progresses at its rung's reps (the logged sets' rep range); isometric holds don't count;
@@ -238,7 +239,11 @@ export function planState(args: {
     }
     const repOut = slot.scheme?.lastSetRepOut ? last.find((s) => s.kind === "rep_out" && s.reps != null) : undefined;
     let next: number;
-    if (repOut) {
+    if (weekType === "calibration") {
+      // Week 0: sets stop at the range top, so the load goes up only on more reps than the top (plan, "Weights to
+      // return with"); otherwise week 1 starts at the same load.
+      next = doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), [range[0], range[1] + 1], step)?.load ?? lastLoad;
+    } else if (repOut) {
       const normal = last.filter((s) => s !== repOut).map((s) => s.reps);
       const before = lastLoggedWorkingLoad(sets, sessions, id, PLAN.startDate, slot.unit);
       const tapered = before != null && Number(repOut.load) >= before - 1e-9;

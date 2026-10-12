@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { SetRow } from "../data/types";
@@ -17,6 +17,7 @@ export function SessionPage() {
   const { local } = useStore();
   const sessions = useRows("sessions");
   const sets = useRows("sets");
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const exercises = useRows("exercises");
   const annotations = useRows("annotations");
   const session = sessions.find((s) => s.id === sessionId);
@@ -109,12 +110,22 @@ export function SessionPage() {
 
       {session.notes && <p className="s-notes">{session.notes}</p>}
 
-      {session.source === "app" && (
-        <button className="btn btn-plain s-delete"
-          onClick={async () => { await local.remove("sessions", [session.id]); navigate("/history"); }}>
-          Delete workout
-        </button>
-      )}
+      {session.source === "app" && (confirmDelete ? (
+        <div className="s-delete-confirm" role="group" aria-label="Delete this workout?">
+          <span>Delete this workout and the training max it set?</span>
+          <button className="btn btn-plain" onClick={() => setConfirmDelete(false)}>Keep</button>
+          <button className="btn btn-primary" onClick={async () => {
+            // Training maxes set from this session's sets go too, or the deleted session would still move the plan.
+            const ids = new Set(local.all("sets").filter((x) => x.session_id === session.id).map((x) => x.id));
+            const tms = local.all("training_maxes").filter((m) => m.source_set_id != null && ids.has(m.source_set_id)).map((m) => m.id);
+            if (tms.length) await local.remove("training_maxes", tms);
+            await local.remove("sessions", [session.id]);
+            navigate("/history");
+          }}>Delete</button>
+        </div>
+      ) : (
+        <button className="btn btn-plain s-delete" onClick={() => setConfirmDelete(true)}>Delete workout</button>
+      ))}
     </main>
   );
 }

@@ -6,12 +6,25 @@ import { PUSH_ORDER, TABLES, type Base, type TableName } from "./types";
 // Pull: fetch rows changed on the server since our cursor, per table, and merge (newer wins).
 
 export type SyncState =
-  | { kind: "idle"; lastSynced: string | null; pending: number }
+  | { kind: "idle"; lastSynced: string | null; pending: number; rejected?: Rejected[] }
   | { kind: "syncing"; pending: number }
   | { kind: "offline"; pending: number }
   | { kind: "error"; message: string; pending: number };
 
+/** A row the database refused (a constraint or type error). It is taken out of the outbox so it can't block the
+ *  rest; the badge shows it. */
+export interface Rejected { table: TableName; id: string; message: string; at: string }
+
+/** Tables with one row per day (unique index): a refused duplicate is merged into the server's row. */
+const NATURAL_KEY: Partial<Record<TableName, string[]>> = {
+  health_daily: ["date"], body_measurements: ["date", "kind"], nutrition_days: ["date"]
+};
+const SYSTEM_COLS = new Set(["id", "user_id", "created_at", "updated_at", "server_updated_at", "deleted_at", "source"]);
+
 const PAGE = 1000;
+
+/** A database answer about the data itself (Postgres SQLSTATE like 23505, or PostgREST PGRST…), not the network. */
+const isDataError = (e: { code?: string } | null) => !!e?.code && (/^[0-9A-Z]{5}$/.test(e.code) || e.code.startsWith("PGRST"));
 const OVERLAP_MS = 2 * 60 * 1000;
 
 export class Sync {
@@ -48,11 +61,16 @@ export class Sync {
     if (!navigator.onLine || this.disabled) return this.set({ kind: "offline", pending });
     this.set({ kind: "syncing", pending });
     try {
-      await this.push();
+      // A failed push must not stop the pull: the server may hold the row that fixes it (e.g. the Watch's sleep row).
+      let pushError: unknown = null;
+      try { await this.push(); } catch (e) { pushError = e; }
       await this.pull();
+      await this.reconcile();
+      if (pushError) throw pushError;
       const now = new Date().toISOString();
       await this.local.setMeta("lastSynced", now);
-      this.set({ kind: "idle", lastSynced: now, pending: (await this.local.outbox()).length });
+      const rejected = (await this.local.getMeta<Rejected[]>("rejected")) ?? [];
+      this.set({ kind: "idle", lastSynced: now, pending: (await this.local.outbox()).length, ...(rejected.length ? { rejected } : {}) });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       this.set({ kind: navigator.onLine ? "error" : "offline", message, pending: (await this.local.outbox()).length } as SyncState);
@@ -73,10 +91,23 @@ export class Sync {
       const entry = byTable.get(table);
       if (!entry) continue;
       const rows = [...entry.ids].map((id) => this.local.rawGet(table, id)).filter((r): r is Base => !!r);
+      const rejected: Rejected[] = [];
       for (let i = 0; i < rows.length; i += 500) {
         const chunk = rows.slice(i, i + 500).map(({ server_updated_at: _s, ...row }) => row);
         const { error } = await this.supabase.from(table).upsert(chunk, { onConflict: "id" });
-        if (error) throw new Error(`${table}: ${error.message}`);
+        if (!error) continue;
+        if (!isDataError(error)) throw new Error(`${table}: ${error.message}`);
+        // One bad row: send them one by one and set the bad ones aside.
+        for (const row of chunk) {
+          const one = await this.supabase.from(table).upsert([row], { onConflict: "id" });
+          if (one.error && !isDataError(one.error)) throw new Error(`${table}: ${one.error.message}`);
+          if (one.error) rejected.push({ table, id: row.id, message: one.error.message, at: new Date().toISOString() });
+        }
+      }
+      if (rejected.length) {
+        const before = (await this.local.getMeta<Rejected[]>("rejected")) ?? [];
+        await this.local.setMeta("rejected", [...before.filter((r) => !rejected.some((x) => x.id === r.id)), ...rejected].slice(-50));
+        console.warn("Sync: rows rejected by the database", rejected);
       }
       await this.local.clearOutbox(entry.keys);
     }
@@ -112,6 +143,30 @@ export class Sync {
         if (rows.length < PAGE) break;
       }
     }
+  }
+
+  /**
+   * A row refused as a duplicate of a day the server already has (e.g. sleep typed in by hand after the Watch sent
+   * that morning): once the server's row is here, copy what was typed onto it and drop the local duplicate.
+   */
+  private async reconcile() {
+    const rejected = (await this.local.getMeta<Rejected[]>("rejected")) ?? [];
+    if (!rejected.length) return;
+    const keep: Rejected[] = [];
+    for (const r of rejected) {
+      const key = NATURAL_KEY[r.table as keyof typeof NATURAL_KEY];
+      const mine = this.local.rawGet(r.table, r.id) as (Base & Record<string, unknown>) | undefined;
+      if (!mine) continue; // already gone
+      const twin = key && /duplicate key/i.test(r.message)
+        ? (this.local.all(r.table) as unknown as (Base & Record<string, unknown>)[]).find((x) => x.id !== mine.id && x.server_updated_at && key.every((k) => x[k] === mine[k]))
+        : undefined;
+      if (!twin) { keep.push(r); continue; }
+      const typed = Object.fromEntries(Object.entries(mine).filter(([k, v]) => v != null && !SYSTEM_COLS.has(k) && !key!.includes(k)));
+      await this.local.save(r.table, { ...typed, id: twin.id } as never);
+      await this.local.forget(r.table, mine.id);
+    }
+    await this.local.setMeta("rejected", keep);
+    if (keep.length !== rejected.length) await this.push();
   }
 
   private set(state: SyncState) {

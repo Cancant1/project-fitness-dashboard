@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { Exercise, PainCheck, SetRow } from "../data/types";
@@ -81,7 +81,8 @@ export function WorkoutPage() {
   const painNow = block ? painFor(sessionPain, block.exerciseId) : null;
 
   async function update(s: SetRow, patch: Partial<SetRow>) {
-    const next = { ...s, ...patch };
+    // Merge onto the stored row, not the rendered one: a blur save and the tick can land in the same tap.
+    const next = { ...(local.get("sets", s.id) ?? s), ...patch };
     // Timed sets keep minutes in load (as SessionPage shows them) and seconds in duration_s; no load_kg.
     const timed = next.unit === "min";
     await local.save("sets", {
@@ -90,9 +91,9 @@ export function WorkoutPage() {
     });
   }
 
-  async function toggle(s: SetRow) {
-    const done = !s.completed;
-    await update(s, { completed: done });
+  async function toggle(s: SetRow, extra: Partial<SetRow> = {}) {
+    const done = !(local.get("sets", s.id) ?? s).completed;
+    await update(s, { ...extra, completed: done });
     const ref = planRef(s);
     if (done && ref?.restSec) setRest({ until: Date.now() + ref.restSec * 1000, total: ref.restSec });
   }
@@ -439,7 +440,7 @@ function PainBanner({ pain }: { pain: PainNow }) {
 
 function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }: {
   block: Block; calibration: boolean; latest: Partial<Record<string, number>>; equipment: EquipmentProfile;
-  onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void>;
+  onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow, extra?: Partial<SetRow>) => Promise<void>;
 }) {
   const warmups = block.sets.filter((s) => s.kind === "warmup");
   const work = block.sets.filter((s) => s.kind !== "warmup");
@@ -472,7 +473,7 @@ function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }
         </section>
       )}
 
-      {repOut && <RepOutCard s={repOut} calibration={calibration} latest={latest} equipment={equipment} onUpdate={onUpdate} onToggle={onToggle} />}
+      {repOut && <RepOutCard key={repOut.id} s={repOut} calibration={calibration} latest={latest} equipment={equipment} onUpdate={onUpdate} onToggle={onToggle} />}
 
       {backoff.length > 0 && (
         <section className="wk-group" aria-label="Back-off sets">
@@ -511,38 +512,57 @@ function SetBadge({ s, effort }: { s: SetRow; effort: Effort | null }) {
   );
 }
 
-function SetLine({ s, effort, onUpdate, onToggle }: { s: SetRow; effort: Effort | null; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void> }) {
-  const [load, setLoad] = useState(s.load == null ? "" : String(s.load).replace(".", ","));
+const loadText = (v: number | null | undefined) => (v == null ? "" : String(v).replace(".", ","));
+/** Sets that need the reps he actually got: to failure, or a rep-out. The others are prescribed fixed reps. */
+const needsReps = (s: SetRow) => s.kind === "failure" || s.kind === "rep_out";
+
+function SetLine({ s, effort, onUpdate, onToggle }: { s: SetRow; effort: Effort | null; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow, extra?: Partial<SetRow>) => Promise<void> }) {
+  const [load, setLoad] = useState(loadText(s.load));
   const [reps, setReps] = useState(s.reps == null ? "" : String(s.reps));
-  useEffect(() => setLoad(s.load == null ? "" : String(s.load).replace(".", ",")), [s.load]);
-  useEffect(() => setReps(s.reps == null ? "" : String(s.reps)), [s.reps]);
+  const repsRef = useRef<HTMLInputElement>(null);
+  // Follow the stored value, but keep what he is typing ("82," is 82 until the 5 comes).
+  useEffect(() => setLoad((prev) => (parseDecimal(prev) === s.load ? prev : loadText(s.load))), [s.load]);
+  useEffect(() => setReps((prev) => (parseDecimal(prev) === s.reps ? prev : s.reps == null ? "" : String(s.reps))), [s.reps]);
   const label = setLabel(s);
+  // Saved as he types: on iPhone a tapped button doesn't take focus, so a blur save can't be relied on.
+  const onLoad = (v: string) => { setLoad(v); const n = parseDecimal(v); if (n != null && n !== s.load) void onUpdate(s, { load: n }); };
+  const onReps = (v: string) => {
+    setReps(v);
+    const n = v.trim() === "" ? null : parseDecimal(v);
+    if ((n != null || v.trim() === "") && n !== s.reps) void onUpdate(s, { reps: n == null ? null : Math.round(n) });
+  };
   return (
     <div className="set-grid">
       <SetBadge s={s} effort={effort} />
       <label className="mini-field">
         <span className="sr-only">Load</span>
-        <input inputMode="decimal" value={load} onChange={(e) => setLoad(e.target.value)} onBlur={() => void onUpdate(s, { load: parseDecimal(load) })} />
+        <input inputMode="decimal" value={load} onChange={(e) => onLoad(e.target.value)}
+          onBlur={() => { if (parseDecimal(load) == null) setLoad(loadText(s.load)); }} />
         <span className="field-suffix" style={{ fontSize: 13 }}>{unitLabel(s.unit)}</span>
       </label>
       <label className="mini-field">
         <span className="sr-only">Reps</span>
-        <input inputMode="numeric" value={reps} placeholder={s.target_reps ?? (s.kind === "failure" ? "max" : "")}
-          onChange={(e) => setReps(e.target.value)} onBlur={() => void onUpdate(s, { reps: parseDecimal(reps) })} />
+        <input ref={repsRef} inputMode="numeric" value={reps} placeholder={s.target_reps ?? (s.kind === "failure" ? "max" : "")}
+          onChange={(e) => onReps(e.target.value)} />
         <span className="field-suffix" style={{ fontSize: 13 }}>reps</span>
       </label>
       <button className="check" aria-pressed={s.completed} aria-label={`Set ${label} done`}
         onClick={async () => {
-          const r = parseDecimal(reps) ?? (s.target_reps ? parseDecimal(s.target_reps.split("–").pop() ?? "") : null);
-          if (!s.completed && r != null && s.reps == null) await onUpdate(s, { reps: r, load: parseDecimal(load) });
-          await onToggle(s);
+          if (s.completed) { await onToggle(s); return; }
+          let r = parseDecimal(reps);
+          if (r == null) {
+            // To failure or a rep-out: the reps are the result, so don't make them up. Ask for them.
+            if (needsReps(s)) { repsRef.current?.focus(); return; }
+            r = s.target_reps ? parseDecimal(s.target_reps.split("–").pop() ?? "") : null;
+          }
+          await onToggle(s, { reps: r == null ? null : Math.round(r), load: parseDecimal(load) ?? s.load });
         }}>{s.completed && <CheckIcon />}</button>
     </div>
   );
 }
 
 /** An isometric hold (wrist-ladder flare-up step): the hold in seconds with a countdown, or tick it off. */
-function TimedLine({ s, onUpdate, onToggle }: { s: SetRow; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void> }) {
+function TimedLine({ s, onUpdate, onToggle }: { s: SetRow; onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow, extra?: Partial<SetRow>) => Promise<void> }) {
   const ref = planRef(s);
   const sec = ref?.durationSec ?? s.duration_s ?? 30;
   const [until, setUntil] = useState<number | null>(null);
@@ -578,7 +598,7 @@ function TimedLine({ s, onUpdate, onToggle }: { s: SetRow; onUpdate: (s: SetRow,
 
 function RepOutCard({ s, calibration, latest, equipment, onUpdate, onToggle }: {
   s: SetRow; calibration: boolean; latest: Partial<Record<string, number>>; equipment: EquipmentProfile;
-  onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow) => Promise<void>;
+  onUpdate: (s: SetRow, p: Partial<SetRow>) => Promise<void>; onToggle: (s: SetRow, extra?: Partial<SetRow>) => Promise<void>;
 }) {
   const ref = planRef(s)!;
   const cap = ref.capReps;
@@ -630,18 +650,19 @@ function RepOutCard({ s, calibration, latest, equipment, onUpdate, onToggle }: {
         </span>
       </div>
       <button className={`btn ${s.completed ? "btn-glass" : "btn-warm"} btn-block`} style={{ marginBottom: 12 }}
-        onClick={async () => { await onUpdate(s, { reps }); if (!s.completed) await onToggle(s); }}>
+        onClick={async () => { if (s.completed) await onUpdate(s, { reps }); else await onToggle(s, { reps }); }}>
         {s.completed ? `Saved · ${s.reps} reps (tap to update)` : "Save Rep-out"}
       </button>
     </section>
   );
 }
 
-function PrimaryAction({ block, stopped, onToggle, onNext }: { block: Block; stopped: boolean; onToggle: (s: SetRow) => Promise<void>; onNext: () => void }) {
+function PrimaryAction({ block, stopped, onToggle, onNext }: { block: Block; stopped: boolean; onToggle: (s: SetRow, extra?: Partial<SetRow>) => Promise<void>; onNext: () => void }) {
   const next = block.sets.find((s) => !s.completed);
   if (!next || stopped) return <button className="btn btn-primary" style={{ flex: 1 }} onClick={onNext}>Next exercise</button>;
   if (next.kind === "rep_out" && planRef(next)?.mainLift) return <button className="btn btn-glass" style={{ flex: 1 }} disabled>Log the rep-out above</button>;
   const sec = planRef(next)?.durationSec;
+  if (needsReps(next) && next.reps == null) return <button className="btn btn-glass" style={{ flex: 1 }} disabled>Type the reps for set {next.set_no}</button>;
   const what = next.kind === "warmup" ? "warm-up" : next.kind === "timed" ? `hold ${next.set_no}` : next.kind === "backoff" ? "back-off" : `set ${next.set_no}`;
   const detail = next.kind === "timed"
     ? (sec != null ? ` · ${sec} s` : "")
@@ -764,6 +785,7 @@ function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
   const [notes, setNotes] = useState("");
   const [energy, setEnergy] = useState<Energy | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [saving, setSaving] = useState(false);
   const sets = blocks.flatMap((b) => b.sets).filter((s) => s.kind !== "warmup");
   const done = sets.filter((s) => s.completed).length;
   return (
@@ -803,7 +825,7 @@ function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
         <textarea rows={3} placeholder="How did it go? (optional)" value={notes} onChange={(e) => setNotes(e.target.value)}
           style={{ border: 0, background: "transparent", width: "100%", resize: "vertical", outline: "none" }} />
       </label>
-      <button className="btn btn-primary" onClick={() => void onFinish(notes.trim(), energy)}>Save Workout</button>
+      <button className="btn btn-primary" disabled={saving} onClick={async () => { if (saving) return; setSaving(true); try { await onFinish(notes.trim(), energy); } finally { setSaving(false); } }}>{saving ? "Saving…" : "Save Workout"}</button>
       {confirmDiscard
         ? <button className="btn btn-glass" style={{ color: "var(--bad)" }} onClick={() => void onDiscard()}>Discard — this removes the workout</button>
         : <button className="btn btn-plain" style={{ color: "var(--bad)" }} onClick={() => setConfirmDiscard(true)}>Discard workout…</button>}

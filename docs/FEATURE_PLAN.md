@@ -41,3 +41,5 @@ or a decision.
 - **Progress photos stored in the app:** private Supabase Storage bucket and a side-by-side compare.
 - **Connie's account** and import.
 - **A settings page:** equipment pins, goals, units, bodyweight goal, bedtime.
+- **After the plan (from 1 Mar 2027):** Today shows "Rest day" every day and the check-in "Too early" once the 20
+  weeks are over. Needs a "plan finished" state and the next block (found in the 12 Oct bug hunt).

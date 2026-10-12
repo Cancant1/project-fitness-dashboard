@@ -77,13 +77,15 @@ export class LocalStore {
         updated_at: now
       } as Tables[T];
     });
+    // Cache first: a second save to the same row in the same tick (blur, then the tick button) must merge onto this
+    // one, not onto the row as it was before.
+    for (const row of saved) this.cache.get(table)!.set(row.id, row);
     const tx = this.db.transaction([table, "outbox"], "readwrite");
     for (const row of saved) {
       void tx.objectStore(table).put(row);
       void tx.objectStore("outbox").add({ table, id: row.id } satisfies OutboxItem);
     }
     await tx.done;
-    for (const row of saved) this.cache.get(table)!.set(row.id, row);
     this.bump(table);
     return saved;
   }
@@ -125,6 +127,13 @@ export class LocalStore {
       this.bump(table);
     }
     return accepted.length;
+  }
+
+  /** Drop a row on this device only (never pushed): a local duplicate the server refused. */
+  async forget(table: TableName, id: string): Promise<void> {
+    await this.db.delete(table, id);
+    this.cache.get(table)!.delete(id);
+    this.bump(table);
   }
 
   async getMeta<T>(key: string): Promise<T | undefined> {

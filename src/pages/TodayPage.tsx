@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useToday } from "../lib/useToday";
 import { Link, useNavigate } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, parseDecimal, todayIso } from "../lib/format";
@@ -43,7 +44,7 @@ export function TodayPage() {
   const [busy, setBusy] = useState(false);
   const toast = useToast();
 
-  const today = todayIso();
+  const today = useToday();
   const program = activeProgram(programs);
   // Protein follows bodyweight (2.0 g/kg) on the plan's default target row; a no-op once done.
   useEffect(() => {
@@ -163,7 +164,8 @@ export function TodayPage() {
         break;
       } catch { continue; }
     }
-    return sessionDebrief({ sets: sessionSets, maxes: tms, keyOf, next: nextDay, nextDateLabel: label });
+    const calibration = (doneSession.legacy_ref as { plan?: { weekType?: string } } | null)?.plan?.weekType === "calibration";
+    return sessionDebrief({ sets: sessionSets, maxes: tms, keyOf, next: nextDay, nextDateLabel: label, calibration });
   }, [doneSession, prescription.state, sets, ids, maxes, today, program, plan, equipment]);
   const listDay = next?.day ?? day;
   const listLifts = listDay?.exercises.filter((e) => e.group !== "shoulder_care") ?? [];

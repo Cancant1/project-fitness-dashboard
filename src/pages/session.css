@@ -38,3 +38,6 @@
 
 .s-notes { font-size: 15px; color: var(--fg2); max-width: 680px; margin: 0 4px; white-space: pre-wrap; }
 .s-delete { align-self: center; height: 44px; color: var(--bad); font-size: 15px; font-weight: 500; opacity: 0.8; }
+.s-delete-confirm { align-self: stretch; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; font-size: 14px; color: var(--fg2); }
+.s-delete-confirm > span { flex: 1 1 180px; min-width: 0; }
+.s-delete-confirm .btn-primary { background: var(--bad); }

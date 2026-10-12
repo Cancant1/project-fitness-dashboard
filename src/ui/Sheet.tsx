@@ -10,7 +10,8 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   closeRef.current = onClose;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.focus();
+    // A field with autoFocus inside the sheet already has focus: leave it there.
+    if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     document.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
