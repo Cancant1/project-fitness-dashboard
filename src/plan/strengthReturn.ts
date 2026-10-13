@@ -162,7 +162,9 @@ const DAYS: ProgramDay[] = [
       isolation('bayesian_curl', failure(2, 8, 12), 40, 'lb', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.'],
         { elbowLoading: true, alternatives: ['preacher_curl'] }),
       isolation('overhead_cable_triceps_extension', failure(2, 12, 20), 20, 'lb', 'per_arm',
-        ['Rope or wrist cuff, no bar grip. Soft lockout.'],
+        ['Pulley at about shoulder height behind you; face away, elbow up beside your head, slight forward lean, one foot forward.',
+          'Hand drops behind your head for a full stretch, then extend up and slightly forward. Elbow stays pointing up.',
+          'Rope or wrist cuff, no bar grip. Soft lockout. Elbow complains in the stretch: drop the pulley to navel height.'],
         { elbowLoading: true, alternatives: ['cross_body_triceps_extension'] }),
       // R1-08 optional: +1 rear delt set paired with the flye, only after checkpoint 1 (extra-set weeks).
       isolation('cable_rear_delt_fly', failure(1, 12, 20), 30, 'lb', 'per_arm', ['Optional extra set (checkpoint 1 met). Cables crossed; keep it in the shoulders.'],
