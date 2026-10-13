@@ -16,6 +16,7 @@ export class LocalStore {
   private cache = new Map<TableName, Map<string, Base>>();
   private versions = new Map<TableName, number>();
   private listeners = new Set<Listener>();
+  private writeListeners = new Set<Listener>();
   readonly userId: string;
 
   constructor(userId: string) {
@@ -61,6 +62,12 @@ export class LocalStore {
     return () => this.listeners.delete(fn);
   }
 
+  /** Called only for writes made on this device (they need pushing), not for rows merged in from a pull. */
+  onWrite(fn: Listener): () => void {
+    this.writeListeners.add(fn);
+    return () => this.writeListeners.delete(fn);
+  }
+
   // ---- writing (from the UI)
 
   async save<T extends TableName>(table: T, rows: Partial<Tables[T]> | Partial<Tables[T]>[]): Promise<Tables[T][]> {
@@ -87,6 +94,7 @@ export class LocalStore {
     }
     await tx.done;
     this.bump(table);
+    for (const fn of this.writeListeners) fn();
     return saved;
   }
 
@@ -112,18 +120,23 @@ export class LocalStore {
     return this.cache.get(table)!.get(id);
   }
 
-  /** Merge rows pulled from the server. A local row with a newer updated_at is kept. */
+  /** Merge rows pulled from the server. A local row with a newer updated_at is kept, and a row we already hold
+   *  unchanged is skipped (so a re-read doesn't count as a change). */
   async merge(table: TableName, remote: Base[]): Promise<number> {
     const local = this.cache.get(table)!;
     const accepted = remote.filter((r) => {
       const mine = local.get(r.id);
-      return !mine || mine.updated_at <= r.updated_at;
+      if (!mine) return true;
+      // Compare as instants: the server writes "+00:00" where this device wrote "Z".
+      const [a, b] = [Date.parse(mine.updated_at), Date.parse(r.updated_at)];
+      return a < b || (a === b && mine.server_updated_at !== r.server_updated_at);
     });
     if (accepted.length) {
+      // Cache first, like save(): an edit made while this write is in flight must land on top, not be overwritten.
+      for (const row of accepted) local.set(row.id, row);
       const tx = this.db.transaction(table, "readwrite");
       for (const row of accepted) void tx.store.put(row);
       await tx.done;
-      for (const row of accepted) local.set(row.id, row);
       this.bump(table);
     }
     return accepted.length;

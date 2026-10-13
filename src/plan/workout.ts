@@ -75,7 +75,7 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
         legacy_ref: {
           plan: {
             exerciseKey: ex.exerciseKey, role: ex.role, mainLift: ex.mainLift, group: ex.group, target: p.target, pctTm: p.pctTm,
-            repRange: p.repRange, restSec: p.kind === "warmup" ? 60 : isLast ? ex.restSec : (ex.sets[i + 1]?.kind === "rep_out" ? ex.restBeforeRepOutSec ?? ex.restSec : ex.restSec),
+            repRange: p.repRange, restSec: restAfter(ex, i),
             note: p.note, effort: setEffort(ex, p),
             ...(p.capReps != null ? { capReps: p.capReps } : {}),
             ...(ex.pair ? { pair: ex.pair, pairLabel: ex.pairLabel } : {}),
@@ -88,6 +88,17 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
   }
   await local.save("sets", rows);
   return session!.id;
+}
+
+/** Rest after set i: the long rest before a rep-out or top set (also after the last warm-up), the deadlift ramp at
+ *  the slot's rest (2–3 min apart), other warm-ups 60 s. */
+function restAfter(ex: PrescribedExercise, i: number): number {
+  const p = ex.sets[i]!;
+  const next = ex.sets[i + 1];
+  if (!next) return ex.restSec;
+  if (next.kind === "rep_out" || next.kind === "top") return ex.restBeforeRepOutSec ?? ex.restSec;
+  if (p.kind === "warmup") return ex.mainLift === "deadlift" ? ex.restSec : 60;
+  return ex.restSec;
 }
 
 export interface MaxUpdate {

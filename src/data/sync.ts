@@ -4,6 +4,8 @@ import { PUSH_ORDER, TABLES, type Base, type TableName } from "./types";
 
 // Push: send the outbox (upsert; the database skips anything older than what it has).
 // Pull: fetch rows changed on the server since our cursor, per table, and merge (newer wins).
+// Egress is capped (free plan: 5 GB/month): a pull must not re-download rows it already has, and rows merged
+// from a pull must not trigger another sync. Both happened before 13 Oct 2026 and used 10 GB in two days.
 
 export type SyncState =
   | { kind: "idle"; lastSynced: string | null; pending: number; rejected?: Rejected[] }
@@ -24,7 +26,9 @@ const SYSTEM_COLS = new Set(["id", "user_id", "created_at", "updated_at", "serve
 const PAGE = 1000;
 
 /** A database answer about the data itself (Postgres SQLSTATE like 23505, or PostgREST PGRST…), not the network. */
-const isDataError = (e: { code?: string } | null) => !!e?.code && (/^[0-9A-Z]{5}$/.test(e.code) || e.code.startsWith("PGRST"));
+/** Only data errors (22xxx bad value, 23xxx constraint) — never auth/permission (42501, PGRST3xx): those must keep
+ *  the outbox, or a push with an expired session would throw away every unsynced edit. */
+const isDataError = (e: { code?: string } | null) => !!e?.code && /^2[23][0-9A-Z]{3}$/.test(e.code);
 const OVERLAP_MS = 2 * 60 * 1000;
 
 export class Sync {
@@ -116,10 +120,15 @@ export class Sync {
   private async pull() {
     for (const table of TABLES) {
       const saved = await this.local.getMeta<string>(`cursor:${table}`);
-      // Start a little before the saved cursor: a write that committed late can carry an older
-      // timestamp. Re-reading a few rows is harmless because merge() is idempotent.
-      let ts = saved ? new Date(Date.parse(saved) - OVERLAP_MS).toISOString() : "1970-01-01T00:00:00Z";
+      const savedId = await this.local.getMeta<string>(`cursorId:${table}`);
+      const overlapDone = await this.local.getMeta<string>(`overlapDone:${table}`);
+      // A write that committed late can carry a timestamp a little before our cursor, so look back once each time
+      // the cursor moves, then continue strictly after (cursor, id). Looking back on every sync re-downloaded a
+      // whole bulk import (14k sets in one minute) each time. No device clock involved: it may be wrong.
+      let ts = "1970-01-01T00:00:00Z";
       let id = "";
+      if (saved && overlapDone !== saved) ts = new Date(Date.parse(saved) - OVERLAP_MS).toISOString();
+      else if (saved) [ts, id] = [saved, savedId ?? ""];
       for (;;) {
         // Keyset paging on (server_updated_at, id): rows from one batch share a timestamp.
         const after = id
@@ -139,9 +148,13 @@ export class Sync {
         const last = rows[rows.length - 1]!;
         ts = last.server_updated_at!;
         id = last.id;
-        await this.local.setMeta(`cursor:${table}`, ts);
+        if (!saved || Date.parse(ts) >= Date.parse(saved)) {
+          await this.local.setMeta(`cursor:${table}`, ts);
+          await this.local.setMeta(`cursorId:${table}`, id);
+        }
         if (rows.length < PAGE) break;
       }
+      if (saved) await this.local.setMeta(`overlapDone:${table}`, saved);
     }
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { todayIso } from "./format";
 
 /**
@@ -19,4 +19,16 @@ export function useToday(): string {
     };
   }, []);
   return today;
+}
+
+/** A picked date that starts at today and, while it still shows today, moves along when the day rolls over. */
+export function useDayPick(today: string): [string, (d: string) => void] {
+  const [date, setDate] = useState(today);
+  const shownToday = useRef(today);
+  useEffect(() => {
+    if (shownToday.current === today) return;
+    setDate((d) => (d === shownToday.current ? today : d));
+    shownToday.current = today;
+  }, [today]);
+  return [date, setDate];
 }

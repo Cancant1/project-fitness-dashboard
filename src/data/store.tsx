@@ -32,12 +32,12 @@ export function StoreProvider({ userId, offline = false, children }: { userId: s
       window.clearTimeout(timer);
       timer = window.setTimeout(() => void sync.run(), 1500);
     };
-    const unsubscribe = local.subscribe(soon);
+    const unsubscribe = local.onWrite(soon);
     const onVisible = () => document.visibilityState === "visible" && void sync.run();
     const onOnline = () => void sync.run();
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
-    const interval = window.setInterval(() => void sync.run(), 60_000);
+    const interval = window.setInterval(() => document.visibilityState === "visible" && void sync.run(), 60_000);
     return () => {
       unsubscribe();
       document.removeEventListener("visibilitychange", onVisible);

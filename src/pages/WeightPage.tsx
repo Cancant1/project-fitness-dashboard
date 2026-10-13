@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useDayPick, useToday } from "../lib/useToday";
 import { useRows, useStore } from "../data/store";
-import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal, todayIso } from "../lib/format";
+import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal } from "../lib/format";
 import { KCAL_PER_KG_LEAN_BULK, adaptiveTdee, type Weigh } from "../lib/energy";
 import { TDEE_MIN_DAYS, photoStatus, saveSleep, saveWaist } from "../coach";
 import { useCoachData } from "../coach/hooks";
@@ -30,7 +31,7 @@ const monthYear = new Intl.DateTimeFormat("en-GB", { month: "short", year: "2-di
 export function WeightPage() {
   const { local } = useStore();
   const rows = useRows("body_measurements");
-  const today = todayIso();
+  const today = useToday();
   const [range, setRange] = useState<Range>("90");
   const [open, setOpen] = useState<WeighIn | null>(null);
   const toast = useToast();
@@ -146,7 +147,7 @@ export function WeightPage() {
 /** Compact weigh-in: date pill (default today, never in the future), kg field, optional hours slept, save. */
 function WeighInput({ weights, today, onSave }: { weights: WeighIn[]; today: string; onSave: (date: string, kg: number | null, sleepHours: number | null) => Promise<void> }) {
   const health = useRows("health_daily");
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useDayPick(today);
   const [text, setText] = useState("");
   const [sleep, setSleep] = useState("");
   const existing = weights.find((w) => w.date === date);
@@ -190,7 +191,7 @@ function BodyExtras({ today }: { today: string }) {
   const rows = useRows("body_measurements");
   const coach = useCoachData();
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(today);
+  const [date, setDate] = useDayPick(today);
   const [text, setText] = useState("");
   const waists = useMemo(
     () => rows.filter((r) => r.kind === "waist").map((r) => ({ date: r.date, cm: r.unit === "in" ? Number(r.value) * 2.54 : Number(r.value) })).sort((a, b) => a.date.localeCompare(b.date)),

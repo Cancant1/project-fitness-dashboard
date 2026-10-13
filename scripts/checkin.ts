@@ -120,7 +120,7 @@ function render(r: WeeklyReport): string {
   lines.push("");
   if (n.muscles.length) {
     lines.push("### Fractional sets per muscle", "", "| Muscle | Sets | Plan | Good weeks | % of good |", "|---|---|---|---|---|");
-    for (const m of n.muscles) lines.push(`| ${m.muscle} | ${m.sets.toFixed(1)} | ${m.plan} | ${m.good} | ${Math.round(m.pctOfGood)}% |`);
+    for (const m of n.muscles) lines.push(`| ${m.muscle} | ${m.sets.toFixed(1)} | ${m.plan} | ${m.good} | ${Math.round(m.pctOfGood * 100)}% |`);
     lines.push("");
   }
 
