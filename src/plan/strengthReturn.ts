@@ -81,19 +81,24 @@ const failure = (sets: number, min: number, max: number) => scheme(sets, min, ma
 const repOutLast = (sets: number, min: number, max: number) => scheme(sets, min, max, { lastSetRepOut: true });
 
 // Shoulder care block, Tue and Sat before the first main lift: not failure sets, 45–60 s rest, 3 s down.
+// Face pull dropped 13 Oct 2026 (DECISIONS; no specific evidence, K-FACEPULL). Its definition stays for history.
 const SHOULDER_BLOCK: ProgramSlot[] = [
   { exerciseKey: 'cable_external_rotation', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 12, 15),
     startLoad: 10, unit: 'lb', loadBasis: 'per_arm', // plan said 5 lb; the lightest pin is 10
     notes: ['Single pulley at elbow height, towel between elbow and ribs.', '3 s back. Not to failure.'] },
   { exerciseKey: 'prone_y_raise', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 10, 12),
     startLoad: 2, unit: 'kg', loadBasis: 'per_hand',
-    notes: ['Chest on a bench at 30–45°, thumbs up, arms in a Y. Lift from the lower shoulder blades, no shrug.'] },
+    notes: ['Adjustable bench at 30–45°. Lie face down on it, chest on the pad, chin just past the top, feet on the floor.',
+      'Arms hang straight down, a 2 kg dumbbell in each hand, thumbs pointing up.',
+      'Keep the arms straight and raise them forward and up into a Y (10 and 2 o’clock) until they line up with your body.',
+      'Start each rep by pulling the shoulder blades down and back. No shrug, neck long. 1 s at the top, 3 s down.',
+      'Right shoulder hurts near the top: stop just below that point.'] },
   { exerciseKey: 'cable_serratus_punch', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 12, 12),
     startLoad: 10, unit: 'lb', loadBasis: 'per_arm',
-    notes: ['Back to the pulley at chest height, arm straight; push the last few cm by sliding the shoulder blade.'] },
-  { exerciseKey: 'face_pull', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 15, 15),
-    startLoad: 30, unit: 'lb', loadBasis: 'total',
-    notes: ['High pulley. Pull toward your forehead, fists beside your ears.'] },
+    notes: ['One arm at a time. Single pulley at chest height; stand facing away from it, handle in one hand.',
+      'Arm straight out in front at shoulder height, elbow locked the whole time.',
+      'Reach the handle a few cm further forward by letting the shoulder blade slide around the ribs, then let it slide back.',
+      'Small movement. If your elbow bends, you are doing a press. 12 per arm.'] },
 ];
 
 const LATERAL = (sets: number, pair?: string): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
@@ -142,7 +147,7 @@ const DAYS: ProgramDay[] = [
   },
   {
     key: 'upper_a', weekday: 2, title: 'Upper A', focus: 'Press and pull-up day', kind: 'lifting', minutes: 80, minutesAlternating: 70,
-    notes: ['Lunch walk.', 'Shoulder care block first, about 10 minutes.'],
+    notes: ['Lunch walk.', 'Shoulder care block first, about 8 minutes.'],
     slots: [
       ...SHOULDER_BLOCK,
       main('incline_db_press', 'incline_db_press', 22.5, 'per_hand',
@@ -153,8 +158,8 @@ const DAYS: ProgramDay[] = [
         { restSec: 120, alternatives: ['chest_supported_db_row'] }),
       FLYE(),
       LATERAL(3),
-      // 50 lb = the plan's 23 kg
-      isolation('bayesian_curl', failure(2, 8, 12), 50, 'lb', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.'],
+      // Plan said 50 lb (23 kg); 13 Oct 2026 50 lb was too heavy on the return, 40 lb × 12, 12 (DECISIONS).
+      isolation('bayesian_curl', failure(2, 8, 12), 40, 'lb', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.'],
         { elbowLoading: true, alternatives: ['preacher_curl'] }),
       isolation('overhead_cable_triceps_extension', failure(2, 12, 20), 20, 'lb', 'per_arm',
         ['Rope or wrist cuff, no bar grip. Soft lockout.'],
@@ -202,7 +207,7 @@ const DAYS: ProgramDay[] = [
   },
   {
     key: 'upper_b', weekday: 6, title: 'Upper B', focus: 'Volume day', kind: 'lifting', minutes: 80, minutesAlternating: 70,
-    notes: ['Shoulder care block first, about 10 minutes.'],
+    notes: ['Shoulder care block first, about 8 minutes.'],
     slots: [
       ...SHOULDER_BLOCK,
       compound('barbell_row', repOutLast(3, 6, 10), 70, 'kg', 'total', ['Straps. Elbow flares: try an underhand grip.'],

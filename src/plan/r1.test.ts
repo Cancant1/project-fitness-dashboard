@@ -49,7 +49,7 @@ describe("E1 effort per exercise and set", () => {
   it("accessories: rep-out-last compounds controlled + max, isolation failure, shoulder block easy, wrist ladder care", () => {
     expect(efforts(ex(1, "lower_a", "romanian_deadlift"))).toEqual(["controlled", "controlled", "max"]);
     expect(ex(1, "lower_a", "cable_lateral_raise").effort).toBe("failure");
-    expect(ex(1, "upper_a", "face_pull").effort).toBe("easy");
+    expect(ex(1, "upper_a", "prone_y_raise").effort).toBe("easy");
     expect(ex(1, "lower_a", "wrist_extension").effort).toBe("care");
     expect(ex(0, "lower_a", "romanian_deadlift").effort).toBe("controlled"); // calibration: easy sets stop at the top of the range
     expect(ex(7, "lower_a", "cable_lateral_raise").effort).toBe("controlled"); // deload: not to failure

@@ -65,7 +65,7 @@ describe('days', () => {
 
   it('lists every exercise in plan order', () => {
     const order = (key: string) => P.days.find((d) => d.key === key)!.slots.map((s) => s.exerciseKey);
-    const shoulder = ['cable_external_rotation', 'prone_y_raise', 'cable_serratus_punch', 'face_pull'];
+    const shoulder = ['cable_external_rotation', 'prone_y_raise', 'cable_serratus_punch'];
     expect(order('lower_a')).toEqual(['squat', 'romanian_deadlift', 'lying_db_hamstring_curl', 'cable_leg_extension',
       'cable_calf_raise', 'kneeling_cable_crunch', 'cable_lateral_raise', 'cross_body_triceps_extension', 'wrist_extension']);
     expect(order('upper_a')).toEqual([...shoulder, 'incline_db_press', 'weighted_pullup', 'seated_cable_row',
@@ -101,7 +101,7 @@ describe('days', () => {
     expect(pick('lower_a', 'cable_lateral_raise')).toEqual([20, 'lb']);
     expect(pick('upper_a', 'seated_cable_row')).toEqual([100, 'lb']);
     expect(pick('upper_a', 'chest_cable_flye')).toEqual([50, 'lb']);
-    expect(pick('upper_a', 'bayesian_curl')).toEqual([50, 'lb']);
+    expect(pick('upper_a', 'bayesian_curl')).toEqual([40, 'lb']);
     expect(pick('upper_a', 'overhead_cable_triceps_extension')).toEqual([20, 'lb']);
     expect(pick('lower_b', 'bulgarian_split_squat')).toEqual([14, 'kg']);
     expect(pick('lower_b', 'hanging_knee_raise')).toEqual([0, 'bodyweight']);
