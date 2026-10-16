@@ -117,3 +117,7 @@
 .wk-last { margin-top: 8px; font-size: 14px; color: var(--fg2); font-variant-numeric: tabular-nums; }
 .wk-last-label { color: var(--fg); font-weight: 600; margin-right: 4px; }
 .wk-last-note { display: block; margin-top: 2px; font-style: italic; }
+
+/* Edit mode: the workout's duration */
+.wk-duration { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 4px; font-size: 15px; color: var(--fg2); }
+.wk-duration .mini-field { width: 112px; }

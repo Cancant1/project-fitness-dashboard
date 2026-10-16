@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
-import type { Exercise, PainCheck, SetRow } from "../data/types";
+import type { Exercise, PainCheck, Session, SetRow } from "../data/types";
 import { fmtNum, parseDecimal, toKg } from "../lib/format";
 import { STEP_RULES, incrementAfterRepOut, platesPerSide, trainingMaxAfterRepOut } from "../plan/engine";
 import { STACK_LABEL, STACK_OF, pinLabel, weightsFor } from "../plan/equipment";
@@ -132,6 +132,7 @@ export function WorkoutPage() {
       </header>
 
       <main className="page" style={{ paddingTop: 12, maxWidth: 640, paddingBottom: "calc(max(var(--safe-bottom), 12px) + 96px)" }}>
+        {editing && <DurationField session={session} />}
         {block ? (
           <>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "0 4px" }}>
@@ -211,6 +212,26 @@ export function WorkoutPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/** Edit mode: the workout's minutes, for when Finish was tapped late (or the workout was opened early). */
+function DurationField({ session }: { session: Session }) {
+  const { local } = useStore();
+  const [v, setV] = useState(session.duration_min == null ? "" : String(session.duration_min));
+  const onChange = (text: string) => {
+    setV(text);
+    const n = parseDecimal(text);
+    if (n != null && n > 0 && Math.round(n) !== session.duration_min) void local.save("sessions", { id: session.id, duration_min: Math.round(n) });
+  };
+  return (
+    <div className="wk-duration">
+      <label htmlFor="wk-duration">Duration</label>
+      <span className="mini-field">
+        <input id="wk-duration" inputMode="numeric" value={v} onChange={(e) => onChange(e.target.value)} />
+        <span className="field-suffix" style={{ fontSize: 13 }}>min</span>
+      </span>
     </div>
   );
 }

@@ -62,7 +62,8 @@ export function TrainPage() {
               <Link to={`/workout/${inProgress.id}`} className="btn tr-hero-btn"><PlayIcon /> Continue</Link>
             </Card>
           ) : next ? (
-            <NextHero next={next} ctx={ctx} today={today} onStartPlan={() => setConfirm(true)} onSetMax={askMax} />
+            <NextHero next={next} ctx={ctx} today={today} onStartPlan={() => setConfirm(true)} onSetMax={askMax}
+              onView={() => setPicking(next.day.key as LiftingDayKey)} />
           ) : (
             <Card className="tr-done"><span className="k-stat-label">Strength Return Plan</span><span className="tr-done-v">Complete</span></Card>
           )}
@@ -94,9 +95,9 @@ export function TrainPage() {
   );
 }
 
-/** The next planned workout: day, main lift and load, one button. */
-function NextHero({ next, ctx, today, onStartPlan, onSetMax }: {
-  next: NonNullable<ReturnType<typeof nextPlanned>>; ctx: PlanContext; today: string; onStartPlan: () => void; onSetMax: () => void;
+/** The next planned workout: day, main lift and load, one button; "View" shows every exercise without starting it. */
+function NextHero({ next, ctx, today, onStartPlan, onSetMax, onView }: {
+  next: NonNullable<ReturnType<typeof nextPlanned>>; ctx: PlanContext; today: string; onStartPlan: () => void; onSetMax: () => void; onView: () => void;
 }) {
   const day = tryDay(next.week.weekNo, next.day.key, ctx.preview, ctx.equipment, ctx.plan);
   const main = day ? headlineLifts(day)[0] : undefined;
@@ -108,6 +109,7 @@ function NextHero({ next, ctx, today, onStartPlan, onSetMax }: {
       <div className="tr-hero-top">
         <Pill tone="plain">{when}</Pill>
         <Pill tone="plain">Week {next.week.weekNo} · {TYPE_NAME[next.week.type]}</Pill>
+        <button type="button" className="tr-hero-view" onClick={onView}>View</button>
       </div>
       <div className="tr-hero-body">
         <div className="tr-hero-id">

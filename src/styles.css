@@ -253,6 +253,8 @@ p { margin: 0; }
   padding: 8px var(--gutter) calc(var(--safe-bottom) + 20px);
   display: flex; flex-direction: column; gap: 16px;
 }
+/* The sheet scrolls, its children don't shrink: a card (overflow hidden) would otherwise squeeze to fit and clip its list. */
+.sheet > * { flex-shrink: 0; }
 .sheet-grip { width: 36px; height: 5px; border-radius: 3px; background: var(--sep); margin: 4px auto 4px; }
 @media (min-width: 900px) {
   .sheet-backdrop { align-items: center; }
