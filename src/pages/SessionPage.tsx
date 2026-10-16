@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
 import type { SetRow } from "../data/types";
 import { fmtLongDate, fmtNum } from "../lib/format";
-import { countsForStrength, e1rm, isFlagged } from "../lib/analysis";
+import { compareSets, countsForStrength, e1rm, isFlagged } from "../lib/analysis";
 import { Card, PageHead, Stat } from "../ui/kit";
 import { ChevronLeft, PlayIcon } from "../ui/icons";
 import "./session.css";
@@ -24,7 +24,7 @@ export function SessionPage() {
   const names = useMemo(() => new Map(exercises.map((e) => [e.id, e.name])), [exercises]);
 
   const blocks = useMemo(() => {
-    const mine = sets.filter((s) => s.session_id === sessionId).sort((a, b) => a.exercise_position - b.exercise_position || a.set_no - b.set_no);
+    const mine = sets.filter((s) => s.session_id === sessionId).sort(compareSets);
     const out: { exerciseId: string; rows: typeof mine }[] = [];
     for (const s of mine) {
       const last = out[out.length - 1];
@@ -75,6 +75,9 @@ export function SessionPage() {
 
       {session.status === "in_progress" && (
         <Link className="btn btn-primary s-continue" to={`/workout/${session.id}`}><PlayIcon /> Continue workout</Link>
+      )}
+      {session.status === "completed" && session.source === "app" && (
+        <Link className="btn btn-tinted s-continue" to={`/workout/${session.id}`}>Edit workout</Link>
       )}
 
       <div className={`k-grid-${tiles.length === 4 ? 4 : tiles.length === 3 ? 3 : 2} s-tiles`}>

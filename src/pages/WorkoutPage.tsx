@@ -8,7 +8,8 @@ import { STACK_LABEL, STACK_OF, pinLabel, weightsFor } from "../plan/equipment";
 import { PLAN, activeProgram, equipmentFrom, latestMaxes, usePlan, usePlanIds } from "../plan/bridge";
 import { EFFORT_SHORT, EFFORT_TONE, effortLabel, loggedEffort } from "../plan/effort";
 import { duringScore, painAction, type PainAction } from "../plan/pain";
-import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef, type PlanSetRef } from "../plan/workout";
+import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef, saveEditedWorkout, type PlanSetRef } from "../plan/workout";
+import { compareSets } from "../lib/analysis";
 import type { Effort, EquipmentProfile, StepLiftKey } from "../plan/types";
 import { saveSessionEnergy, savePainCheck } from "../coach";
 import { Segmented } from "../ui/kit";
@@ -44,9 +45,12 @@ export function WorkoutPage() {
   const equipment = equipmentFrom(profiles[0]);
   const program = activeProgram(programs);
 
+  // Rows keep the order they had when they first showed, so a warm-up doesn't jump while its load is being typed.
+  const rank = useRef(new Map<string, number>());
   const blocks = useMemo<Block[]>(() => {
-    const mine = allSets.filter((s) => s.session_id === sessionId)
-      .sort((a, b) => a.exercise_position - b.exercise_position || kindOrder(a) - kindOrder(b) || a.set_no - b.set_no || a.created_at.localeCompare(b.created_at));
+    const mine = allSets.filter((s) => s.session_id === sessionId).sort(compareSets);
+    for (const s of mine) if (!rank.current.has(s.id)) rank.current.set(s.id, rank.current.size);
+    mine.sort((a, b) => a.exercise_position - b.exercise_position || rank.current.get(a.id)! - rank.current.get(b.id)!);
     const out: Block[] = [];
     for (const s of mine) {
       const last = out[out.length - 1];
@@ -73,6 +77,9 @@ export function WorkoutPage() {
 
   if (!session) return <main className="page"><p className="muted">This workout isn't on this device.</p></main>;
 
+  // A finished workout opens here to be edited: changes save as he types; Done keeps the end time and duration.
+  // (Not while the finish sheet is saving: the status flips to completed just before it navigates away.)
+  const editing = session.status === "completed" && !finishing;
   const elapsed = session.started_at ? Math.max(0, Math.floor((now - Date.parse(session.started_at)) / 1000)) : 0;
   const planInfo = (session.legacy_ref as { plan?: { weekType?: string; dayKey?: string } }).plan;
   const calibration = planInfo?.weekType === "calibration";
@@ -95,7 +102,7 @@ export function WorkoutPage() {
     const done = !(local.get("sets", s.id) ?? s).completed;
     await update(s, { ...extra, completed: done });
     const ref = planRef(s);
-    if (done && ref?.restSec) setRest({ until: Date.now() + ref.restSec * 1000, total: ref.restSec });
+    if (done && ref?.restSec && !editing) setRest({ until: Date.now() + ref.restSec * 1000, total: ref.restSec });
   }
 
   async function addSet(b: Block) {
@@ -107,15 +114,21 @@ export function WorkoutPage() {
   }
 
   const finishUpdates = () => maxUpdates(session, blocks.flatMap((b) => b.sets), ids, maxes, equipment, { painChecks });
+  async function doneEditing() {
+    await saveEditedWorkout(local, session!, blocks.flatMap((b) => b.sets), finishUpdates(), ids, program);
+    navigate(`/session/${session!.id}`, { replace: true });
+  }
+  const finish = () => (editing ? void doneEditing() : setFinishing(true));
 
   return (
     <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
       <header className="workout-top">
-        <button className="btn btn-glass btn-icon" aria-label="Minimise workout" onClick={() => navigate("/")}><ChevronDown /></button>
+        <button className="btn btn-glass btn-icon" aria-label={editing ? "Back to the workout" : "Minimise workout"}
+          onClick={() => (editing ? void doneEditing() : navigate("/"))}><ChevronDown /></button>
         <div className="workout-title glass">
-          <strong>{session.title}</strong><span className="dot" /><span className="num muted">{clock(elapsed)}</span>
+          <strong>{session.title}</strong><span className="dot" /><span className="num muted">{editing ? "Editing" : clock(elapsed)}</span>
         </div>
-        <button className="btn btn-glass btn-sm" style={{ height: 44, borderRadius: 22, color: "var(--accent-text)" }} onClick={() => setFinishing(true)}>Finish</button>
+        <button className="btn btn-glass btn-sm" style={{ height: 44, borderRadius: 22, color: "var(--accent-text)" }} onClick={finish}>{editing ? "Done" : "Finish"}</button>
       </header>
 
       <main className="page" style={{ paddingTop: 12, maxWidth: 640, paddingBottom: "calc(max(var(--safe-bottom), 12px) + 96px)" }}>
@@ -152,7 +165,7 @@ export function WorkoutPage() {
               <button className="btn btn-plain" disabled={i === 0} onClick={() => setIndex(i - 1)}><ChevronLeft /> Previous</button>
               {i < blocks.length - 1
                 ? <button className="btn btn-plain" onClick={() => setIndex(i + 1)}>Next: {blocks[i + 1]!.name.split(",")[0]} <ChevronRight /></button>
-                : <button className="btn btn-plain" onClick={() => setFinishing(true)}>Finish <ChevronRight /></button>}
+                : <button className="btn btn-plain" onClick={finish}>{editing ? "Done" : "Finish"} <ChevronRight /></button>}
             </div>
           </>
         ) : (
@@ -165,7 +178,7 @@ export function WorkoutPage() {
 
       <div className="workout-actions">
         <button className="btn btn-glass" style={{ padding: "0 20px", fontSize: 15 }} onClick={() => setPain(true)}>Pain check</button>
-        {block && <PrimaryAction block={block} stopped={painNow?.action === "stop"} onToggle={toggle} onNext={() => i < blocks.length - 1 ? setIndex(i + 1) : setFinishing(true)} />}
+        {block && <PrimaryAction block={block} stopped={painNow?.action === "stop"} onToggle={toggle} onNext={() => i < blocks.length - 1 ? setIndex(i + 1) : finish()} />}
       </div>
 
       {adding && (
@@ -200,10 +213,6 @@ export function WorkoutPage() {
       )}
     </div>
   );
-}
-
-function kindOrder(s: SetRow) {
-  return s.kind === "warmup" ? 0 : 1;
 }
 
 function clock(sec: number) {
@@ -453,15 +462,11 @@ function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }
   return (
     <>
       {warmups.length > 0 && (
-        <section className="list" aria-label="Warm-up">
-          {warmups.map((s, n) => (
-            <div className="row" key={s.id} style={{ color: s.completed ? "var(--fg2)" : "var(--fg)" }}>
-              <span className="row-sub" style={{ width: 64 }}>{n === 0 ? "Warm-up" : ""}</span>
-              <span className="num" style={{ flex: 1, textAlign: "right" }}>{s.unit === "bodyweight" && !s.load ? "BW" : `${fmtNum(s.load)} ${s.unit === "bodyweight" ? "+kg" : s.unit}`}</span>
-              <span className="num" style={{ width: 48, textAlign: "right" }}>× {s.reps}</span>
-              <button className="check" aria-pressed={s.completed} aria-label={`Warm-up set ${n + 1} done`} onClick={() => void onToggle(s)} style={{ marginLeft: 8 }}>{s.completed && <CheckIcon />}</button>
-            </div>
-          ))}
+        <section className="wk-group" aria-label="Warm-up">
+          <div className="wk-group-head"><span className="wk-group-title">Warm-up</span></div>
+          <div className="list">
+            {warmups.map((s) => <SetLine key={s.id} s={s} effort={null} onUpdate={onUpdate} onToggle={onToggle} />)}
+          </div>
         </section>
       )}
 
@@ -502,7 +507,7 @@ function plates(total: number, eq: EquipmentProfile) {
   return `Per side: ${p.perSide.length ? p.perSide.join(" + ") : "nothing"} · bar ${eq.barKg} kg${p.shortfallKg > 0 ? ` · ${fmtNum(p.shortfallKg)} kg short` : ""}`;
 }
 
-const setLabel = (s: SetRow) => (s.kind === "failure" ? "F" : s.kind === "rep_out" ? "R" : s.kind === "top" ? "T" : s.kind === "backoff" ? "B" : s.kind === "timed" ? "H" : String(s.set_no));
+const setLabel = (s: SetRow) => (s.kind === "warmup" ? "W" : s.kind === "failure" ? "F" : s.kind === "rep_out" ? "R" : s.kind === "top" ? "T" : s.kind === "backoff" ? "B" : s.kind === "timed" ? "H" : String(s.set_no));
 
 /** The set number as a small badge, tinted by how hard the set goes (E1). */
 function SetBadge({ s, effort }: { s: SetRow; effort: Effort | null }) {

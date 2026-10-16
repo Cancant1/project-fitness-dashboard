@@ -4,7 +4,7 @@ import { LocalStore } from "../data/local";
 import type { Exercise, Program } from "../data/types";
 import { prescribeDay } from "./engine";
 import { PLAN, ensurePlanExercises } from "./bridge";
-import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef, startFreeWorkout, startWorkout } from "./workout";
+import { addExerciseToSession, finishWorkout, maxUpdates, nextExercisePosition, planRef, saveEditedWorkout, startFreeWorkout, startWorkout } from "./workout";
 
 let n = 0;
 async function store(): Promise<LocalStore> {
@@ -100,6 +100,70 @@ describe("startWorkout (still works)", () => {
     expect(sets).toHaveLength(day.exercises.reduce((k, e) => k + e.sets.length, 0));
     expect(sets.every((s) => planRef(s) !== undefined)).toBe(true);
     expect(local.get("sessions", id)).toMatchObject({ program_id: program!.id, program_week_no: 1, title: "Lower A" });
+  });
+
+  it("numbers the warm-ups 1, 2, 3 so the ramp keeps its order", async () => {
+    const local = await store();
+    const ids = await ensurePlanExercises(local);
+    const [program] = await local.save("programs", {
+      name: "Strength Return Plan", start_date: "2026-10-12", weeks: 20, status: "active", rules: { key: "strength-return-2026" }, goals: [], notes: null
+    });
+    const day = prescribeDay(PLAN, 1, "lower_b", { trainingMaxes: { squat: 140, deadlift: 200 }, currentLoads: {} });
+    const id = await startWorkout(local, program as Program, day, ids, "2026-10-23");
+    const dl = local.all("sets").filter((s) => s.session_id === id && s.exercise_id === ids.get("deadlift"));
+    const warm = dl.filter((s) => s.kind === "warmup").sort((a, b) => a.set_no - b.set_no);
+    expect(warm.length).toBeGreaterThan(1);
+    expect(warm.map((s) => s.set_no)).toEqual(warm.map((_, k) => k + 1));
+    // The ramp goes up in prescription order.
+    expect(warm.map((s) => s.load)).toEqual([...warm.map((s) => s.load!)].sort((a, b) => a - b));
+  });
+});
+
+describe("saveEditedWorkout", () => {
+  const EQ = { barKg: 20, platesKg: [20, 10, 5, 2.5, 1.25], dumbbellRackKg: [20, 22.5, 25], cableStepLb: 5, cableStepKg: 2.5, beltStepKg: 2.5, barbellStepKg: 2.5 };
+
+  async function finishedDeadlift(reps: number) {
+    const local = await store();
+    const ids = await ensurePlanExercises(local);
+    const [program] = await local.save("programs", {
+      name: "Strength Return Plan", start_date: "2026-10-12", weeks: 20, status: "active", rules: { key: "strength-return-2026" }, goals: [], notes: null
+    });
+    const day = prescribeDay(PLAN, 0, "lower_b", { trainingMaxes: {}, currentLoads: {} });
+    const id = await startWorkout(local, program as Program, day, ids, "2026-10-16");
+    const all = local.all("sets").filter((s) => s.session_id === id);
+    await local.save("sets", all.map((s) => ({ id: s.id, completed: true, reps: s.kind === "rep_out" || s.kind === "top" ? reps : s.reps })));
+    const sets = () => local.all("sets").filter((s) => s.session_id === id);
+    const session = local.get("sessions", id)!;
+    await finishWorkout(local, session, sets(), maxUpdates(session, sets(), ids, local.all("training_maxes"), EQ), ids, program as Program);
+    const done = local.get("sessions", id)!;
+    return { local, ids, program: program as Program, id, sets, session: done };
+  }
+
+  it("a warm-up edit keeps the session's end, duration and training max as they were", async () => {
+    const { local, ids, program, id, sets, session } = await finishedDeadlift(12);
+    const before = local.all("training_maxes");
+    expect(before).toHaveLength(1);
+    const warm = sets().find((s) => s.kind === "warmup")!;
+    await local.save("sets", { id: warm.id, load: 60, load_kg: 60, reps: 5 });
+    await saveEditedWorkout(local, session, sets(), maxUpdates(session, sets(), ids, local.all("training_maxes"), EQ), ids, program);
+    expect(local.all("training_maxes")).toEqual(before);
+    expect(local.get("sessions", id)).toMatchObject({ status: "completed", ended_at: session.ended_at, duration_min: session.duration_min });
+    expect(local.get("sets", warm.id)).toMatchObject({ load: 60, reps: 5 });
+  });
+
+  it("a changed rep-out redoes the training max it set", async () => {
+    const { local, ids, program, sets, session } = await finishedDeadlift(12);
+    const [old] = local.all("training_maxes");
+    const top = sets().find((s) => planRef(s)?.mainLift === "deadlift" && (s.kind === "rep_out" || s.kind === "top"))!;
+    await local.save("sets", { id: top.id, reps: 8 });
+    const updates = maxUpdates(session, sets(), ids, local.all("training_maxes"), EQ);
+    await saveEditedWorkout(local, session, sets(), updates, ids, program);
+    const now = local.all("training_maxes");
+    expect(now).toHaveLength(1);
+    expect(now[0]!.id).not.toBe(old!.id);
+    expect(now[0]!.value_kg).toBe(updates[0]!.to);
+    expect(now[0]!.value_kg).toBeLessThan(old!.value_kg);
+    expect(now[0]!.source_set_id).toBe(top.id);
   });
 });
 

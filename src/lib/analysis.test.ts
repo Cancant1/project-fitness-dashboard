@@ -1,6 +1,6 @@
 import type { Session, SetRow } from "../data/types";
 import {
-  blockComparison, blockLabel, confidenceLabel, detectPRs, e1rm, fractionalVolume, goalValue, isFlagged, linearFit,
+  blockComparison, blockLabel, compareSets, confidenceLabel, detectPRs, e1rm, fractionalVolume, goalValue, isFlagged, linearFit,
   metricValue, monthIndex, monthFromIndex, monthlyAverages, monthlyBests, pearson, regainCurve, repBests, rolling7, runningBests, windowBest,
   sessionBests, weeklyCounts, workSets, worstConfidence, type WorkSet
 } from "./analysis";
@@ -32,6 +32,18 @@ describe("existing helpers", () => {
     expect(e1rm(100, 5)).toBeCloseTo(116.67, 2);
     expect(e1rm(100, 1)).toBe(100);
     expect(e1rm(100, 13)).toBeNull();
+  });
+});
+
+describe("compareSets", () => {
+  it("puts warm-ups first, lightest first when they share set_no 0, then the work by set number", () => {
+    // Friday 16 Oct 2026: three set_no-0 warm-ups came back as 130, 80, 100.
+    const top = set("s", "dl", 140, 12, { kind: "rep_out", set_no: 1 });
+    const w130 = set("s", "dl", 130, 1, { kind: "warmup", set_no: 0 });
+    const w80 = set("s", "dl", 80, 3, { kind: "warmup", set_no: 0 });
+    const w100 = set("s", "dl", 100, 2, { kind: "warmup", set_no: 0 });
+    const next = set("s", "bss", 14, 12, { exercise_position: 1, set_no: 1 });
+    expect([next, top, w130, w80, w100].sort(compareSets).map((s) => s.load_kg)).toEqual([80, 100, 130, 140, 14]);
   });
 });
 

@@ -64,12 +64,15 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
   const rows: Partial<SetRow>[] = [];
   for (const ex of day.exercises) {
     let n = 0;
+    let w = 0;
     ex.sets.forEach((p, i) => {
       if (p.kind !== "warmup") n += 1;
+      else w += 1;
       const isLast = i === ex.sets.length - 1;
       rows.push({
+        // Warm-ups are numbered too (1, 2, 3 before set 1), so the ramp keeps its order.
         session_id: session!.id, exercise_id: ids.get(ex.exerciseKey)!, exercise_position: ex.order,
-        set_no: p.kind === "warmup" ? 0 : n, kind: p.kind, load: p.load, unit: p.unit, load_kg: toKg(p.load, p.unit),
+        set_no: p.kind === "warmup" ? w : n, kind: p.kind, load: p.load, unit: p.unit, load_kg: toKg(p.load, p.unit),
         reps: p.reps, duration_s: null, rpe: null, target_reps: targetText(p), target_load: p.load, completed: false,
         flags: [], note: null, exercise_as_logged: ex.name,
         legacy_ref: {
@@ -180,13 +183,30 @@ export async function finishWorkout(local: LocalStore, session: Session, sets: S
     id: session.id, status: "completed", ended_at: ended.toISOString(),
     duration_min: Math.max(1, Math.round((ended.getTime() - started.getTime()) / 60000))
   });
-  if (updates.length) {
-    const sourceSet = (lift: string) => sets.find((s) => planRef(s)?.mainLift === lift && (s.kind === "rep_out" || s.kind === "top"))?.id ?? null;
-    await local.save("training_maxes", updates.map((u) => ({
-      exercise_id: ids.get(u.lift)!, program_id: program?.id ?? null, effective_date: session.date, value_kg: u.to,
-      reason: u.reason, source_set_id: sourceSet(u.lift), note: u.note ?? (u.from != null ? `from ${u.from}` : null)
-    })));
-  }
+  await saveMaxes(local, session, sets, updates, ids, program);
+}
+
+/**
+ * Edits to a finished workout: the session keeps its status, end time and duration. The training maxes (and next
+ * loads) it set are redone from the edited sets when they change; an edit that doesn't move them leaves them alone.
+ */
+export async function saveEditedWorkout(local: LocalStore, session: Session, sets: SetRow[], updates: MaxUpdate[], ids: Map<string, string>, program: Program | undefined) {
+  const setIds = new Set(sets.map((s) => s.id));
+  const mine = local.all("training_maxes").filter((m) => m.source_set_id != null && setIds.has(m.source_set_id));
+  const same = mine.length === updates.length
+    && updates.every((u) => mine.some((m) => m.exercise_id === ids.get(u.lift) && m.value_kg === u.to && m.reason === u.reason));
+  if (same) return;
+  if (mine.length) await local.remove("training_maxes", mine.map((m) => m.id));
+  await saveMaxes(local, session, sets, updates, ids, program);
+}
+
+async function saveMaxes(local: LocalStore, session: Session, sets: SetRow[], updates: MaxUpdate[], ids: Map<string, string>, program: Program | undefined) {
+  if (!updates.length) return;
+  const sourceSet = (lift: string) => sets.find((s) => planRef(s)?.mainLift === lift && (s.kind === "rep_out" || s.kind === "top"))?.id ?? null;
+  await local.save("training_maxes", updates.map((u) => ({
+    exercise_id: ids.get(u.lift)!, program_id: program?.id ?? null, effective_date: session.date, value_kg: u.to,
+    reason: u.reason, source_set_id: sourceSet(u.lift), note: u.note ?? (u.from != null ? `from ${u.from}` : null)
+  })));
 }
 
 // ---------- free workouts (no plan) ----------

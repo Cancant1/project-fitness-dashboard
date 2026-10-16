@@ -20,6 +20,17 @@ export function countsForStrength(s: SetRow): boolean {
   return s.completed && s.kind !== "warmup" && !isFlagged(s) && s.load_kg != null && s.reps != null;
 }
 
+/**
+ * Sets in session order: by exercise, warm-ups before the work, then set number. Warm-ups logged before Oct 2026 all
+ * have set_no 0, so a tie between warm-ups goes lightest first (a ramp only goes up).
+ */
+export function compareSets(a: SetRow, b: SetRow): number {
+  const warm = (s: SetRow) => (s.kind === "warmup" ? 0 : 1);
+  return a.exercise_position - b.exercise_position || warm(a) - warm(b) || a.set_no - b.set_no
+    || (a.kind === "warmup" && b.kind === "warmup" ? (a.load_kg ?? 0) - (b.load_kg ?? 0) : 0)
+    || a.created_at.localeCompare(b.created_at);
+}
+
 // ------------------------------------------------------------------ joined work sets
 
 export type Confidence = Session["date_confidence"];
