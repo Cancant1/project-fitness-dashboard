@@ -48,7 +48,11 @@ const EXERCISES: ExerciseDefinition[] = [
   { key: 'cable_rear_delt_fly', name: 'Cable rear delt fly', equipment: 'cable', muscles: ['rear_delts'] },
   { key: 'underhand_cable_curl', name: 'Underhand cable curl', equipment: 'cable', muscles: ['biceps'] },
   { key: 'reverse_grip_pushdown', name: 'Reverse-grip pushdown', equipment: 'cable', muscles: ['triceps'] },
-  // Not a default: an alternative to the underhand cable curl once the elbow is at 0–3 for 4 weeks (E23).
+  // Saturday's curl and pushdown from 17 Oct 2026 (DECISIONS): the straight-bar underhand versions bothered the
+  // pinky side of the right wrist. The two above stay for history and as alternatives.
+  { key: 'single_arm_cable_curl', name: 'Single-arm cable curl, D-handle', equipment: 'cable', muscles: ['biceps'] },
+  { key: 'rope_pushdown', name: 'Rope pushdown', equipment: 'cable', muscles: ['triceps'] },
+  // Not a default: an alternative to the Saturday cable curl once the elbow is at 0–3 for 4 weeks (E23).
   { key: 'incline_hammer_curl', name: 'Seated high-incline hammer curl', equipment: 'dumbbell', muscles: ['biceps', 'forearms'] },
 ];
 
@@ -213,8 +217,9 @@ const DAYS: ProgramDay[] = [
     slots: [
       ...SHOULDER_BLOCK,
       compound('barbell_row', repOutLast(3, 6, 10), 70, 'kg', 'total', ['Straps. Elbow flares: try an underhand grip.'],
-        { alternatives: ['chest_supported_db_row'] }),
-      compound('db_bench_press', repOutLast(3, 6, 10), 25, 'kg', 'per_hand', ['Neutral grip, soft lockout.'], { alternatives: ['db_floor_press'] }),
+        { warmup: true, alternatives: ['chest_supported_db_row'] }),
+      compound('db_bench_press', repOutLast(3, 6, 10), 25, 'kg', 'per_hand', ['Neutral grip, soft lockout.'],
+        { warmup: true, alternatives: ['db_floor_press'] }),
       compound('lat_pulldown', failure(2, 8, 12), 120, 'lb', 'total', ['Neutral handle, full stretch overhead.'],
         { restSec: 120, alternatives: ['single_arm_lat_pulldown'] }),
       FLYE(),
@@ -222,10 +227,14 @@ const DAYS: ProgramDay[] = [
       // June 40 lb −10% → 30 (no 35 pin)
       isolation('cable_rear_delt_fly', failure(2, 12, 20), 30, 'lb', 'per_arm', ['Cables crossed; keep it in the shoulders.'],
         { alternatives: ['prone_db_rear_delt_raise'] }),
-      isolation('underhand_cable_curl', failure(2, 8, 12), 40, 'lb', 'total', ['Replaces hammer curl.'],
-        { elbowLoading: true, alternatives: ['incline_hammer_curl', 'preacher_curl'] }),
-      isolation('reverse_grip_pushdown', failure(2, 12, 20), 80, 'lb', 'total', ['Replaces overhand pushdown. Soft lockout.'],
-        { elbowLoading: true, alternatives: ['rope_pushdown'] }),
+      // 17 Oct 2026: replaces the straight-bar underhand curl (40 lb × 13 two-handed → 20 lb per arm) and the
+      // reverse-grip pushdown (80 lb × 20; the rope starts a pin lower).
+      isolation('single_arm_cable_curl', failure(2, 8, 12), 20, 'lb', 'per_arm',
+        ['D-handle, one arm at a time. Let the wrist turn where it is comfortable: palm up or a little thumb-up.',
+          'Soft lockout at the bottom.'],
+        { elbowLoading: true, alternatives: ['underhand_cable_curl', 'incline_hammer_curl', 'preacher_curl'] }),
+      isolation('rope_pushdown', failure(2, 12, 20), 70, 'lb', 'total', ['Neutral grip; spread the rope at the bottom. Soft lockout.'],
+        { elbowLoading: true, alternatives: ['reverse_grip_pushdown'] }),
     ],
   },
   {
@@ -389,8 +398,8 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
       targets: [
         { dayKey: 'upper_a', exerciseKey: 'bayesian_curl' },
         { dayKey: 'upper_a', exerciseKey: 'overhead_cable_triceps_extension' },
-        { dayKey: 'upper_b', exerciseKey: 'underhand_cable_curl' },
-        { dayKey: 'upper_b', exerciseKey: 'reverse_grip_pushdown' },
+        { dayKey: 'upper_b', exerciseKey: 'single_arm_cable_curl' },
+        { dayKey: 'upper_b', exerciseKey: 'rope_pushdown' },
       ],
     },
     rearDelt: { muscles: ['rear_delts'], targets: [{ dayKey: 'upper_a', exerciseKey: 'cable_rear_delt_fly' }] },

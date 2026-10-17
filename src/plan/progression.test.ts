@@ -15,8 +15,8 @@ describe("progression from ticked sets", () => {
   });
   it("week 0: past the range top on every set → one step up", () => {
     const w = new World();
-    w.session(dayIn(0, "lower_a"), "lower_a", { reps: (e, p) => (e.exerciseKey === "cable_lateral_raise" && p.repRange ? p.repRange[1] + 2 : undefined) });
-    expect(w.data().state.currentLoads.cable_lateral_raise).toBeGreaterThan(20);
+    w.session(dayIn(0, "lower_a"), "lower_a", { reps: (e, p) => (e.exerciseKey === "lying_db_hamstring_curl" && p.repRange ? p.repRange[1] + 2 : undefined) });
+    expect(w.data().state.currentLoads.lying_db_hamstring_curl).toBeGreaterThan(25);
   });
   it("shoulder block: filled in at the range bottom, so a plain tick keeps the load", () => {
     const tue = prescribeDay(PLAN, 1, "upper_a", STATE);

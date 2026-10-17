@@ -176,7 +176,7 @@ export const HAMMER_CURL_AFTER_DAYS = 28;
 
 /**
  * E23: after 4 weeks of elbow pain at 0–3 (no elbow check at 4/10 or more, no old sharp/sore), offer the seated
- * high-incline hammer curl as an alternative to the underhand cable curl (info, with a swap action). Not a default.
+ * high-incline hammer curl as an alternative to Saturday's cable curl (info, with a swap action). Not a default.
  */
 function hammerCurlOffer(ctx: WeekCtx): Signal | null {
   const { data } = ctx;
@@ -187,10 +187,10 @@ function hammerCurlOffer(ctx: WeekCtx): Signal | null {
     && (Math.max(duringScore(p) ?? 0, Number(p.morning_score ?? 0)) >= PAIN_HOLD || p.next_morning === "sore"));
   if (bad) return null;
   const [lo, hi] = slot.scheme!.repRange;
-  return sig("joints.alternative.underhand_cable_curl", "joints", "info", "Incline hammer curl allowed",
-    `Elbow at 0–3/10 for 4 weeks: the ${swapLabel("incline_hammer_curl")} (start ${slot.startLoad} kg, ${lo}–${hi} reps) may replace the underhand cable curl on Saturday. Optional; back to the underhand curl if the elbow climbs past 3.`,
+  return sig("joints.alternative.single_arm_cable_curl", "joints", "info", "Incline hammer curl allowed",
+    `Elbow at 0–3/10 for 4 weeks: the ${swapLabel("incline_hammer_curl")} (start ${slot.startLoad} kg, ${lo}–${hi} reps) may replace the single-arm cable curl on Saturday. Optional; back to the cable curl if the elbow climbs past 3.`,
     ["J-ELBOW", "J-SWAPS", "P-EXERCISE"],
-    { action: { kind: "swap", exerciseKey: "underhand_cable_curl", to: "incline_hammer_curl", until: data.end, startLoad: slot.startLoad, unit: slot.unit } });
+    { action: { kind: "swap", exerciseKey: "single_arm_cable_curl", to: "incline_hammer_curl", until: data.end, startLoad: slot.startLoad, unit: slot.unit } });
 }
 
 /**

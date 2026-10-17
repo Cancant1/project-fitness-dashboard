@@ -29,6 +29,10 @@ interface Block {
 /** "warm" | "plain" | "accent" | "muted" for an effort. */
 const toneOf = (e: Effort) => EFFORT_TONE[e];
 
+/** "Do later" swaps an exercise with the next one; pairs (P-TIMESAVE) stay together, so not for those. */
+const canDoLater = (blocks: Block[], i: number): boolean =>
+  i < blocks.length - 1 && !blocks[i]!.ref?.pair && !blocks[i + 1]!.ref?.pair;
+
 export function WorkoutPage() {
   const { sessionId = "" } = useParams();
   const navigate = useNavigate();
@@ -113,6 +117,15 @@ export function WorkoutPage() {
     });
   }
 
+  // Machine taken: this exercise swaps places with the next one, so the screen shows the next exercise and the
+  // log keeps the order he actually lifted in. Tap again to push it further down.
+  async function doLater(b: Block, next: Block) {
+    await local.save("sets", [
+      ...b.sets.map((s) => ({ id: s.id, exercise_position: next.position })),
+      ...next.sets.map((s) => ({ id: s.id, exercise_position: b.position }))
+    ]);
+  }
+
   const finishUpdates = () => maxUpdates(session, blocks.flatMap((b) => b.sets), ids, maxes, equipment, { painChecks });
   async function doneEditing() {
     await saveEditedWorkout(local, session!, blocks.flatMap((b) => b.sets), finishUpdates(), ids, program);
@@ -131,7 +144,9 @@ export function WorkoutPage() {
         <button className="btn btn-glass btn-sm" style={{ height: 44, borderRadius: 22, color: "var(--accent-text)" }} onClick={finish}>{editing ? "Done" : "Finish"}</button>
       </header>
 
-      <main className="page" style={{ paddingTop: 12, maxWidth: 640, paddingBottom: "calc(max(var(--safe-bottom), 12px) + 96px)" }}>
+      {/* Tight spacing so one exercise (with the rest timer) fits a phone screen without scrolling; the bottom padding
+          is just the fixed action bar (56) plus 16. */}
+      <main className="page" style={{ paddingTop: 8, gap: 16, maxWidth: 640, paddingBottom: "calc(max(var(--safe-bottom), 12px) + 72px)" }}>
         {editing && <DurationField session={session} />}
         {block ? (
           <>
@@ -154,18 +169,23 @@ export function WorkoutPage() {
             <BlockSets block={block} calibration={calibration} latest={latest} equipment={equipment} onUpdate={update} onToggle={toggle} />
 
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="btn btn-glass btn-sm" onClick={() => void addSet(block)}><PlusIcon /> Add set</button>
+              {/* Short labels so the four buttons fit one line on a phone. */}
+              <button className="btn btn-glass btn-sm" aria-label="Add set" onClick={() => void addSet(block)}><PlusIcon /> Set</button>
               <ExerciseNotes block={block} />
               <ExerciseNote sessionId={session.id} date={session.date} exerciseId={block.exerciseId} name={block.name} />
-              <button className="btn btn-glass btn-sm" onClick={() => setAdding(true)}><PlusIcon /> Add exercise</button>
+              <button className="btn btn-glass btn-sm" aria-label="Add exercise" onClick={() => setAdding(true)}><PlusIcon /> Exercise</button>
             </div>
 
             {rest && rest.until > now && <RestTimer rest={rest} now={now} onAdd={() => setRest({ until: rest.until + 30_000, total: rest.total + 30 })} onSkip={() => setRest(null)} />}
 
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-              <button className="btn btn-plain" disabled={i === 0} onClick={() => setIndex(i - 1)}><ChevronLeft /> Previous</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <button className="btn btn-plain btn-icon" aria-label="Previous exercise" disabled={i === 0} onClick={() => setIndex(i - 1)}><ChevronLeft /></button>
+              {!editing && canDoLater(blocks, i) && <button className="btn btn-plain" style={{ flex: "none", whiteSpace: "nowrap" }} onClick={() => void doLater(blocks[i]!, blocks[i + 1]!)}>Do later</button>}
+              <span style={{ flex: 1 }} />
               {i < blocks.length - 1
-                ? <button className="btn btn-plain" onClick={() => setIndex(i + 1)}>Next: {blocks[i + 1]!.name.split(",")[0]} <ChevronRight /></button>
+                ? <button className="btn btn-plain" style={{ minWidth: 0 }} onClick={() => setIndex(i + 1)}>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Next: {blocks[i + 1]!.name.split(",")[0]}</span> <ChevronRight />
+                  </button>
                 : <button className="btn btn-plain" onClick={finish}>{editing ? "Done" : "Finish"} <ChevronRight /></button>}
             </div>
           </>
@@ -341,6 +361,7 @@ function EffortLine({ block }: { block: Block }) {
     <>
       <EffortTag effort={block.effort} text={effortLabel(block.effort, reps, ref?.capReps)} />
       {other && <EffortTag effort={other} text={`Last set · ${effortLabel(other)}`} />}
+      {ref?.aimReps != null && <p className="wk-eff-text">Next pin is a big jump: {ref.aimReps} reps on every set first.</p>}
     </>
   );
 }
@@ -909,10 +930,9 @@ function PinPicker({ block, onUpdate }: { block: Block; onUpdate: (s: SetRow, p:
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 6 }} aria-label="Weight stack">
       <span className="row-sub" style={{ margin: "0 4px" }}>Pins on {STACK_LABEL[stack]}</span>
-      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2 }}>
+      <div className="wk-pins">
         {shown.map((w) => (
-          <button key={w} className={`btn btn-sm ${Math.abs(w - current) < 1e-9 ? "btn-primary" : "btn-glass"}`}
-            style={{ flex: "none", minWidth: 64, height: 40 }}
+          <button key={w} className={`btn btn-sm ${Math.abs(w - current) < 1e-9 ? "btn-primary" : ""}`}
             aria-pressed={Math.abs(w - current) < 1e-9}
             onClick={() => void Promise.all(open.map((s) => onUpdate(s, { load: w, unit: "lb" })))}>
             {pinLabel(key, w)}

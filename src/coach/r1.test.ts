@@ -167,13 +167,13 @@ describe("E14 joints on a 0–10 scale", () => {
   });
   it("E23: 4 weeks of elbow pain at 0–3 → the incline hammer curl is offered (info), not after a 4/10", () => {
     const w = new World();
-    const s = get(weeklyReport(w.data(), 5, sunday(5)), "joints.alternative.underhand_cable_curl");
+    const s = get(weeklyReport(w.data(), 5, sunday(5)), "joints.alternative.single_arm_cable_curl");
     expect(s).toMatchObject({
-      status: "info", action: { kind: "swap", exerciseKey: "underhand_cable_curl", to: "incline_hammer_curl", until: "2027-02-28", startLoad: 12, unit: "kg" }
+      status: "info", action: { kind: "swap", exerciseKey: "single_arm_cable_curl", to: "incline_hammer_curl", until: "2027-02-28", startLoad: 12, unit: "kg" }
     });
-    expect(get(weeklyReport(w.data(), 3, sunday(3)), "joints.alternative.underhand_cable_curl")).toBeUndefined(); // < 4 weeks in
+    expect(get(weeklyReport(w.data(), 3, sunday(3)), "joints.alternative.single_arm_cable_curl")).toBeUndefined(); // < 4 weeks in
     w.pain("2026-11-10", "right_elbow", "bayesian_curl", { pain_score: 4 });
-    expect(get(weeklyReport(w.data(), 5, sunday(5)), "joints.alternative.underhand_cable_curl")).toBeUndefined();
+    expect(get(weeklyReport(w.data(), 5, sunday(5)), "joints.alternative.single_arm_cable_curl")).toBeUndefined();
   });
 });
 

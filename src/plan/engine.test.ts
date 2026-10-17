@@ -354,7 +354,7 @@ describe('week shapes', () => {
     expect(prescribeWeek(P, 15, STATE).map((d) => d.workingSetCount)).toEqual([13, 15, 0, 0, 10, 14, 0]);
     expect(ex(15, 'upper_b', 'cable_lateral_raise').sets).toHaveLength(2);
     expect(ex(15, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
-    expect(ex(15, 'upper_b', 'barbell_row').sets).toHaveLength(3);
+    expect(ex(15, 'upper_b', 'barbell_row').sets.filter((s) => s.kind !== 'warmup')).toHaveLength(3);
     expect(ex(15, 'upper_b', 'lat_pulldown').sets).toHaveLength(2);
     expect(ex(17, 'lower_a', 'squat').sets.at(-1)).toMatchObject({ load: 122.5, target: 4 });
   });
@@ -545,5 +545,16 @@ describe('§6.2 provisional training max', () => {
 
   it('later rep-outs move the TM by the table (nearest 2.5), however many reps', () => {
     expect(trainingMaxAfterRepOut(100, 15, { previous: 140, target: 10 })).toEqual({ tm: nextTrainingMax(140, 15, 10, 'nearest'), reason: 'rep_out', provisional: false });
+  });
+});
+
+describe('compound warm-ups (17 Oct 2026)', () => {
+  it('row and DB bench get ≈55% × 5 and ≈85% × 3 before the work sets; warm-ups are not working sets', () => {
+    const row = ex(1, 'upper_b', 'barbell_row');
+    expect(row.sets.filter((s) => s.kind === 'warmup').map((s) => [s.load, s.reps])).toEqual([[40, 5], [60, 3]]);
+    expect(row.sets[2]).toMatchObject({ kind: 'working', load: 70 });
+    const bench = ex(1, 'upper_b', 'db_bench_press');
+    expect(bench.sets.filter((s) => s.kind === 'warmup').map((s) => [s.load, s.reps])).toEqual([[12, 5], [20, 3]]);
+    expect(ex(1, 'upper_b', 'lat_pulldown').sets.some((s) => s.kind === 'warmup')).toBe(false);
   });
 });

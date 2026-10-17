@@ -2,7 +2,7 @@
 // and Sunday rounds.
 import { dayIn, World } from "../coach/testkit";
 import { planState, PLAN } from "./bridge";
-import { DEFAULT_EQUIPMENT, prescribeWeek } from "./engine";
+import { DEFAULT_EQUIPMENT, prescribeDay, prescribeWeek } from "./engine";
 
 function stateOf(w: World) {
   const t = w.tables;
@@ -32,10 +32,29 @@ describe("planState: accessories", () => {
     expect(stateOf(w).currentLoads.bulgarian_split_squat).toBe(16);
   });
 
-  it("failure isolation 5+ reps over the range top on every set → two pins up", () => {
+  it("failure isolation 5+ reps over the range top on every set → two steps up", () => {
     const w = new World();
-    w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? 25 : undefined) });
-    expect(stateOf(w).currentLoads.cable_lateral_raise).toBe(40); // 20 lb → 30 → 40 on the single pulley
+    w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p) => (ex.exerciseKey === "lying_db_hamstring_curl" && p.kind === "failure" ? 20 : undefined) });
+    expect(stateOf(w).currentLoads.lying_db_hamstring_curl).toBe(30); // 25 → 27.5 → 30 kg: +20%, under the cap
+  });
+
+  it("jump cap: never more than +25% at once; a coarser pin waits for top + 5 on every set", () => {
+    const at = (reps: number) => {
+      const w = new World();
+      w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? reps : undefined) });
+      return stateOf(w);
+    };
+    // 20 lb → 30 is +50%: top + 5 (25) earns one pin, not two.
+    expect(at(25).currentLoads.cable_lateral_raise).toBe(30);
+    expect(at(25).bigJump?.cable_lateral_raise).toBeUndefined();
+    // At the top but not top + 5: the load stays, with a note for the next session.
+    const s = at(22);
+    expect(s.currentLoads.cable_lateral_raise).toBe(20);
+    expect(s.bigJump?.cable_lateral_raise).toEqual({ next: 30, reps: 25 });
+    const lateral = prescribeDay(PLAN, 2, "lower_a", { ...s, trainingMaxes: { squat: 140, deadlift: 200 } }).exercises.find((e) => e.exerciseKey === "cable_lateral_raise")!;
+    expect(lateral.notes.join(" "))
+      .toContain("stay here until every set reaches 25 reps");
+    expect(lateral.sets.every((x) => x.kind === "warmup" || x.aimReps === 25)).toBe(true);
   });
 
   it("a deload session carries its load forward instead of stepping up", () => {

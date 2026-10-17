@@ -73,7 +73,7 @@ describe('days', () => {
     expect(order('lower_b')).toEqual(['deadlift', 'bulgarian_split_squat', 'seated_cable_leg_curl', 'cable_leg_extension',
       'cable_calf_raise', 'hanging_knee_raise', 'cable_lateral_raise', 'preacher_curl', 'wrist_extension']);
     expect(order('upper_b')).toEqual([...shoulder, 'barbell_row', 'db_bench_press', 'lat_pulldown', 'chest_cable_flye',
-      'cable_lateral_raise', 'cable_rear_delt_fly', 'underhand_cable_curl', 'reverse_grip_pushdown']);
+      'cable_lateral_raise', 'cable_rear_delt_fly', 'single_arm_cable_curl', 'rope_pushdown']);
   });
 
   it('has a definition for every slot exercise', () => {
@@ -108,7 +108,7 @@ describe('days', () => {
     expect(pick('lower_b', 'preacher_curl')).toEqual([40, 'lb']);
     expect(pick('upper_b', 'barbell_row')).toEqual([70, 'kg']);
     expect(pick('upper_b', 'lat_pulldown')).toEqual([120, 'lb']);
-    expect(pick('upper_b', 'reverse_grip_pushdown')).toEqual([80, 'lb']);
+    expect(pick('upper_b', 'rope_pushdown')).toEqual([70, 'lb']);
     expect(slot('upper_a', 'weighted_pullup').loadBasis).toBe('added');
     expect(slot('upper_a', 'incline_db_press').loadBasis).toBe('per_hand');
   });

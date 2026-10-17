@@ -121,3 +121,12 @@
 /* Edit mode: the workout's duration */
 .wk-duration { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 4px; font-size: 15px; color: var(--fg2); }
 .wk-duration .mini-field { width: 112px; }
+
+/* ---------------------------------------------------------------- pin picker (cable stacks) */
+
+/* Solid chips with room for their shadow: a scroller clips box-shadows, and glass (backdrop blur) inside one
+   rendered as a grey band on iOS. */
+.wk-pins { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 4px 12px; margin: -2px -4px -12px; }
+.wk-pins::-webkit-scrollbar { display: none; }
+.wk-pins > .btn { flex: none; min-width: 64px; height: 44px; border-radius: 22px; }
+.wk-pins > .btn:not(.btn-primary) { background: var(--surface); color: var(--fg); box-shadow: var(--elev); }

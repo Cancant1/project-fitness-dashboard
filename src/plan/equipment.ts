@@ -22,6 +22,8 @@ export const STACK_OF: Record<string, Stack> = {
   overhead_cable_triceps_extension: "single",
   reverse_grip_pushdown: "single",
   underhand_cable_curl: "single",
+  single_arm_cable_curl: "single",
+  rope_pushdown: "single",
   preacher_curl: "single",
   kneeling_cable_crunch: "single",
   cable_leg_extension: "single",

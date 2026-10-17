@@ -231,8 +231,8 @@ function Rest() {
 const SWAPS: [string, string, string][] = [
   ["Incline DB press", "Neutral grip, bench about 30°", "Neutral-grip DB bench, then DB floor press"],
   ["Overhead triceps extension", "Single-arm, rope or cuff, soft lockout", "Cross-body extension, then reverse-grip pushdown"],
-  ["Bar pushdown", "Reverse (underhand) grip", "Rope pushdown"],
-  ["Hammer curl", "Underhand cable curl", "Preacher curl"],
+  ["Bar pushdown", "Rope pushdown", "No swap: go lighter"],
+  ["Hammer curl", "Single-arm cable curl, D-handle", "Preacher curl"],
   ["Bayesian curl", "Keep, unless the front of the shoulder hurts", "Preacher curl in both curl slots"],
   ["Weighted pull-up", "Neutral grip", "Neutral-handle lat pulldown as the main lift"],
   ["Barbell or Pendlay row", "Keep, with straps", "Underhand grip, then neutral-handle seated cable row"],

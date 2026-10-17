@@ -322,6 +322,25 @@ export function failureProgression(lastSets: readonly LoggedSet[], repRange: rea
   return { load: steps ? stepLoad(load, step, 1, steps) : load, steps };
 }
 
+/** A load increase above this share of the current load is a big jump (single pulley 20 → 30 lb is +50%). */
+export const BIG_JUMP = 0.25;
+
+export const isBigJump = (from: number, to: number): boolean => from > 0 && to > from * (1 + BIG_JUMP) + 1e-9;
+
+/**
+ * Jump cap for accessories (DECISIONS 2026-10-17). An increase is never more than +25% at once. When one step is
+ * already more than that (coarse pins at a light load), the step waits until every set of the last session reached
+ * the range top + 5; until then the load stays and the reps keep climbing. Decreases and holds are left alone.
+ */
+export function capJump(lastLoad: number, next: number, lastSets: readonly LoggedSet[], repRange: readonly [number, number],
+  step: LoadSteps): number {
+  if (!isBigJump(lastLoad, next)) return next;
+  const one = stepLoad(lastLoad, step, 1);
+  if (!isBigJump(lastLoad, one)) return one;
+  const earned = lastSets.length > 0 && lastSets.every((s) => s.reps !== null && s.reps >= repRange[1] + OVERSHOOT_REPS);
+  return earned ? one : lastLoad;
+}
+
 export type ApreJump = 'plus7_5' | 'plus5' | 'plus1' | 'minus1' | 'same';
 
 /**
@@ -908,6 +927,8 @@ const HOLD_NOTE = 'Hold the load: pain was 4–5/10 last time. No increase until
 function painNotes(slot: ProgramSlot, ctx: SlotContext): string[] {
   const out: string[] = [];
   if (ctx.state.holdLoad?.[slot.exerciseKey]) out.push(HOLD_NOTE);
+  const big = ctx.state.bigJump?.[slot.exerciseKey];
+  if (big) out.push(`The next weight (${big.next} ${slot.unit}) is a big jump: stay here until every set reaches ${big.reps} reps.`);
   const f = activeCut(slot, ctx.date);
   if (f != null) out.push(`Sets cut by ${Math.round(f * 100) === 33 ? 'a third' : `${Math.round(f * 100)}%`}: morning pain rising two weeks running.`);
   return out;
@@ -966,15 +987,36 @@ function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): DraftExercise 
     return { kind: 'working', load, unit, reps: isShoulder ? scheme.repRange[0] : scheme.repRange[1], repRange, effort: plainEffort };
   });
 
+  const aim = ctx.state.bigJump?.[slot.exerciseKey]?.reps;
+  if (aim != null) for (const s of sets) s.aimReps = aim;
+  const ramp = slot.warmup && n > 0 ? compoundRamp(slot, load, ctx) : [];
   const shell = exerciseShell(slot, ctx);
   const ruleNote = !isShoulder && !slot.rehab ? ctx.rule.accessoryNote : undefined;
   const extraNote = ctx.extraSets > 0 && !slot.extraOnly ? `+${ctx.extraSets} ${ctx.extraSets === 1 ? 'set' : 'sets'} (checkpoint 1 met).` : undefined;
   return {
     ...shell,
-    sets,
+    sets: [...ramp, ...sets],
     ...(lastRepOut ? { restBeforeRepOutSec: shell.restSec } : {}),
     notes: [...shell.notes, ...(ruleNote ? [ruleNote] : []), ...(extraNote ? [extraNote] : []), ...(stopSign ? [stopSign] : []), ...painNotes(slot, ctx)],
   };
+}
+
+/**
+ * Warm-up for a compound that opens its pattern (17 Oct 2026, DECISIONS): ≈55% × 5 and ≈85% × 3 of the work load,
+ * the way Mario ramps his row (70 kg → 40, 60). Barbell to the nearest 10 kg (never the empty bar), dumbbells down
+ * to the rack. Steps that land on the work load or repeat are dropped. Warm-ups are not working sets.
+ */
+function compoundRamp(slot: ProgramSlot, load: number, ctx: SlotContext): DraftSet[] {
+  if (slot.unit !== 'kg' || load <= 0) return [];
+  const { profile } = ctx;
+  const barbell = ctx.program.exercises[slot.exerciseKey]?.equipment === 'barbell';
+  const out: DraftSet[] = [];
+  for (const [pct, reps] of [[0.55, 5], [0.85, 3]] as const) {
+    const x = barbell ? Math.round((load * pct) / 10) * 10 : dumbbellFloor(load * pct, profile.dumbbellRackKg);
+    if (x == null || x >= load - EPS || (barbell && x <= profile.barKg + EPS) || out.some((s) => Math.abs(s.load - x) < EPS)) continue;
+    out.push({ kind: 'warmup', load: x, unit: 'kg', reps, effort: 'easy' });
+  }
+  return out;
 }
 
 /**

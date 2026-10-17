@@ -94,6 +94,8 @@ export interface ProgramSlot {
   group?: 'shoulder_care';
   /** Curls, triceps extensions and pushdowns (E9): never two in one pair; stop-sign rule while the elbow is irritable. */
   elbowLoading?: boolean;
+  /** A compound that opens its pattern for the day: two warm-up sets (≈55% × 5, ≈85% × 3) before the work sets. */
+  warmup?: boolean;
   /** P-TIMESAVE pair id: slots of a day with the same id are done alternately (A, B). */
   pair?: string;
   /** Listed equivalents (exercise keys) for the deload variety swap (P-VARIETY, weeks 7 and 10). */
@@ -318,6 +320,8 @@ export interface PlanState {
   normalReps?: Partial<Record<StepLiftKey, number>>;
   /** E14: pain 4–5/10 last time → hold the load (planState already held it; the engine adds a note). */
   holdLoad?: Partial<Record<string, boolean>>;
+  /** Jump cap: the next step is more than +25%, so the load waits until every set reaches `reps` (engine note). */
+  bigJump?: Partial<Record<string, { next: number; reps: number }>>;
   /** E3 recalibration (≥ 4 weeks off): load of the next calibration rep-out (75% of the last TM). */
   recalibrate?: Partial<Record<TmLiftKey, number>>;
   /** E9: isolation that ends at the first stop sign instead of failure. */
@@ -369,6 +373,8 @@ export interface PrescribedSet {
   durationSec?: number;
   /** A calibration rep-out (week 0, or a recalibration after ≥ 4 weeks off): it sets the TM instead of moving it. */
   calibration?: boolean;
+  /** Jump cap: the next pin is a big jump, so every set aims for this many reps first. */
+  aimReps?: number;
 }
 
 export interface PrescribedExercise {

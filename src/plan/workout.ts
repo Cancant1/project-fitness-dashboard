@@ -28,6 +28,8 @@ export interface PlanSetRef {
   durationSec?: number;
   /** A calibration rep-out (week 0 or a recalibration): sets the TM instead of moving it. */
   calibration?: boolean;
+  /** Jump cap: every set aims for this many reps before the next (big) pin. */
+  aimReps?: number;
 }
 
 export function planRef(s: SetRow): PlanSetRef | undefined {
@@ -83,7 +85,8 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
             ...(p.capReps != null ? { capReps: p.capReps } : {}),
             ...(ex.pair ? { pair: ex.pair, pairLabel: ex.pairLabel } : {}),
             ...(p.durationSec != null ? { durationSec: p.durationSec } : {}),
-            ...(p.calibration ? { calibration: true } : {})
+            ...(p.calibration ? { calibration: true } : {}),
+            ...(p.aimReps != null ? { aimReps: p.aimReps } : {})
           } satisfies PlanSetRef
         }
       });
@@ -100,7 +103,11 @@ function restAfter(ex: PrescribedExercise, i: number): number {
   const next = ex.sets[i + 1];
   if (!next) return ex.restSec;
   if (next.kind === "rep_out" || next.kind === "top") return ex.restBeforeRepOutSec ?? ex.restSec;
-  if (p.kind === "warmup") return ex.mainLift === "deadlift" ? ex.restSec : 60;
+  if (p.kind === "warmup") {
+    if (ex.mainLift === "deadlift") return ex.restSec;
+    // A compound's own warm-up (row, DB bench): 90 s before the first work set.
+    return !ex.mainLift && next.kind !== "warmup" ? Math.min(ex.restSec, 90) : 60;
+  }
   return ex.restSec;
 }
 

@@ -8,7 +8,8 @@ import { isFlagged } from "../lib/analysis";
 import { todayIso } from "../lib/format";
 import { adjustmentState, adjustmentsOf, applyAdjustments } from "./adjustments";
 import {
-  apreNextLoad, doubleProgression, DEFAULT_EQUIPMENT, dumbbellFloor, failureProgression, progressionStep, roundBarbell,
+  apreNextLoad, capJump, doubleProgression, DEFAULT_EQUIPMENT, dumbbellFloor, failureProgression, isBigJump, OVERSHOOT_REPS,
+  progressionStep, roundBarbell, stepLoad,
   roundsNextWeek, stuckNormalReps, weekForDate
 } from "./engine";
 import { STRENGTH_RETURN_PLAN } from "./strengthReturn";
@@ -52,6 +53,9 @@ export const HISTORY_NAME: Record<string, string> = {
   cable_rear_delt_fly: "Rear Delt Fly",
   underhand_cable_curl: "Cable Curl",
   reverse_grip_pushdown: "Reverse-Grip Pushdown",
+  single_arm_cable_curl: "Single-Arm Cable Curl",
+  // His rope pushdowns (≈200 sets, to Jun 2025) are logged under "Triceps Pushdown".
+  rope_pushdown: "Triceps Pushdown",
   // Alternatives and swap targets with history (start loads, R1-17). The incline hammer curl's last logged
   // set (12 kg × 12, Sep 2026) is under "Hammer Curl".
   incline_hammer_curl: "Hammer Curl",
@@ -204,6 +208,7 @@ export function planState(args: {
   const keyOf = new Map([...ids].map(([k, id]) => [id, k]));
   const pain = (args.painChecks ?? []).filter((p) => !p.deleted_at);
   const hold = holdLoadState(pain, keyOf, completedPlan, sets);
+  const bigJump: NonNullable<PlanState["bigJump"]> = {};
   const wristKey = PLAN.wristLadder?.exerciseKey;
   let ladderLast: NonNullable<PlanState["wristLadder"]>["last"];
 
@@ -253,6 +258,15 @@ export function planState(args: {
     } else {
       next = doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
     }
+    // Jump cap (not the care block, whose loads are tiny and not reps-driven): at most +25% at once; a coarser step
+    // waits for top + 5 reps on every set.
+    if (slot.role !== "shoulder" && !slot.rehab) {
+      const logged = last.map((s) => ({ load: Number(s.load), reps: s.reps }));
+      const ownRange = slot.scheme?.repRange ?? range;
+      next = capJump(lastLoad, next, logged, ownRange, step);
+      const oneUp = stepLoad(lastLoad, step, 1);
+      if (Math.abs(next - lastLoad) < 1e-9 && isBigJump(lastLoad, oneUp)) bigJump[key] = { next: oneUp, reps: ownRange[1] + OVERSHOOT_REPS };
+    }
     // E14: pain 4–5/10 last time → no increase.
     currentLoads[key] = hold[key] ? Math.min(next, lastLoad) : next;
   }
@@ -288,6 +302,7 @@ export function planState(args: {
     ...(rounds !== undefined ? { sundayRounds: rounds } : {}),
     ...(Object.keys(normalReps).length ? { normalReps } : {}),
     ...(Object.keys(holdLoad).length ? { holdLoad } : {}),
+    ...(Object.keys(bigJump).length ? { bigJump } : {}),
     ...(Object.keys(recalibrate).length ? { recalibrate } : {}),
     ...(restart ? { restart } : {}),
     ...(effort ? { effort } : {}),
