@@ -65,7 +65,7 @@ describe('days', () => {
 
   it('lists every exercise in plan order', () => {
     const order = (key: string) => P.days.find((d) => d.key === key)!.slots.map((s) => s.exerciseKey);
-    const shoulder = ['cable_external_rotation', 'prone_y_raise', 'cable_serratus_punch'];
+    const shoulder = ['cable_external_rotation', 'cable_serratus_punch'];
     expect(order('lower_a')).toEqual(['squat', 'romanian_deadlift', 'lying_db_hamstring_curl', 'cable_leg_extension',
       'cable_calf_raise', 'kneeling_cable_crunch', 'cable_lateral_raise', 'cross_body_triceps_extension', 'wrist_extension']);
     expect(order('upper_a')).toEqual([...shoulder, 'incline_db_press', 'weighted_pullup', 'seated_cable_row',
