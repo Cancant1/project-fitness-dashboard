@@ -6,13 +6,13 @@ import { startFreeWorkout } from "../plan/workout";
 import type { LiftingDayKey } from "../plan/types";
 import { Card, Label, Pill, Segmented } from "../ui/kit";
 import { Sheet } from "../ui/Sheet";
-import { ChevronRight, PlayIcon, PlusIcon } from "../ui/icons";
+import { CheckIcon, ChevronRight, PlayIcon, PlusIcon } from "../ui/icons";
 import { SetMaxSheet, type Lift } from "./plan/MaxesPanel";
 import { StartPlanSheet } from "./plan/StartPlanSheet";
-import { DayBody, MINIMUM_LABEL, StartDay, StartOptions } from "./plan/WeekDetail";
+import { DayBody, LoggedDayBody, MINIMUM_LABEL, StartDay, StartOptions } from "./plan/WeekDetail";
 import { WeekRibbon } from "./plan/WeekRibbon";
 import {
-  DAY_SHORT, LIFTING_DAYS, TYPE_NAME, currentWeek, dayDef, fmtRange, headlineLifts, mainSummary, nextPlanned, shortName, tryDay, tryMinimum,
+  DAY_SHORT, LIFTING_DAYS, TYPE_NAME, currentWeek, dayDef, doneSession, fmtRange, headlineLifts, mainSummary, nextPlanned, shortName, tryDay, tryMinimum,
   usePlanContext, weekEnd, type PlanContext
 } from "./plan/planView";
 import "./plan/plan.css";
@@ -150,6 +150,8 @@ function DaySheet({ dayKey, initialWeek, ctx, onClose, onStartPlan, onSetMax }: 
   const week = ctx.plan.weeks[weekNo]!;
   const day = minimum ? tryMinimum(weekNo, dayKey, ctx.preview, ctx.equipment, ctx.plan) : tryDay(weekNo, dayKey, ctx.preview, ctx.equipment, ctx.plan);
   const now = currentWeek(todayIso(), ctx.plan);
+  const sessions = useRows("sessions");
+  const done = doneSession(sessions, ctx.program, weekNo, dayKey);
   return (
     <Sheet title={dayDef(dayKey).title} onClose={onClose}>
       <div className="tr-sheet-week">
@@ -157,15 +159,24 @@ function DaySheet({ dayKey, initialWeek, ctx, onClose, onStartPlan, onSetMax }: 
         <span className="k-muted">{TYPE_NAME[week.type]} · {fmtRange(week.startDate, weekEnd(week))}</span>
       </div>
       <WeekRibbon compact plan={ctx.plan} selected={weekNo} onSelect={setWeekNo} nowWeekNo={now?.week.weekNo ?? null} />
-      <div className="tr-sheet-mode">
-        <Segmented label="Session" value={mode} onChange={setMode}
-          options={[{ value: "full", label: "Full session" }, { value: "minimum", label: MINIMUM_LABEL }]} />
-      </div>
-      {day && day.kind === "lifting"
-        ? <div className="k-card tr-sheet-day"><DayBody day={day} ctx={ctx} /></div>
-        : <p className="k-muted">No lifting this week.</p>}
-      <StartDay weekNo={weekNo} dayKey={dayKey} ctx={ctx} onStartPlan={onStartPlan} onSetMax={onSetMax} primary minimum={minimum}
-        label={minimum ? `Start the minimum · week ${weekNo}` : `Start week ${weekNo}`} onStarted={onClose} />
+      {done ? (
+        <div className="k-card tr-sheet-day">
+          <div className="tr-sheet-done"><Pill tone="good"><CheckIcon /> Done</Pill><span className="k-muted">{fmtShortDate(done.date)}</span></div>
+          <LoggedDayBody session={done} plan={ctx.plan} />
+        </div>
+      ) : (
+        <>
+          <div className="tr-sheet-mode">
+            <Segmented label="Session" value={mode} onChange={setMode}
+              options={[{ value: "full", label: "Full session" }, { value: "minimum", label: MINIMUM_LABEL }]} />
+          </div>
+          {day && day.kind === "lifting"
+            ? <div className="k-card tr-sheet-day"><DayBody day={day} ctx={ctx} /></div>
+            : <p className="k-muted">No lifting this week.</p>}
+          <StartDay weekNo={weekNo} dayKey={dayKey} ctx={ctx} onStartPlan={onStartPlan} onSetMax={onSetMax} primary minimum={minimum}
+            label={minimum ? `Start the minimum · week ${weekNo}` : `Start week ${weekNo}`} onStarted={onClose} />
+        </>
+      )}
     </Sheet>
   );
 }

@@ -162,6 +162,22 @@ describe("Logger (Part U)", () => {
     expect(host.querySelector('.wk-setno[data-tone="accent"]')?.textContent).toBe("F");
   });
 
+  it("a done day shows the logged sets, not next time's loads", async () => {
+    const id = await startDay(1, "lower_a", STATE, "2026-10-19");
+    const squat = local.all("sets").filter((s) => s.session_id === id && planRef(s)?.exerciseKey === "squat" && s.kind !== "warmup");
+    for (const s of squat) await local.save("sets", { id: s.id, load: 95, load_kg: 95, reps: s.kind === "rep_out" ? 12 : 5, completed: true });
+    const session = local.all("sessions").find((s) => s.id === id)!;
+    await local.save("sessions", { id, status: "completed", ended_at: "2026-10-19T16:00:00Z", legacy_ref: session.legacy_ref });
+    await render(<TrainPage />, "/train");
+    await click([...host.querySelectorAll(".tr-tile")].find((b) => b.textContent?.includes("Lower A")));
+    const sheet = document.querySelector(".tr-sheet-day")!;
+    expect(sheet.textContent).toMatch(/Done/);
+    expect(sheet.textContent).toMatch(/5 · 5 · 5 · rep-out 12/);
+    expect(sheet.querySelector(".pl-main-load")?.textContent).toBe("95kg");
+    expect(button(/^Start week/)).toBeUndefined();
+    expect([...document.querySelectorAll("a")].some((a) => a.textContent === "Open workout")).toBe(true);
+  });
+
   it("no supersets (19 Oct 2026): the knee raise is a straight set with no A/B switch", async () => {
     const id = await startDay(1, "lower_b", STATE, "2026-10-23");
     await render(null, `/workout/${id}`);

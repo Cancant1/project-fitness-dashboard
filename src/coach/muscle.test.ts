@@ -73,13 +73,13 @@ describe("muscle.progress", () => {
 });
 
 describe("muscle.effort (§6.3)", () => {
-  it("every failure set ≥ hi + 5 → info, two steps next time", () => {
+  it("every failure set ≥ hi + 5 → info with the engine's next load (jump cap: one pin, not two)", () => {
     const at = (reps: number) => {
       const w = new World();
       w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? reps : undefined) });
       return get(weeklyReport(w.data(), 1, sunday(1)), "muscle.effort.cable_lateral_raise");
     };
-    expect(at(25)).toMatchObject({ status: "info", message: "Single-arm cable lateral raise: 25 reps is above the 12–20 range. The load jumps two steps next time." });
+    expect(at(25)).toMatchObject({ status: "info", message: "Single-arm cable lateral raise: 25 reps is above the 12–20 range. Next time 30 lb (from 20)." });
     expect(at(24)).toBeUndefined();
   });
 });

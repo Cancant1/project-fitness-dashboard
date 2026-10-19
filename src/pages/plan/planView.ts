@@ -3,7 +3,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 import { useRows } from "../../data/store";
-import type { Program, Session } from "../../data/types";
+import type { Program, Session, SetRow } from "../../data/types";
 import { addDays as addDaysIso, fmtNum, todayIso } from "../../lib/format";
 import { addDays, dayForDate, prescribeDay, prescribeMinimum, prescribeWeek, trainingMaxFromSet, weekForDate } from "../../plan/engine";
 import { PLAN, activeProgram, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../../plan/bridge";
@@ -118,6 +118,57 @@ export function doneSlots(sessions: Session[], program: Program | undefined): { 
     dates: new Set(mine.map((s) => s.date)),
     slots: new Set(mine.map((s) => `${s.program_week_no}:${(s.legacy_ref as { plan?: { dayKey?: string } }).plan?.dayKey ?? ""}`))
   };
+}
+
+/** The completed session logged for a plan week and day (the latest, if there are several). */
+export function doneSession(sessions: Session[], program: Program | undefined, weekNo: number, dayKey: DayKey): Session | undefined {
+  if (!program) return undefined;
+  return sessions
+    .filter((s) => s.status === "completed" && s.program_id === program.id && s.program_week_no === weekNo
+      && (s.legacy_ref as { plan?: { dayKey?: string } }).plan?.dayKey === dayKey)
+    .sort((a, b) => (b.ended_at ?? b.created_at).localeCompare(a.ended_at ?? a.created_at))[0];
+}
+
+export interface LoggedExercise {
+  position: number;
+  name: string;
+  main: boolean;
+  /** "5 · 5 · 5" (one load) or "80×10 · 85×8" (mixed loads); the rep-out is kept apart. */
+  scheme: string;
+  repOut: number | null;
+  /** The top working load, formatted. */
+  load: string;
+  loadValue: number | null;
+  unit: string;
+}
+
+/** What was actually logged in a session, one entry per exercise: completed non-warm-up sets only. */
+export function loggedExercises(sets: SetRow[], sessionId: string, plan: ProgramDefinition = PLAN): LoggedExercise[] {
+  const mine = sets.filter((s) => s.session_id === sessionId && s.kind !== "warmup" && s.completed)
+    .sort((a, b) => a.exercise_position - b.exercise_position || a.set_no - b.set_no);
+  const byPos = new Map<number, SetRow[]>();
+  for (const s of mine) byPos.set(s.exercise_position, [...(byPos.get(s.exercise_position) ?? []), s]);
+  const slots = plan.days.flatMap((d) => d.slots);
+  return [...byPos.entries()].map(([position, rows]) => {
+    const ref = (rows[0]!.legacy_ref as { plan?: { exerciseKey?: string; role?: string; mainLift?: MainLiftKey } }).plan;
+    const key = ref?.exerciseKey ?? "";
+    const def = plan.exercises[key];
+    const name = def ? shortName({ name: def.name, exerciseKey: key, mainLift: ref?.mainLift }) : (rows[0]!.exercise_as_logged ?? "Exercise").split(",")[0]!;
+    const basis = slots.find((s) => s.exerciseKey === key)?.loadBasis ?? "total";
+    const ro = rows.find((s) => s.kind === "rep_out");
+    const normal = rows.filter((s) => s !== ro);
+    const loads = [...new Set(rows.map((s) => s.load ?? 0))];
+    const repText = (s: SetRow) => (s.duration_s != null && s.reps == null ? `${s.duration_s} s` : String(s.reps ?? "–"));
+    const scheme = loads.length > 1
+      ? normal.map((s) => `${fmtNum(s.load ?? 0)}×${repText(s)}`).join(" · ")
+      : normal.map(repText).join(" · ");
+    const top = Math.max(...rows.map((s) => s.load ?? 0));
+    const unit = rows[0]!.unit;
+    return {
+      position, name, main: ref?.role === "main", scheme, repOut: ro?.reps ?? null,
+      load: fmtLoadShort(top, unit as PrescribedSet["unit"], basis), loadValue: rows[0]!.load == null ? null : top, unit
+    };
+  });
 }
 
 /** First lifting day from today on that isn't done yet. */

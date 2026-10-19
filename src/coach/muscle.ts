@@ -194,8 +194,13 @@ function effortSignals(ctx: WeekCtx): Signal[] {
       const name = exerciseLabel(data, slot.exerciseKey);
       const lowR = Math.min(...reps);
       const highR = Math.max(...reps);
+      // The engine decides the step (two steps, or one when the jump cap applies); quote its load, not a rule.
+      const load = Math.max(...sets.map((s) => s.load ?? 0));
+      const next = data.state.currentLoads[slot.exerciseKey];
+      const unit = slot.unit === "bodyweight" ? "" : ` ${slot.unit}`;
+      const tail = next != null && next > load ? ` Next time ${fmtLoad(next)}${unit} (from ${fmtLoad(load)}).` : " The load goes up next time.";
       out.push(sig(`muscle.effort.${slot.exerciseKey}`, "muscle", "info", `Above range: ${titleName(name)}`,
-        `${name}: ${lowR === highR ? lowR : `${lowR}–${highR}`} reps is above the ${lo}–${hi} range. The load jumps two steps next time.`,
+        `${name}: ${lowR === highR ? lowR : `${lowR}–${highR}`} reps is above the ${lo}–${hi} range.${tail}`,
         ["P-EFFORT", "P-PROG-DOUBLE"]));
     }
   }

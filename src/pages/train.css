@@ -46,6 +46,7 @@
 .tr-sheet-week { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 15px; }
 .tr-sheet-week-no { font-size: 20px; font-weight: 700; letter-spacing: -0.2px; }
 .tr-sheet-day { padding: 16px; }
+.tr-sheet-done { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 13px; }
 
 /* Recent: slim timeline */
 .tr-recent { padding: 6px 0; position: relative; }

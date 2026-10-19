@@ -9,11 +9,12 @@ import { VARIETY_NOTE } from "../../plan/strengthReturn";
 import { swapLabel } from "../../plan/swaps";
 import { startWorkout } from "../../plan/workout";
 import type { DayKey, Effort, PrescribedDay, PrescribedExercise, WeekType } from "../../plan/types";
+import type { Session } from "../../data/types";
 import { Card, Label, Pill } from "../../ui/kit";
 import { CheckIcon, ChevronDown, PlayIcon } from "../../ui/icons";
 import {
-  DAY_SHORT, dayDef, doneSlots, fmtLoadShort, fmtPct, fmtRest, mainSummary, rowSummary, shortName, tryDay, tryMinimum, weekDays,
-  type PlanContext
+  DAY_SHORT, dayDef, doneSession, fmtLoadShort, fmtPct, fmtRest, loggedExercises, mainSummary, rowSummary, shortName, tryDay, tryMinimum,
+  weekDays, type LoggedExercise, type PlanContext
 } from "./planView";
 
 /** The selected week: four lifting cards, the three conditioning days as chips, notes behind a disclosure. */
@@ -21,7 +22,6 @@ export function WeekDays({ weekNo, ctx, onSetMax }: { weekNo: number; ctx: PlanC
   const week = getWeek(ctx.plan, weekNo);
   const today = todayIso();
   const sessions = useRows("sessions");
-  const { slots } = doneSlots(sessions, ctx.program);
   const { days, error } = weekDays(weekNo, ctx);
   const lifting = days.filter((d) => dayDef(d.dayKey).kind === "lifting");
   const cardio = days.filter((d) => dayDef(d.dayKey).kind === "conditioning");
@@ -36,7 +36,7 @@ export function WeekDays({ weekNo, ctx, onSetMax }: { weekNo: number; ctx: PlanC
       {error && <Card className="pl-error"><span className="k-muted">{error}</span></Card>}
       <div className="pl-days">
         {lifting.map((d) => (
-          <DayCard key={d.dayKey} day={d} ctx={ctx} isToday={d.date === today} done={slots.has(`${weekNo}:${d.dayKey}`)} onSetMax={onSetMax} />
+          <DayCard key={d.dayKey} day={d} ctx={ctx} isToday={d.date === today} done={doneSession(sessions, ctx.program, weekNo, d.dayKey)} onSetMax={onSetMax} />
         ))}
       </div>
       {cardio.length > 0 && (
@@ -54,7 +54,7 @@ export function WeekDays({ weekNo, ctx, onSetMax }: { weekNo: number; ctx: PlanC
   );
 }
 
-function DayCard({ day, ctx, isToday, done, onSetMax }: { day: PrescribedDay; ctx: PlanContext; isToday: boolean; done: boolean; onSetMax: () => void }) {
+function DayCard({ day, ctx, isToday, done, onSetMax }: { day: PrescribedDay; ctx: PlanContext; isToday: boolean; done: Session | undefined; onSetMax: () => void }) {
   return (
     <Card className={`pl-day${isToday ? " is-today" : ""}`} aria-label={`${DAY_SHORT[day.weekday - 1]} ${day.title}`}>
       <div className="pl-day-head">
@@ -65,7 +65,8 @@ function DayCard({ day, ctx, isToday, done, onSetMax }: { day: PrescribedDay; ct
         {done ? <Pill tone="good"><CheckIcon /> Done</Pill>
           : day.kind === "lifting" && <span className="pl-day-sets"><b>{day.workingSetCount}</b> {day.workingSetCount === 1 ? "set" : "sets"}</span>}
       </div>
-      {day.kind === "lifting" ? <DayBody day={day} ctx={ctx} /> : <p className="k-muted pl-day-rest">No lifting</p>}
+      {done ? <LoggedDayBody session={done} plan={ctx.plan} />
+        : day.kind === "lifting" ? <DayBody day={day} ctx={ctx} /> : <p className="k-muted pl-day-rest">No lifting</p>}
       {day.kind === "lifting" && ctx.program && !done && (
         <StartOptions weekNo={day.weekNo} dayKey={day.dayKey} ctx={ctx} onSetMax={onSetMax} primary={isToday} />
       )}
@@ -146,6 +147,46 @@ export function DayBody({ day, ctx }: { day: PrescribedDay; ctx: PlanContext }) 
           {notes.length > 0 && <ul className="pl-notes">{notes.map((n) => <li key={n}>{n}</li>)}</ul>}
         </div>
       </details>
+    </div>
+  );
+}
+
+/**
+ * A done day shows what was logged, not a fresh prescription: after the session the engine state has already
+ * moved on (new TM, next loads), so re-prescribing would show next time's numbers on a finished day.
+ */
+export function LoggedDayBody({ session, plan }: { session: Session; plan: PlanContext["plan"] }) {
+  const sets = useRows("sets");
+  const rows = loggedExercises(sets, session.id, plan);
+  const mains = rows.filter((r) => r.main);
+  const rest = rows.filter((r) => !r.main);
+  const unitOf = (r: LoggedExercise) => (/ (kg|lb)$/.test(r.load) ? r.unit : "");
+  return (
+    <div className="pl-day-body" aria-label="Logged">
+      {mains.map((r) => (
+        <div key={r.position} className="pl-main">
+          <div className="pl-main-l">
+            <span className="pl-main-name">{r.name}</span>
+            <span className="pl-main-scheme">{r.scheme}{r.scheme && r.repOut != null ? " · " : ""}{r.repOut != null && <b>rep-out {r.repOut}</b>}</span>
+          </div>
+          <div className="pl-main-r">
+            <span className="pl-main-load">{r.load.replace(/ (kg|lb)$/, "")}{unitOf(r) && <small>{unitOf(r)}</small>}</span>
+          </div>
+        </div>
+      ))}
+      {rest.length > 0 && (
+        <div className="pl-rows">
+          {rest.map((r) => (
+            <div key={r.position} className="pl-row">
+              <span className="pl-row-name">{r.name}</span>
+              <span className="pl-row-scheme">{r.scheme}{r.repOut != null && <>{r.scheme ? " · " : ""}<i className="pl-ro-dot" title="Rep-out" />{r.repOut}</>}</span>
+              <span className="pl-row-load">{r.load}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {rows.length === 0 && <p className="k-muted">No sets logged.</p>}
+      <Link to={`/session/${session.id}`} className="btn btn-tinted pl-start">Open workout</Link>
     </div>
   );
 }
