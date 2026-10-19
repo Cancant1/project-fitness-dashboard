@@ -321,7 +321,8 @@ export interface PlanState {
   /** E14: pain 4–5/10 last time → hold the load (planState already held it; the engine adds a note). */
   holdLoad?: Partial<Record<string, boolean>>;
   /** Jump cap: the next step is more than +25%, so the load waits until every set reaches `reps` (engine note). */
-  bigJump?: Partial<Record<string, { next: number; reps: number }>>;
+  /** Jump cap: the next pin and the reps it waits for; `average` = the sets' average (not elbow work), else every set. */
+  bigJump?: Partial<Record<string, { next: number; reps: number; average?: boolean }>>;
   /** E3 recalibration (≥ 4 weeks off): load of the next calibration rep-out (75% of the last TM). */
   recalibrate?: Partial<Record<TmLiftKey, number>>;
   /** E9: isolation that ends at the first stop sign instead of failure. */
@@ -373,8 +374,10 @@ export interface PrescribedSet {
   durationSec?: number;
   /** A calibration rep-out (week 0, or a recalibration after ≥ 4 weeks off): it sets the TM instead of moving it. */
   calibration?: boolean;
-  /** Jump cap: the next pin is a big jump, so every set aims for this many reps first. */
+  /** Jump cap: the next pin is a big jump, so the sets aim for this many reps first. */
   aimReps?: number;
+  /** Jump cap: `aimReps` is the sets' average, not every set. */
+  aimAverage?: boolean;
 }
 
 export interface PrescribedExercise {

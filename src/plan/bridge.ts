@@ -259,13 +259,14 @@ export function planState(args: {
       next = doubleProgression(last.map((s) => ({ load: Number(s.load), reps: s.reps })), range, step)?.load ?? lastLoad;
     }
     // Jump cap (not the care block, whose loads are tiny and not reps-driven): at most +25% at once; a coarser step
-    // waits for top + 5 reps on every set.
+    // waits for top + 5 reps on average (elbow-loading moves: on every set).
     if (slot.role !== "shoulder" && !slot.rehab) {
       const logged = last.map((s) => ({ load: Number(s.load), reps: s.reps }));
       const ownRange = slot.scheme?.repRange ?? range;
-      next = capJump(lastLoad, next, logged, ownRange, step);
+      const average = !slot.elbowLoading;
+      next = capJump(lastLoad, next, logged, ownRange, step, { average });
       const oneUp = stepLoad(lastLoad, step, 1);
-      if (Math.abs(next - lastLoad) < 1e-9 && isBigJump(lastLoad, oneUp)) bigJump[key] = { next: oneUp, reps: ownRange[1] + OVERSHOOT_REPS };
+      if (Math.abs(next - lastLoad) < 1e-9 && isBigJump(lastLoad, oneUp)) bigJump[key] = { next: oneUp, reps: ownRange[1] + OVERSHOOT_REPS, average };
     }
     // E14: pain 4–5/10 last time → no increase.
     currentLoads[key] = hold[key] ? Math.min(next, lastLoad) : next;

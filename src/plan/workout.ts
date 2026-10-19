@@ -28,8 +28,10 @@ export interface PlanSetRef {
   durationSec?: number;
   /** A calibration rep-out (week 0 or a recalibration): sets the TM instead of moving it. */
   calibration?: boolean;
-  /** Jump cap: every set aims for this many reps before the next (big) pin. */
+  /** Jump cap: the sets aim for this many reps before the next (big) pin. */
   aimReps?: number;
+  /** Jump cap: `aimReps` is the sets' average, not every set. */
+  aimAverage?: boolean;
 }
 
 export function planRef(s: SetRow): PlanSetRef | undefined {
@@ -86,7 +88,8 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
             ...(ex.pair ? { pair: ex.pair, pairLabel: ex.pairLabel } : {}),
             ...(p.durationSec != null ? { durationSec: p.durationSec } : {}),
             ...(p.calibration ? { calibration: true } : {}),
-            ...(p.aimReps != null ? { aimReps: p.aimReps } : {})
+            ...(p.aimReps != null ? { aimReps: p.aimReps } : {}),
+            ...(p.aimAverage ? { aimAverage: true } : {})
           } satisfies PlanSetRef
         }
       });

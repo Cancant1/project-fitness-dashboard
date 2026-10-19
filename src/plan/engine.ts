@@ -329,16 +329,27 @@ export const isBigJump = (from: number, to: number): boolean => from > 0 && to >
 
 /**
  * Jump cap for accessories (DECISIONS 2026-10-17). An increase is never more than +25% at once. When one step is
- * already more than that (coarse pins at a light load), the step waits until every set of the last session reached
- * the range top + 5; until then the load stays and the reps keep climbing. Decreases and holds are left alone.
+ * already more than that (coarse pins at a light load), the step waits until the last session reached the range
+ * top + 5; until then the load stays and the reps keep climbing. Decreases and holds are left alone.
+ *
+ * "Reached" (DECISIONS 2026-10-19): the AVERAGE of the sets, because set 2 after a failure set always loses reps,
+ * so "every set" kept a lift stuck while set 1 kept climbing. Elbow-loading moves keep the strict every-set rule
+ * (`average: false`): a +50% pin on a sore elbow waits for every set.
  */
 export function capJump(lastLoad: number, next: number, lastSets: readonly LoggedSet[], repRange: readonly [number, number],
-  step: LoadSteps): number {
+  step: LoadSteps, opts: { average?: boolean } = {}): number {
   if (!isBigJump(lastLoad, next)) return next;
   const one = stepLoad(lastLoad, step, 1);
   if (!isBigJump(lastLoad, one)) return one;
-  const earned = lastSets.length > 0 && lastSets.every((s) => s.reps !== null && s.reps >= repRange[1] + OVERSHOOT_REPS);
-  return earned ? one : lastLoad;
+  return bigJumpEarned(lastSets, repRange, opts.average ?? true) ? one : lastLoad;
+}
+
+/** The jump-cap test: every set, or the average of the sets, at the range top + 5. Unlogged reps count as 0. */
+export function bigJumpEarned(lastSets: readonly LoggedSet[], repRange: readonly [number, number], average: boolean): boolean {
+  if (lastSets.length === 0) return false;
+  const aim = repRange[1] + OVERSHOOT_REPS;
+  if (!average) return lastSets.every((s) => s.reps !== null && s.reps >= aim);
+  return lastSets.reduce((t, s) => t + (s.reps ?? 0), 0) / lastSets.length >= aim - 1e-9;
 }
 
 export type ApreJump = 'plus7_5' | 'plus5' | 'plus1' | 'minus1' | 'same';
@@ -928,7 +939,7 @@ function painNotes(slot: ProgramSlot, ctx: SlotContext): string[] {
   const out: string[] = [];
   if (ctx.state.holdLoad?.[slot.exerciseKey]) out.push(HOLD_NOTE);
   const big = ctx.state.bigJump?.[slot.exerciseKey];
-  if (big) out.push(`The next weight (${big.next} ${slot.unit}) is a big jump: stay here until every set reaches ${big.reps} reps.`);
+  if (big) out.push(`The next weight (${big.next} ${slot.unit}) is a big jump: stay here until ${big.average ? `your sets average ${big.reps} reps` : `every set reaches ${big.reps} reps`}.`);
   const f = activeCut(slot, ctx.date);
   if (f != null) out.push(`Sets cut by ${Math.round(f * 100) === 33 ? 'a third' : `${Math.round(f * 100)}%`}: morning pain rising two weeks running.`);
   return out;
@@ -988,7 +999,8 @@ function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): DraftExercise 
   });
 
   const aim = ctx.state.bigJump?.[slot.exerciseKey]?.reps;
-  if (aim != null) for (const s of sets) s.aimReps = aim;
+  const aimAverage = !!ctx.state.bigJump?.[slot.exerciseKey]?.average;
+  if (aim != null) for (const s of sets) Object.assign(s, { aimReps: aim }, aimAverage ? { aimAverage } : {});
   const ramp = slot.warmup && n > 0 ? compoundRamp(slot, load, ctx) : [];
   const shell = exerciseShell(slot, ctx);
   const ruleNote = !isShoulder && !slot.rehab ? ctx.rule.accessoryNote : undefined;
