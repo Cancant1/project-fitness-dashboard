@@ -125,7 +125,7 @@ describe('days', () => {
 
   it('records the session lengths', () => {
     const len = (k: string) => { const d = P.days.find((x) => x.key === k)!; return [d.minutes, d.minutesAlternating]; };
-    expect([len('lower_a'), len('upper_a'), len('lower_b'), len('upper_b')]).toEqual([[75, 65], [80, 70], [70, 60], [80, 70]]);
+    expect([len('lower_a'), len('upper_a'), len('lower_b'), len('upper_b')]).toEqual([[75, undefined], [80, undefined], [70, undefined], [80, undefined]]); // no supersets (19 Oct 2026)
   });
 });
 

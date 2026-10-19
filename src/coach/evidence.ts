@@ -22,7 +22,7 @@ export const EVIDENCE = {
   "P-ADHERENCE": "Showing up decides the block: the floor is 2 sessions; a missed week is not repeated (it counts as a deload); 2–3 weeks off: TM −5%; 4+: recalibrate.",
   "P-EXTRASETS": "Checkpoint 1 met: +2 biceps and +2 triceps sets a week (one more set on each arm exercise on Tue and Sat); optional +1 rear delt set.",
   "P-MINIMUM": "A ~30-min minimum session (main-lift rep-out + one hard set of 2 accessories) counts as the day's session.",
-  "P-TIMESAVE": "Isolation work in pairs (never two elbow-loading moves together): 45–60 s between, 75 s after the pair.",
+  "P-TIMESAVE": "Straight sets, no supersets. Short day (past 80 min): the last 2 sets of one cable isolation become 1 drop set.",
   "P-RESTART": "After ≥10 days off the rep-out is capped at target + 2; the first week after ≥2 weeks has no failure or extra sets; missed sets are gone.",
   "P-VARIETY": "At the deloads (weeks 7 and 10) up to 2 accessories may be swapped for a listed equivalent.",
   "P-HABITS": "Habits: sessions first, never miss twice, come back within 48 h, 6 weeks at 4+ sessions; if-then plans for bad days.",

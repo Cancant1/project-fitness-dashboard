@@ -72,7 +72,7 @@ describe("E1 effort per exercise and set", () => {
     expect(loggedEffort("backoff", { exerciseKey: "deadlift" })).toBe("controlled");
     expect(loggedEffort("working", null)).toBe("controlled");
   });
-  it("startWorkout writes the resolved effort, pair and cap into each set's plan ref", async () => {
+  it("startWorkout writes the resolved effort and cap into each set's plan ref", async () => {
     const local = new LocalStore(`r1-${Date.now()}-a`);
     await local.open();
     const ids = await ensurePlanExercises(local);
@@ -82,10 +82,10 @@ describe("E1 effort per exercise and set", () => {
     const sets = local.all("sets").filter((s) => s.session_id === id);
     const flye = sets.filter((s) => planRef(s)?.exerciseKey === "chest_cable_flye");
     expect(planRef(flye[0]!)).toMatchObject({ effort: "failure" });
-    expect(planRef(flye[0]!)?.pair).toBeUndefined(); // 12 Oct: no cable+cable pairs
     const monId = await startWorkout(local, program as Program, prescribeDay(PLAN, 1, "lower_a", STATE), ids, "2026-10-19");
     const ham = local.all("sets").find((s) => s.session_id === monId && planRef(s)?.exerciseKey === "lying_db_hamstring_curl")!;
-    expect(planRef(ham)).toMatchObject({ effort: "failure", pair: "mon_1", pairLabel: "A", restSec: 50 });
+    expect(planRef(ham)).toMatchObject({ effort: "failure", restSec: 90 });
+    expect(planRef(ham)?.pair).toBeUndefined(); // 19 Oct 2026: no supersets
     const repOut = sets.find((s) => planRef(s)?.exerciseKey === "incline_db_press" && s.kind === "rep_out")!;
     expect(planRef(repOut)).toMatchObject({ effort: "max", capReps: 10, target: 8 });
     expect(repOut.target_reps).toBe("8–10");
@@ -297,13 +297,9 @@ describe("E10 triceps ranges 12–20", () => {
 });
 
 describe("E11 pairs (P-TIMESAVE)", () => {
-  it("default pairs; never two elbow-loading moves or two cable stations in one pair", () => {
+  it("19 Oct 2026: no pairs in the plan; the checks still catch elbow and cable-station clashes", () => {
     expect(validatePairs(PLAN)).toEqual([]);
-    const pairs = Object.fromEntries(PLAN.days.map((d) => [d.key, d.slots.filter((s) => s.pair).map((s) => `${s.pair}:${s.exerciseKey}`)]));
-    expect(pairs.upper_a).toEqual([]);
-    expect(pairs.upper_b).toEqual([]);
-    expect(pairs.lower_a).toEqual(["mon_1:lying_db_hamstring_curl", "mon_1:cross_body_triceps_extension"]);
-    expect(pairs.lower_b).toEqual(["fri_1:hanging_knee_raise", "fri_1:cable_lateral_raise"]);
+    expect(PLAN.days.flatMap((d) => d.slots).filter((s) => s.pair)).toEqual([]);
     const withPair = (dayKey: string, keys: string[]): ProgramDefinition => ({ ...PLAN, days: PLAN.days.map((d) => (d.key === dayKey
       ? { ...d, slots: d.slots.map((s) => (keys.includes(s.exerciseKey) ? { ...s, pair: "x" } : s)) } : d)) });
     expect(validatePairs(withPair("upper_a", ["bayesian_curl", "overhead_cable_triceps_extension"])))
@@ -312,21 +308,22 @@ describe("E11 pairs (P-TIMESAVE)", () => {
       .toEqual(["upper_a x: chest_cable_flye + bayesian_curl need more than one cable station"]);
     expect(validatePairs(withPair("lower_a", ["cable_calf_raise", "lying_db_hamstring_curl"])).join(" ")).toContain("cable station");
   });
-  it("members are adjacent, A rests 45–60 s (50), the last member 75 s", () => {
+  it("straight sets keep the slot order; a pair, if one is set, makes its members adjacent", () => {
+    const mon = day(1, "lower_a").exercises;
+    expect(mon.map((e) => e.exerciseKey)).toEqual(["squat", "romanian_deadlift", "lying_db_hamstring_curl", "cable_leg_extension",
+      "cable_calf_raise", "kneeling_cable_crunch", "cable_lateral_raise", "cross_body_triceps_extension", "wrist_extension"]);
+    expect(mon.some((e) => e.pair || e.pairLabel)).toBe(false);
     const fri = day(1, "lower_b").exercises;
-    const k = fri.findIndex((e) => e.exerciseKey === "hanging_knee_raise");
-    expect(fri.slice(k, k + 2).map((e) => [e.exerciseKey, e.pairLabel, e.restSec])).toEqual([
+    const paired = arrangePairs(fri.map((e) => (e.exerciseKey === "hanging_knee_raise" || e.exerciseKey === "cable_lateral_raise" ? { ...e, pair: "x" } : e)));
+    const k = paired.findIndex((e) => e.exerciseKey === "hanging_knee_raise");
+    expect(paired.slice(k, k + 2).map((e) => [e.exerciseKey, e.pairLabel, e.restSec])).toEqual([
       ["hanging_knee_raise", "A", 50], ["cable_lateral_raise", "B", 75]
     ]);
-    expect(fri.map((e) => e.order)).toEqual(fri.map((_, i) => i + 1));
-    const mon = day(1, "lower_a").exercises.map((e) => e.exerciseKey);
-    expect(mon.indexOf("cross_body_triceps_extension")).toBe(mon.indexOf("lying_db_hamstring_curl") + 1);
     // A pair with one member left that day is a straight set.
     const solo = arrangePairs([{ ...fri[0]!, pair: "x" }]);
     expect(solo[0]!.pair).toBeUndefined();
   });
 });
-
 describe("E12 restart after a break", () => {
   it("restartState: gap ≥ 10 days caps the next rep-outs; ≥ 14 days marks the first week back", () => {
     expect(restartState(["2026-10-19"], PLAN, "2026-10-28")).toBeUndefined();

@@ -216,7 +216,7 @@ function Rest() {
           <tbody>
             <tr><td>Squat, deadlift, incline DB, pull-up</td><td className="n">{fmtRest(r.main)}</td><td>3 min; {fmtRest(PLAN.repOutRestSec)} before a rep-out</td></tr>
             <tr><td>Other compounds</td><td className="n">{fmtRest(r.compound)}</td><td>2–3 min</td></tr>
-            <tr><td>Isolation</td><td className="n">{fmtRest(r.isolation)}</td><td>90 s, or alternate two exercises</td></tr>
+            <tr><td>Isolation</td><td className="n">{fmtRest(r.isolation)}</td><td>90 s</td></tr>
             <tr><td>Shoulder care block</td><td className="n">{fmtRest(r.shoulder)}</td><td>45–60 s</td></tr>
           </tbody>
         </table>
