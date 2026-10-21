@@ -6,14 +6,14 @@ export {
 } from "./report";
 export {
   applyCoachAction, removeAdjustment, ensurePlanProteinPerKg, answerPainCheck, savePainCheck, saveElbowMonthly, saveGassed,
-  savePhotosDone, saveHomeTask, saveSessionEnergy, saveWaist, saveSleep, type ApplyResult
+  savePhotosDone, saveHomeTask, saveSessionEnergy, saveWaist, type ApplyResult
 } from "./apply";
 export { applyAdjustments, adjustmentState, adjustmentsOf, swapNote } from "../plan/adjustments";
 export { nextSwap, swapLabel, swapStartLoad, SWAP_CHAINS, type SwapStartLoad, type SwapHistory } from "../plan/swaps";
 export { REFERENCE, muscleKey, type MuscleReference } from "./reference";
 export { EVIDENCE, type EvidenceId } from "./evidence";
 export {
-  expectedBand, creatineOffset, BODYWEIGHT_PATH, rateFit, isRateWeek, waistTrend, photoStatus, photosCue, isPhotosRow, WAIST_MIN_READINGS
+  expectedBand, creatineOffset, BODYWEIGHT_PATH, bodyweightStatus, PACE_DAYS, type BodyweightStatus, type BodyweightSide, rateFit, isRateWeek, waistTrend, photoStatus, photosCue, isPhotosRow, WAIST_MIN_READINGS
 } from "./body";
 export { planLine, goalTm, stepsTo, earlyDeloadRun } from "./strength";
 export { laggingMuscles, muscleSets, OVERREACH_FACTOR } from "./muscle";
@@ -25,6 +25,6 @@ export {
   liftingDayKeys, isMinimumSession, type PlannedDay
 } from "./consistency";
 export {
-  weekContext, sleepHoursOn, shortSleepBefore, SHORT_SLEEP_H, SLEEP_TARGET_BEFORE_LIFTING_H, LIGHTS_OUT_BEFORE_LIFTING, type WeekCtx
+  weekContext, SLEEP_TARGET_BEFORE_LIFTING_H, LIGHTS_OUT_BEFORE_LIFTING, type WeekCtx
 } from "./common";
 export * from "./types";

@@ -5,13 +5,19 @@ import { fmtNum, parseDecimal } from "../../lib/format";
 import { entryFromFood, rankFoodsForAdd, servingOf, type AddGroup, type EntryDraft } from "../../lib/nutrition";
 import { Sheet } from "../../ui/Sheet";
 import { PlusIcon } from "../../ui/icons";
-import { FoodLine, MealPicker, QuantityStepper, SearchIcon, StarIcon, mealLabel } from "./ui";
+import { FoodLine, MealPicker, QuantityStepper, SearchIcon, fmtQty, mealLabel } from "./ui";
 
+const EMPTY_QUICK = { name: "", kcal: "", protein: "", carbs: "", fat: "" };
 const GROUP_LABEL: Record<AddGroup, string> = { favorite: "Favourites", recent: "Recent", all: "All foods" };
+/** Quick picks in the quantity step (servings). */
+const QUICK_QTY = [0.5, 1, 1.5, 2, 3];
 
-/** Pick a food (favourites, recent, the rest; archived foods are hidden), set servings, add. Quick add for one-offs. */
-export function AddFoodSheet({ meal: initialMeal, day = null, foods, entries, onAdd, onClose }: {
-  meal: Meal; foods: Food[]; entries: FoodEntry[];
+/**
+ * Pick a food (favourites = the 3 most logged this week, recent, the rest; archived foods are hidden), choose how
+ * many servings, add. Quick add for one-offs.
+ */
+export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entries, onAdd, onClose }: {
+  meal: Meal; today: string; foods: Food[]; entries: FoodEntry[];
   /** Short name of the day being logged to ("Tue 6 Oct"), or null for today. */
   day?: string | null;
   onAdd: (items: EntryDraft[]) => Promise<void> | void;
@@ -21,11 +27,11 @@ export function AddFoodSheet({ meal: initialMeal, day = null, foods, entries, on
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Food | null>(null);
   const [qty, setQty] = useState(1);
-  const [quick, setQuick] = useState({ name: "", kcal: "", protein: "" });
+  const [quick, setQuick] = useState(EMPTY_QUICK);
   const [quickError, setQuickError] = useState(false);
   const [added, setAdded] = useState<string[]>([]);
 
-  const ranked = useMemo(() => rankFoodsForAdd(foods, entries, q), [foods, entries, q]);
+  const ranked = useMemo(() => rankFoodsForAdd(foods, entries, q, today), [foods, entries, q, today]);
 
   function add(food: Food, quantity: number) {
     void onAdd([entryFromFood(food, quantity, meal)]);
@@ -38,10 +44,15 @@ export function AddFoodSheet({ meal: initialMeal, day = null, foods, entries, on
     const kcal = parseDecimal(quick.kcal);
     const protein = quick.protein.trim() ? parseDecimal(quick.protein) : 0;
     if (kcal == null || kcal < 0 || protein == null || protein < 0) return setQuickError(true);
+    // Carbs and fat are optional: left empty they stay null (unknown), not 0.
+    const optional = (text: string) => (text.trim() ? parseDecimal(text) : null);
+    const carbs = optional(quick.carbs);
+    const fat = optional(quick.fat);
+    if ((quick.carbs.trim() && (carbs == null || carbs < 0)) || (quick.fat.trim() && (fat == null || fat < 0))) return setQuickError(true);
     const name = quick.name.trim() || "Quick add";
-    void onAdd([{ meal, food_id: null, name, serving_label: null, quantity: 1, kcal, protein, carbs: null, fat: null, note: null }]);
+    void onAdd([{ meal, food_id: null, name, serving_label: null, quantity: 1, kcal, protein, carbs, fat, note: null }]);
     setAdded((a) => [...a, name]);
-    setQuick({ name: "", kcal: "", protein: "" });
+    setQuick(EMPTY_QUICK);
     setQuickError(false);
   }
 
@@ -59,6 +70,11 @@ export function AddFoodSheet({ meal: initialMeal, day = null, foods, entries, on
             <span className="row-sub">{picked.brand ? `${picked.brand} · ` : ""}{servingOf(picked)}</span>
           </div>
           <QuantityStepper value={qty} onChange={setQty} />
+          <div className="food-qty-quick" role="group" aria-label="Quick amounts">
+            {QUICK_QTY.map((n) => (
+              <button key={n} type="button" aria-pressed={qty === n} onClick={() => setQty(n)}>{fmtQty(n)}×</button>
+            ))}
+          </div>
           <p className="num" style={{ fontSize: 15 }}>
             <strong>{fmtNum(picked.kcal * qty, 0)}</strong> kcal · <strong>{fmtNum(picked.protein * qty, 1)}</strong> g protein
             {picked.carbs != null && <span className="muted"> · {fmtNum(picked.carbs * qty, 0)} g carbs</span>}
@@ -96,12 +112,12 @@ export function AddFoodSheet({ meal: initialMeal, day = null, foods, entries, on
                 <button className="food-row" onClick={() => { setPicked(f); setQty(1); }}>
                   <span className="food-row-text">
                     <span className="food-ellipsis">
-                      {f.name}{f.favorite && <StarIcon on size={13} style={{ color: "var(--warm)", marginLeft: 6, verticalAlign: -1 }} />}
+                      {f.name}
                     </span>
                     <FoodLine food={f} />
                   </span>
                 </button>
-                <button className="food-icon-btn add" aria-label={`Add 1 serving of ${f.name}`} onClick={() => add(f, 1)}><PlusIcon /></button>
+                <button className="food-icon-btn add" aria-label={`Add ${f.name}`} onClick={() => { setPicked(f); setQty(1); }}><PlusIcon /></button>
               </div>
             ))}
           </div>
@@ -121,8 +137,10 @@ export function AddFoodSheet({ meal: initialMeal, day = null, foods, entries, on
           <div className="grid-2" style={{ gap: 8 }}>
             <label className="field" htmlFor="qa-kcal"><span className="sr-only">Energy</span><input id="qa-kcal" className="num" inputMode="decimal" placeholder="0" value={quick.kcal} onChange={(e) => setQuick({ ...quick, kcal: e.target.value })} /><span className="field-suffix">kcal</span></label>
             <label className="field" htmlFor="qa-p"><span className="sr-only">Protein</span><input id="qa-p" className="num" inputMode="decimal" placeholder="0" value={quick.protein} onChange={(e) => setQuick({ ...quick, protein: e.target.value })} /><span className="field-suffix">g protein</span></label>
+            <label className="field" htmlFor="qa-c"><span className="sr-only">Carbs</span><input id="qa-c" className="num" inputMode="decimal" placeholder="Optional" value={quick.carbs} onChange={(e) => setQuick({ ...quick, carbs: e.target.value })} /><span className="field-suffix">g carbs</span></label>
+            <label className="field" htmlFor="qa-f"><span className="sr-only">Fat</span><input id="qa-f" className="num" inputMode="decimal" placeholder="Optional" value={quick.fat} onChange={(e) => setQuick({ ...quick, fat: e.target.value })} /><span className="field-suffix">g fat</span></label>
           </div>
-          {quickError && <p role="alert" style={{ color: "var(--bad)", fontSize: 13, margin: "0 4px" }}>Enter the kcal as a number.</p>}
+          {quickError && <p role="alert" style={{ color: "var(--bad)", fontSize: 13, margin: "0 4px" }}>Enter the numbers as numbers.</p>}
           <button className="btn btn-tinted" style={{ height: 44, alignSelf: "flex-end" }} onClick={addQuick}>Add to {mealLabel(meal)}</button>
         </div>
       </section>

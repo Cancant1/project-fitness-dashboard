@@ -224,20 +224,3 @@ export async function saveWaist(local: LocalStore, date: string, cm: number): Pr
   const existing = local.all("body_measurements").find((m) => m.kind === "waist" && m.date === date);
   await local.save("body_measurements", { ...(existing ? { id: existing.id } : {}), date, kind: "waist", value: cm, unit: "cm", source: "app", note: existing?.note ?? null });
 }
-
-/**
- * Hours slept, dated the morning the night ended. One health_daily row per day (unique per user and date):
- * an existing row (e.g. from the iOS Shortcut) keeps its other fields and source; a new row is source "manual".
- */
-export async function saveSleep(local: LocalStore, date: string, hours: number): Promise<void> {
-  const existing = local.all("health_daily").find((h) => h.date === date);
-  const minutes = Math.round(hours * 60);
-  if (existing) {
-    await local.save("health_daily", { id: existing.id, sleep_total_min: minutes });
-    return;
-  }
-  await local.save("health_daily", {
-    date, sleep_total_min: minutes, sleep_deep_min: null, sleep_rem_min: null, sleep_core_min: null, sleep_awake_min: null,
-    resting_hr: null, hrv_sdnn_ms: null, source: "manual"
-  });
-}

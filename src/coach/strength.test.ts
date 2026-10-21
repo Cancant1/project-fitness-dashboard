@@ -96,7 +96,7 @@ describe("strength.misses", () => {
     setup?.(w);
     return get(weeklyReport(w.data(), 2, today), "strength.misses");
   };
-  it("two rep-outs ≥ 2 under target, bodyweight and sleep fine → deload now (next week once this one is over)", () => {
+  it("two rep-outs ≥ 2 under target, bodyweight fine → deload now (next week once this one is over)", () => {
     expect(missed()).toMatchObject({
       status: "act", message: "Rep-outs missed by 2+ reps two weeks running. Take the deload now; the plan allows it early.", action: { kind: "deload_now", weekNo: 3 }
     });
@@ -110,10 +110,6 @@ describe("strength.misses", () => {
       status: "act", message: "Rep-outs missed by 2+ reps two weeks running and bodyweight is dropping. Eat first: +100 kcal.",
       action: { kind: "kcal", delta: 100, from: "2026-11-02" }
     });
-  });
-  it("short sleep → fix sleep first (no deload)", () => {
-    const s = missed((w) => { for (const d of [0, 1, 2, 3]) w.sleep(`2026-10-${27 + d}`, 5.5); });
-    expect(s).toMatchObject({ status: "watch", message: "Rep-outs missed by 2+ reps two weeks running. Sleep 5.5 h: fix sleep first." });
   });
   it("one week only, or hit: nothing", () => {
     const w = new World();

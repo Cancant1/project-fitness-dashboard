@@ -5,7 +5,7 @@ import type { Program } from "../data/types";
 import { adjustmentState, adjustmentsOf, applyAdjustments, type Adjustment, type CoachAction } from "../plan/adjustments";
 import { PLAN, activeProgram, ensurePlanExercises, planFor } from "../plan/bridge";
 import { prescribeWeek } from "../plan/engine";
-import { answerPainCheck, applyCoachAction, ensurePlanProteinPerKg, removeAdjustment, saveSessionEnergy, saveSleep, saveWaist } from "./apply";
+import { answerPainCheck, applyCoachAction, ensurePlanProteinPerKg, removeAdjustment, saveSessionEnergy, saveWaist } from "./apply";
 import { STATE } from "./testkit";
 
 let n = 0;
@@ -170,7 +170,7 @@ describe("applying through the LocalStore", () => {
     expect(planFor(activeProgram(local.all("programs"))).weeks[3]!.type).toBe("C");
   });
 
-  it("input helpers: pain answer, session energy, waist and sleep (one per day)", async () => {
+  it("input helpers: pain answer, session energy, waist (one per day)", async () => {
     const { local, ids } = await setup();
     const [pain] = await local.save("pain_checks", { date: "2026-10-20", site: "right_elbow", exercise_id: ids.get("incline_db_press")!, session_id: null, during_set: "ache", next_morning: null, worse_than_last: null, note: null });
     expect(await answerPainCheck(local, pain!.id, 6)).toEqual({ morning_score: 6, next_morning: "sore", flare: true });
@@ -187,8 +187,5 @@ describe("applying through the LocalStore", () => {
     await saveWaist(local, "2026-10-20", 80.5);
     expect(local.all("body_measurements")).toEqual([expect.objectContaining({ kind: "waist", value: 80.5, unit: "cm" })]);
 
-    await saveSleep(local, "2026-10-21", 7.5);
-    await saveSleep(local, "2026-10-21", 6.75);
-    expect(local.all("health_daily")).toEqual([expect.objectContaining({ date: "2026-10-21", sleep_total_min: 405, source: "manual" })]);
   });
 });

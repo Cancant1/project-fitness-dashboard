@@ -205,10 +205,8 @@ function tileFor(area: Area, r: WeeklyReport, data: CoachData, today: string): T
       return { value: String(total), unit: total === 1 ? "ache" : "aches", foot: caption(total ? sites : "No complaints") };
     }
     case "recovery": {
-      const { avgHours } = n.sleep;
-      if (avgHours != null) return { value: fmtNum(avgHours, 1), unit: "h sleep", foot: <Bar value={avgHours / 9} marker={7 / 9} color="var(--chart-1)" /> };
       if (n.energy.avg != null) return { value: fmtNum(n.energy.avg, 1), unit: "/5 energy", foot: <Bar value={n.energy.avg / 5} color="var(--chart-1)" /> };
-      return { value: "—", unit: "h sleep", foot: caption("Log at weigh-in") };
+      return { value: "—", unit: "/5 energy", foot: caption("Rate each session") };
     }
     case "conditioning": {
       const c = n.conditioning;
@@ -432,7 +430,7 @@ function HabitCard({ report }: { report: WeeklyReport }) {
   );
 }
 
-/** Small facts for the week: progress photos, sleep before lifting days, resting HR and HRV (info only). */
+/** Small facts for the week: progress photos, resting HR and HRV (info only). */
 function InfoCard({ report }: { report: WeeklyReport }) {
   const n = report.numbers;
   const rows: { label: string; value: ReactNode; sub?: string }[] = [];
@@ -445,10 +443,6 @@ function InfoCard({ report }: { report: WeeklyReport }) {
           : ph.next ? <span className="k-num">Thu {fmtShortDate(ph.next)}</span> : <span className="k-muted">—</span>,
       ...(ph.photoWeek ? {} : ph.next ? { sub: "Next photos" } : {})
     });
-  }
-  const bl = n.sleep.beforeLifting;
-  if (bl && bl.avgHours != null) {
-    rows.push({ label: "Sleep before lifting", value: <span className="k-num">{fmtNum(bl.avgHours, 1)} h</span>, sub: `${bl.nights} ${bl.nights === 1 ? "night" : "nights"} · target 7.5 h` });
   }
   const hr = n.heart;
   if (hr?.restingHr7d != null) {

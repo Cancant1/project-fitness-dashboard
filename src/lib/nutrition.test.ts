@@ -1,7 +1,7 @@
 import type { Food, FoodEntry, NutritionDay, NutritionTarget } from "../data/types";
 import {
   dayTotals, entryFromFood, foodSetupDone, isDinnerEntry, libraryList, mealForHour, normName, parseFoodForm, pickCanonical,
-  bodyweight7d, planDaySavedMeal, proposeFoodSetup, rankFoodsForAdd, rescaleEntry, servingText, setupCounts, setupWrites, stepQuantity, targetFor
+  bodyweight7d, proposeFoodSetup, rankFoodsForAdd, rescaleEntry, servingText, setupCounts, setupWrites, stepQuantity, targetFor
 } from "./nutrition";
 
 const base = { user_id: "u", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z", deleted_at: null };
@@ -102,14 +102,27 @@ describe("ranking", () => {
   const archived = food("Gone", { archived: true });
   const entries = [entry("Pizza", { date: "2026-09-05" }), entry("Appel", { food_id: "appel", date: "2026-08-01" })];
 
-  it("puts favourites, then recent (also matched by name), then the rest; never archived", () => {
-    const r = rankFoodsForAdd([old, recentA, fav, archived, food("Banaan")], entries, "");
+  it("puts recent (also matched by name), then the rest; a starred food is not a favourite by itself; never archived", () => {
+    const r = rankFoodsForAdd([old, recentA, fav, archived, food("Banaan")], entries, "", "2026-10-21");
     expect(r.map((x) => [x.food.name, x.group])).toEqual([
-      ["Zz favourite", "favorite"], ["Pizza", "recent"], ["Appel", "recent"], ["Banaan", "all"]
+      ["Pizza", "recent"], ["Appel", "recent"], ["Banaan", "all"], ["Zz favourite", "all"]
     ]);
   });
+  it("favourites: the 3 foods logged most in the last 7 days, the latest first on a tie", () => {
+    const foods = ["Skyr", "Kwark", "Banaan", "Appel", "Pizza"].map((n) => food(n, { id: n.toLowerCase() }));
+    const log = [
+      ...["2026-10-15", "2026-10-17", "2026-10-18"].map((date) => entry("Kwark", { food_id: "kwark", date })),
+      ...["2026-10-19", "2026-10-20"].map((date) => entry("Banaan", { food_id: "banaan", date })),
+      ...["2026-10-16", "2026-10-21"].map((date) => entry("Appel", { food_id: "appel", date })),
+      entry("Skyr", { date: "2026-10-21" }), // matched by name
+      ...["2026-10-10", "2026-10-11", "2026-10-12", "2026-10-14"].map((date) => entry("Pizza", { food_id: "pizza", date })) // before the 7 days
+    ];
+    const r = rankFoodsForAdd(foods, log, "", "2026-10-21");
+    expect(r.filter((x) => x.group === "favorite").map((x) => x.food.name)).toEqual(["Kwark", "Appel", "Banaan"]);
+    expect(r.filter((x) => x.group === "recent").map((x) => x.food.name)).toEqual(["Skyr", "Pizza"]);
+  });
   it("searches name and brand", () => {
-    expect(rankFoodsForAdd([food("Skyr", { brand: "Jumbo" }), food("Kwark")], [], "jumbo").map((x) => x.food.name)).toEqual(["Skyr"]);
+    expect(rankFoodsForAdd([food("Skyr", { brand: "Jumbo" }), food("Kwark")], [], "jumbo", "2026-10-21").map((x) => x.food.name)).toEqual(["Skyr"]);
   });
   it("lists the library favourites first, then A–Z, in use or removed", () => {
     const foods = [food("b"), food("a"), food("c", { favorite: true }), food("x", { archived: true })];
@@ -216,17 +229,6 @@ describe("food setup proposal", () => {
     const after = foods.map((f) => ({ ...f, ...patches.find((p) => p.id === f.id) })) as Food[];
     expect(foodSetupDone(foods)).toBe(false);
     expect(foodSetupDone(after)).toBe(true);
-  });
-
-  it("builds the plan's usual day from your foods (about 1,700 kcal without dinner)", () => {
-    const meal = planDaySavedMeal(foods);
-    const kcal = meal.items.reduce((s, i) => s + i.kcal, 0);
-    const protein = meal.items.reduce((s, i) => s + i.protein, 0);
-    expect(meal.items.find((i) => i.name === "Skyr 500ml vanille")?.food_id).toBe("skyr");
-    expect(meal.items.find((i) => i.name === "AH saucijzenbroodje")?.food_id).toBeNull();
-    expect(kcal).toBeGreaterThan(1650);
-    expect(kcal).toBeLessThan(1750);
-    expect(protein).toBeGreaterThan(140);
   });
 });
 

@@ -15,7 +15,7 @@ const ENDPOINT = ingestEndpoint(import.meta.env.VITE_SUPABASE_URL as string | un
 const dateTime = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const fmtWhen = (iso: string | null) => (iso ? dateTime.format(new Date(iso)) : "Never");
 
-/** Settings → Apple Watch: tokens for the iOS Shortcut, the endpoint to paste, and the last nights that came in. */
+/** Settings → Apple Watch: tokens for the iOS Shortcut, the endpoint to paste, and the last days that came in. */
 export function WatchSettingsPage() {
   const [signedIn, setSignedIn] = useState<boolean | undefined>(undefined);
 
@@ -30,7 +30,7 @@ export function WatchSettingsPage() {
       {signedIn === false ? (
         <Card className="watch-signin">
           <Stat size="md" value="Sign in to set this up" />
-          <p className="k-muted">The Shortcut sends sleep, resting heart rate and HRV to your account, so it needs a signed-in app.</p>
+          <p className="k-muted">The Shortcut sends resting heart rate and HRV to your account, so it needs a signed-in app.</p>
         </Card>
       ) : signedIn ? (
         <div className="k-dash">
@@ -39,7 +39,7 @@ export function WatchSettingsPage() {
             <Endpoint />
           </div>
           <div className="k-col">
-            <Nights />
+            <Days />
           </div>
         </div>
       ) : null}
@@ -167,22 +167,23 @@ function Endpoint() {
   );
 }
 
-// ------------------------------------------------------------------ last nights
+// ------------------------------------------------------------------ last days
 
-function Nights() {
+/** Resting HR and HRV, last 7 days. Sleep still arrives from the Shortcut but isn't shown (2026-10-21). */
+function Days() {
   const { sync } = useStore();
   const health = useRows("health_daily");
   const [refreshing, setRefreshing] = useState(false);
   const today = todayIso();
 
-  const nights = useMemo(() => {
+  const days = useMemo(() => {
     const byDate = new Map(health.map((h) => [h.date, h]));
     return Array.from({ length: 7 }, (_, i) => {
       const date = addDays(today, -i);
       return { date, row: byDate.get(date) ?? null };
     });
   }, [health, today]);
-  const last = nights.find((n) => n.row?.sleep_total_min != null);
+  const last = days.find((n) => n.row?.resting_hr != null);
 
   async function refresh() {
     setRefreshing(true);
@@ -191,31 +192,26 @@ function Nights() {
 
   return (
     <Card className="watch-card">
-      <Label action={<button onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing…" : "Refresh"}</button>}>Last 7 nights</Label>
-      <Stat size="lg" value={last ? hours(last.row!.sleep_total_min!) : "—"} unit={last ? "h" : undefined}
-        sub={last ? `Slept · ${last.date === today ? "last night" : fmtShortDate(last.date)}` : "Nothing received yet"} />
-      <div className="watch-nights" role="table" aria-label="Sleep, resting heart rate and HRV, last 7 nights">
+      <Label action={<button onClick={() => void refresh()} disabled={refreshing}>{refreshing ? "Refreshing…" : "Refresh"}</button>}>Last 7 days</Label>
+      <Stat size="lg" value={last ? String(last.row!.resting_hr) : "—"} unit={last ? "bpm" : undefined}
+        sub={last ? `Resting HR · ${last.date === today ? "today" : fmtShortDate(last.date)}` : "Nothing received yet"} />
+      <div className="watch-nights" role="table" aria-label="Resting heart rate and HRV, last 7 days">
         <div className="watch-night watch-night-head" role="row">
-          <span role="columnheader">Night</span>
-          <span role="columnheader">Sleep</span>
+          <span role="columnheader">Day</span>
           <span role="columnheader">RHR</span>
           <span role="columnheader">HRV</span>
         </div>
-        {nights.map(({ date, row }) => (
+        {days.map(({ date, row }) => (
           <div key={date} className="watch-night" role="row">
             <span role="cell">{date === today ? "Today" : fmtShortDate(date)}</span>
-            <span role="cell" className="k-num">{row?.sleep_total_min != null ? `${hours(row.sleep_total_min)} h` : "—"}</span>
             <span role="cell" className="k-num">{row?.resting_hr != null ? row.resting_hr : "—"}</span>
             <span role="cell" className="k-num">{row?.hrv_sdnn_ms != null ? `${fmtNum(Number(row.hrv_sdnn_ms), 0)} ms` : "—"}</span>
           </div>
         ))}
       </div>
-      {last?.row?.source === "manual" && <p className="k-muted watch-note">Last value typed in by hand</p>}
     </Card>
   );
 }
-
-const hours = (min: number) => fmtNum(min / 60, 1);
 
 /** Server messages in plain words. */
 function friendly(message: string): string {

@@ -101,15 +101,6 @@ describe("E7 early-deload trigger and E18 short nights", () => {
     });
     expect(get(run([10, 7, 5]), "strength.misses")).toBeUndefined();
   });
-  it("a miss after a short night (< 6 h) is read in context and doesn't count", () => {
-    const r = run([8, 6], (w) => w.sleep(dayIn(2, "lower_a"), 5.4));
-    expect(get(r, "strength.misses")).toBeUndefined();
-    expect(get(r, "strength.repout.squat")).toMatchObject({
-      status: "watch",
-      message: "Squat 107.5 × 6 (target 8): TM −5% to 132.5. Squat missed after a short night (5.4 h); one-off misses after short nights don't count toward the early-deload rule."
-    });
-    expect(get(run([8, 6]), "strength.misses")?.status).toBe("act");
-  });
   it("joint aches rising two weeks running → deload now", () => {
     const w = new World();
     for (const n of [1, 2, 3]) w.week(n);
@@ -199,7 +190,7 @@ describe("E21 habit metrics and if-then cues", () => {
     expect(get(weeklyReport(w.data(), 2, sunday(2)), "consistency.habit")).toMatchObject({ status: "info", message: "Habit meter: 2 of 6 weeks at 4+ sessions in a row." });
     expect(get(weeklyReport(w.data(), 6, sunday(6)), "consistency.habit")).toMatchObject({ status: "good", message: "6 weeks at 4+ sessions: the habit threshold." });
   });
-  it("missed yesterday · minimum session (feel ≤ 2 twice, or < 6 h) · first exercise after 17:00 · Sunday planning", () => {
+  it("missed yesterday · minimum session (feel ≤ 2 twice) · first exercise after 17:00 · Sunday planning", () => {
     const w = new World();
     expect(habitCues(w.data(), dayIn(1, "upper_a"), 9).map((c) => c.id)).toEqual(["habit.missed_yesterday"]);
     w.session(dayIn(1, "lower_a"), "lower_a", { energy: 2 });
@@ -207,9 +198,6 @@ describe("E21 habit metrics and if-then cues", () => {
     const fri = habitCues(w.data(), dayIn(1, "lower_b"), 9);
     expect(fri.find((c) => c.id === "habit.minimum")).toMatchObject({ text: "Take the minimum session today. It counts.", startMinimum: true });
     expect(habitCues(w.data(), dayIn(1, "lower_b"), 18).map((c) => c.id)).toContain("habit.first_exercise");
-    const slept = new World();
-    slept.sleep(dayIn(1, "lower_a"), 5.5);
-    expect(habitCues(slept.data(), dayIn(1, "lower_a"), 9).map((c) => c.id)).toContain("habit.minimum");
     w.session(dayIn(1, "lower_b"), "lower_b");
     expect(habitCues(w.data(), dayIn(1, "lower_b"), 18)).toEqual([]);
     expect(habitCues(w.data(), dayIn(1, "rounds"), 9).map((c) => c.text)).toEqual(["Missed yesterday → do it on your next free day (Wed or Sun). No doubling up.", "Plan the week: which 4 days?"]);
@@ -217,14 +205,7 @@ describe("E21 habit metrics and if-then cues", () => {
   });
 });
 
-describe("E18 sleep before lifting days and C-READINESS", () => {
-  it("≥ 7.5 h before lifting days; lights out 23:15", () => {
-    const w = new World();
-    for (const d of ["lower_a", "upper_a", "lower_b", "upper_b"] as const) w.sleep(dayIn(1, d), 7);
-    expect(get(weeklyReport(w.data(), 1, sunday(1)), "recovery.sleep_lifting")).toMatchObject({
-      status: "watch", message: "Before lifting days: 7 h asleep (target 7.5). Lights out 23:15 on Sun, Mon, Thu and Fri nights."
-    });
-  });
+describe("C-READINESS", () => {
   it("resting HR and HRV: 7-day average against a 60-day baseline, information only", () => {
     const w = new World();
     const row = (date: string, hr: number, hrv: number): HealthDaily => ({

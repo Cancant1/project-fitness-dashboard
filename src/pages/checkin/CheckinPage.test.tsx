@@ -151,12 +151,12 @@ describe("Apply", () => {
 });
 
 describe("Today", () => {
-  it("shows the check-in row with this week's verdict and a sleep field on the weigh-in", async () => {
+  it("shows the check-in row with this week's verdict and no sleep field on the weigh-in", async () => {
     await render(<TodayPage />);
     const row = host.querySelector('a.t-checkin[href="/checkin"]');
     expect(row?.textContent).toContain("Check-in");
     expect(row?.textContent).toMatch(VERDICTS);
-    expect(host.querySelector('input[placeholder="Slept"]')).toBeTruthy();
+    expect(host.querySelector('input[placeholder="Slept"]')).toBeNull();
   });
 
   it("asks about yesterday's ache in the morning (0–10); 6 writes morning_score, next_morning sore, and the cue goes", async () => {

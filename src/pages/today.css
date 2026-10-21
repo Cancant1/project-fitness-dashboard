@@ -49,7 +49,7 @@
 .today-weigh { display: flex; flex-direction: column; gap: 16px; padding: 20px; }
 .today-weigh-top { display: flex; align-items: flex-end; gap: 16px; }
 .today-weigh-input { display: flex; gap: 8px; }
-.today-sleep { flex: none; width: 92px; }
+.today-track { display: inline-flex; margin-top: 6px; }
 
 /* Coach: today's cues and the check-in verdict, one quiet card under the hero. */
 .t-coach { padding: 0 18px; }

@@ -1,14 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { useDayPick, useToday } from "../lib/useToday";
 import { useRows, useStore } from "../data/store";
 import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal } from "../lib/format";
 import { KCAL_PER_KG_LEAN_BULK, adaptiveTdee, type Weigh } from "../lib/energy";
-import { TDEE_MIN_DAYS, photoStatus, saveSleep, saveWaist } from "../coach";
+import { PACE_DAYS, TDEE_MIN_DAYS, bodyweightStatus, expectedBand, photoStatus, saveWaist, type BodyweightSide, type BodyweightStatus } from "../coach";
 import { useCoachData } from "../coach/hooks";
 import { AreaChart, Card, Delta, Label, PageHead, Pill, Segmented, Stat } from "../ui/kit";
 import { Sheet } from "../ui/Sheet";
-import { CheckIcon, ChevronDown, ChevronRight, PlusIcon, WatchIcon } from "../ui/icons";
+import { CheckIcon, ChevronDown, ChevronRight, PlusIcon } from "../ui/icons";
 import { DateButton, useToast } from "./food/ui";
 import "./weight.css";
 
@@ -46,7 +45,11 @@ export function WeightPage() {
   const last = weights[weights.length - 1];
   const recent = !!latestAvg && latestAvg.date >= addDays(today, -14);
   const twoWeeksAgo = latestAvg ? avg.filter((a) => a.date <= addDays(latestAvg.date, -14)).pop() : undefined;
-  const ratePerWeek = latestAvg && twoWeeksAgo ? (latestAvg.value - twoWeeksAgo.value) / (daysBetween(twoWeeksAgo.date, latestAvg.date) / 7) : null;
+  const coach = useCoachData();
+  // On track? Judged on the day of the last weigh-in, so it matches the 7-day average shown.
+  const status = useMemo(() => (recent && latestAvg ? bodyweightStatus(coach, latestAvg.date) : null), [coach, recent, latestAvg]);
+  const ratePerWeek = status?.pace?.rate
+    ?? (latestAvg && twoWeeksAgo ? (latestAvg.value - twoWeeksAgo.value) / (daysBetween(twoWeeksAgo.date, latestAvg.date) / 7) : null);
 
   /** One weigh-in per date: saving onto a date that already has one updates that row. */
   async function save(date: string, value: number, current?: WeighIn) {
@@ -68,6 +71,16 @@ export function WeightPage() {
   const base = shownRaw[0]?.date ?? today;
   const x = (d: string) => daysBetween(base, d);
   const nearGoal = shownAvg.length > 0 && Math.abs(shownAvg[shownAvg.length - 1]!.value - (GOAL.lo + GOAL.hi) / 2) < 6;
+  // The plan's expected path (with the creatine water), from the plan start up to the last weigh-in.
+  const pathTo = last && last.date < today ? last.date : today;
+  const pathBand = useMemo(() => {
+    const pts: { x: number; lo: number; hi: number }[] = [];
+    for (let d = [coach.start, from, base].sort().at(-1)!; d <= pathTo; d = addDays(d, 1)) {
+      const b = expectedBand(d, coach.plan);
+      if (b) pts.push({ x: daysBetween(base, d), lo: b[0], hi: b[1] });
+    }
+    return pts;
+  }, [coach.start, coach.plan, from, base, pathTo]);
 
   /** Tap on the chart: open the weigh-in nearest to that day. */
   function pick(p: { x: number }) {
@@ -95,13 +108,10 @@ export function WeightPage() {
                 <Pill tone="warm">Goal {GOAL.lo}–{GOAL.hi}</Pill>
               </div>
             </div>
-            <WeighInput weights={weights} today={today} onSave={async (d, kg, sleep) => {
-              if (kg != null) await save(d, kg);
-              if (sleep != null) await saveSleep(local, d, sleep);
-              if (kg == null && sleep != null) toast.show(`Sleep saved · ${fmtShortDate(d)}`);
-            }} />
-            <Link to="/settings/watch" className="w-watch-link"><WatchIcon size={16} />Sleep from Apple Watch</Link>
+            <WeighInput weights={weights} today={today} onSave={save} />
           </Card>
+
+          {status && <TrackCard status={status} />}
 
           <Card className="w-chart">
             <div className="w-chart-head">
@@ -120,6 +130,7 @@ export function WeightPage() {
                   }
                 ]}
                 yBands={nearGoal ? [{ from: GOAL.lo, to: GOAL.hi, label: `Goal ${GOAL.lo}–${GOAL.hi}` }] : []}
+                ribbons={pathBand.length > 1 ? [{ points: pathBand, label: "Plan" }] : []}
                 onPick={pick}
                 formatX={(v) => { const d = addDays(base, Math.round(v)); return range === "90" ? fmtShortDate(d) : monthYear.format(new Date(d + "T12:00:00")); }}
                 formatY={(v) => fmtNum(v, 1)}
@@ -144,23 +155,60 @@ export function WeightPage() {
   );
 }
 
-/** Compact weigh-in: date pill (default today, never in the future), kg field, optional hours slept, save. */
-function WeighInput({ weights, today, onSave }: { weights: WeighIn[]; today: string; onSave: (date: string, kg: number | null, sleepHours: number | null) => Promise<void> }) {
-  const health = useRows("health_daily");
+const VERDICT: Record<BodyweightSide, { label: string; food: string; tone: "good" | "warm" }> = {
+  on: { label: "On track", food: "Food is about right", tone: "good" },
+  above: { label: "Above target", food: "Eating a bit much", tone: "warm" },
+  below: { label: "Below target", food: "Room to eat more", tone: "warm" }
+};
+const SIDE: Record<BodyweightSide, string> = { below: "Below", on: "Inside", above: "Above" };
+const signedKg = (v: number) => `${v > 0.004 ? "+" : v < -0.004 ? "−" : ""}${Math.abs(v).toFixed(2)}`;
+const span = (lo: number, hi: number, digits: number) => `${fmtNum(lo, digits)}–${fmtNum(hi, digits)}`;
+
+/** On track? The 7-day average against the plan's path and the 2-week pace against the plan's rate (N-RATE). */
+function TrackCard({ status }: { status: BodyweightStatus }) {
+  const v = VERDICT[status.verdict];
+  const { pace } = status;
+  return (
+    <Card className="w-track" aria-label="On track">
+      <div className="w-track-head">
+        <Pill tone={v.tone}>{v.label}</Pill>
+        <span className="w-track-food">{v.food}</span>
+        {status.early && <span className="w-track-early">Early read</span>}
+      </div>
+      <div className="k-grid-2">
+        <Stat size="sm" label="Plan path" value={span(status.band[0], status.band[1], 1)} unit="kg"
+          sub={`${SIDE[status.path]} · ${fmtNum(status.avg, 1)}`} />
+        {pace ? (
+          <Stat size="sm" label="Pace, 2 weeks" value={signedKg(pace.rate)} unit="kg/wk" sub={`Plan ${span(pace.lo, pace.hi, 2)}`} />
+        ) : (
+          <Stat size="sm" label="Pace, 2 weeks" value="—" sub="Needs 5 weigh-ins" />
+        )}
+      </div>
+      <details className="w-how">
+        <summary>How it works</summary>
+        <p>
+          Plan path: where the plan expects your 7-day average today, going to {GOAL.lo}–{GOAL.hi} kg by the test week,
+          including about 0.7 kg of creatine water in the first 4 weeks. Pace: the line through your weigh-ins of the
+          last {PACE_DAYS} days against the plan's 0.10–0.25 kg a week (plus the creatine water while it builds).
+          Above the path or gaining faster than the plan means you're eating a bit more than the plan needs; one high
+          and one low means it's already correcting. Weeks 0–2 are an early read: water and glycogen still move the
+          scale, so calories only change at the 2-weekly rate check from week 5 (±100 kcal).
+        </p>
+      </details>
+    </Card>
+  );
+}
+
+/** Compact weigh-in: date pill (default today, never in the future), kg field, save. */
+function WeighInput({ weights, today, onSave }: { weights: WeighIn[]; today: string; onSave: (date: string, kg: number) => Promise<void> }) {
   const [date, setDate] = useDayPick(today);
   const [text, setText] = useState("");
-  const [sleep, setSleep] = useState("");
   const existing = weights.find((w) => w.date === date);
-  const slept = health.find((h) => h.date === date)?.sleep_total_min;
   async function save() {
     const v = parseDecimal(text);
-    const h = parseDecimal(sleep);
-    const kg = v != null && v >= 30 && v <= 250 ? Math.round(v * 100) / 100 : null;
-    const hours = h != null && h > 0 && h <= 16 ? h : null;
-    if ((kg == null && hours == null) || date > today) return;
-    await onSave(date, kg, hours);
+    if (v == null || v < 30 || v > 250 || date > today) return;
+    await onSave(date, Math.round(v * 100) / 100);
     setText("");
-    setSleep("");
   }
   return (
     <div className="w-input">
@@ -171,13 +219,7 @@ function WeighInput({ weights, today, onSave }: { weights: WeighIn[]; today: str
           value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
         <span className="field-suffix">kg</span>
       </label>
-      <label className="field">
-        <span className="sr-only">Hours slept the night before (optional)</span>
-        <input inputMode="decimal" className="num" placeholder={slept ? fmtNum(slept / 60, 1).replace(".", ",") : "Slept"}
-          value={sleep} onChange={(e) => setSleep(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
-        <span className="field-suffix">h</span>
-      </label>
-      <button className="btn btn-primary btn-icon" aria-label="Save weight and sleep" onClick={() => void save()}><CheckIcon /></button>
+      <button className="btn btn-primary btn-icon" aria-label="Save weight" onClick={() => void save()}><CheckIcon /></button>
     </div>
   );
 }

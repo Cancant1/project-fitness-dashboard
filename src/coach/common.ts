@@ -122,24 +122,11 @@ export function tmAt(data: CoachData, lift: TmLiftKey, date: string): number | n
 export const bw7 = (data: CoachData, date: string): number | null => bodyweight7d(data.measurements, date);
 
 // ---------- sleep ----------
+// Sleep isn't tracked (2026-10-21); only the evening lights-out cue remains.
 
-/** C-SLEEP (R1-23): a night under 6 h asleep is a short night (session flag `shortSleep`). */
-export const SHORT_SLEEP_H = 6;
 /** C-SLEEP: target asleep before lifting days, and lights-out the night before (he sleeps 23:40–07:40). */
 export const SLEEP_TARGET_BEFORE_LIFTING_H = 7.5;
 export const LIGHTS_OUT_BEFORE_LIFTING = "23:15";
-
-/** Hours asleep the night that ended on the morning of `date` (health_daily is dated that morning), or null. */
-export function sleepHoursOn(data: CoachData, date: string): number | null {
-  const h = data.allHealth.find((x) => x.date === date && (x.sleep_total_min ?? 0) > 0);
-  return h ? Number(h.sleep_total_min) / 60 : null;
-}
-
-/** E18: the session flag — the night before was under 6 h (hours), else null. */
-export function shortSleepBefore(data: CoachData, sessionDate: string): number | null {
-  const h = sleepHoursOn(data, sessionDate);
-  return h != null && h < SHORT_SLEEP_H ? h : null;
-}
 
 // ---------- dates ----------
 

@@ -5,8 +5,8 @@
 .w-rate { display: inline-flex; align-items: baseline; gap: 6px; }
 .w-rate .k-delta { font-size: 17px; }
 .w-rate small { font-size: 13px; color: var(--fg2); }
-/* Date · kg · slept (h) · save. The two fields share the row (kg a little wider). */
-.w-input { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 0.85fr) 44px; gap: 8px; align-items: center; }
+/* Date · kg · save. */
+.w-input { display: grid; grid-template-columns: auto minmax(0, 1fr) 44px; gap: 8px; align-items: center; }
 .w-input .field { padding: 0 10px; }
 .w-input .date-btn { background: var(--field); border-radius: 14px; padding: 0 12px; flex: none; }
 .w-input .btn-icon { border-radius: 14px; flex: none; }
@@ -39,9 +39,6 @@
 .w-sheet-field { flex: 1; height: 52px; }
 .w-sheet-field input { font-size: 26px; font-weight: 700; text-align: right; }
 
-/* The small Apple Watch link under the weigh-in row (sleep can come from the Watch). */
-.w-watch-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-end; margin-top: -10px; font-size: 13px; font-weight: 600; color: var(--accent-text); min-height: 32px; }
-
 /* Quiet extras: progress-photo status and the optional waist (collapsed to one row). */
 .w-extras { padding: 0 16px 0 20px; }
 .w-waist { display: flex; flex-direction: column; }
@@ -49,3 +46,10 @@
 .w-waist-val { display: inline-flex; align-items: center; gap: 8px; }
 .w-waist-row[aria-expanded="true"] .w-all-chev { transform: rotate(180deg); }
 .w-waist .w-input { padding: 4px 0 16px; }
+
+/* On track: verdict pill, what it means for food, then path and pace. */
+.w-track { display: flex; flex-direction: column; gap: 16px; }
+.w-track-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.w-track-food { font-size: 15px; font-weight: 600; }
+.w-track-early { margin-left: auto; font-size: 13px; color: var(--fg2); }
+.w-track .w-how { margin-top: -8px; }

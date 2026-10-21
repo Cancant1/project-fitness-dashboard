@@ -5,7 +5,7 @@
 import { daysBetween } from "../lib/format";
 import { addDays, isoWeekday, weekForDate } from "../plan/engine";
 import type { DayKey, ProgramDefinition, ProgramWeek } from "../plan/types";
-import { SHORT_SLEEP_H, sessionsIn, sig, sleepHoursOn, tmAt, weekBounds, type AreaResult, type WeekCtx } from "./common";
+import { sessionsIn, sig, tmAt, weekBounds, type AreaResult, type WeekCtx } from "./common";
 import type { CoachData } from "./data";
 import type { DailyCue, Signal } from "./types";
 
@@ -242,8 +242,7 @@ export function habitCues(data: CoachData, today: string, nowHour: number): Dail
   if (t && !doneOn(today)) {
     const [a, b] = data.planSessions.filter((s) => s.date < today).slice(-2);
     const lowFeel = !!a && !!b && a.energy != null && b.energy != null && Number(a.energy) <= 2 && Number(b.energy) <= 2;
-    const sleep = sleepHoursOn(data, today);
-    if (lowFeel || (sleep != null && sleep < SHORT_SLEEP_H)) {
+    if (lowFeel) {
       out.push({ id: "habit.minimum", tone: "warm", to: "/train", text: "Take the minimum session today. It counts.", startMinimum: true });
     }
     if (nowHour >= 17 && !startedToday) {

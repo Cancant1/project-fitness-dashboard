@@ -6,7 +6,7 @@ import { useRows, useStore } from "../data/store";
 import type { FoodEntry, Meal, SavedMeal } from "../data/types";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, todayIso } from "../lib/format";
 import {
-  PLAN_DAY_NAME, bodyweight7d, dayTotals, entryFromFood, foodSetupDone, hasPlanTarget, mealForHour, planDaySavedMeal, planTargetRow, servingText, sumEntries, targetFor,
+  PLAN_DAY_NAME, bodyweight7d, dayTotals, entryFromFood, foodSetupDone, hasPlanTarget, mealForHour, planTargetRow, servingText, sumEntries, targetFor,
   type EntryDraft
 } from "../lib/nutrition";
 import { Bar, Card, Label, PageHead, Pill, Ring } from "../ui/kit";
@@ -59,8 +59,7 @@ export function FoodPage() {
   const target = targetFor(date, targets, bodyweight7d(weights, date));
   const setupDone = foodSetupDone(foods);
   const planTarget = hasPlanTarget(targets);
-  const planDay = saved.some((s) => s.name === PLAN_DAY_NAME);
-  const savedSorted = useMemo(() => [...saved].sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)), [saved]);
+  const savedSorted = useMemo(() => saved.filter((s) => s.name !== PLAN_DAY_NAME).sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)), [saved]);
   const isToday = date === today;
   const dayName = isToday ? null : dayShort.format(new Date(date + "T12:00:00")).replace(",", "");
 
@@ -87,22 +86,9 @@ export function FoodPage() {
       void local.save("food_entries", list.map((e) => ({ id: e.id, deleted_at: null }))));
   }
 
-  async function addPlanSetup() {
-    const added: string[] = [];
-    let targetId: string | null = null;
-    let mealId: string | null = null;
-    if (!planTarget) {
-      targetId = (await local.save("nutrition_targets", planTargetRow()))[0]!.id;
-      added.push("targets");
-    }
-    if (!planDay) {
-      mealId = (await local.save("saved_meals", planDaySavedMeal(foods)))[0]!.id;
-      added.push("usual day");
-    }
-    toast.show(`Added plan ${added.join(" and ")}`, () => {
-      if (targetId) void local.remove("nutrition_targets", [targetId]);
-      if (mealId) void local.remove("saved_meals", [mealId]);
-    });
+  async function addPlanTarget() {
+    const id = (await local.save("nutrition_targets", planTargetRow()))[0]!.id;
+    toast.show("Added plan targets", () => void local.remove("nutrition_targets", [id]));
   }
 
   const suggestions = useMemo(() => (isToday && target && totals.source !== "day"
@@ -206,7 +192,7 @@ export function FoodPage() {
             )}
           </section>
 
-          {(!setupDone || !planTarget || !planDay) && (
+          {(!setupDone || !planTarget) && (
             <Card pad={false} className="food-setup k-rows">
               {!setupDone && (
                 <div className="k-row">
@@ -214,13 +200,13 @@ export function FoodPage() {
                   <button className="btn btn-tinted btn-sm" onClick={() => setSetupOpen(true)}>Review</button>
                 </div>
               )}
-              {(!planTarget || !planDay) && (
+              {!planTarget && (
                 <div className="k-row">
                   <span className="k-row-main">
-                    <span>{planTarget ? "Plan usual day" : "Plan targets"}</span>
-                    <span className="num">{!planTarget ? `2,800 kcal · 2 g/kg${!planDay ? " · usual day" : ""}` : "About 1,700 kcal"}</span>
+                    <span>Plan targets</span>
+                    <span className="num">2,800 kcal · 2 g/kg</span>
                   </span>
-                  <button className="btn btn-tinted btn-sm" onClick={() => void addPlanSetup()}>Add</button>
+                  <button className="btn btn-tinted btn-sm" onClick={() => void addPlanTarget()}>Add</button>
                 </div>
               )}
             </Card>
@@ -274,7 +260,7 @@ export function FoodPage() {
       </div>
 
       {adding && (
-        <AddFoodSheet meal={adding} day={dayName} foods={foods} entries={entries} onClose={closeAdd} onAdd={async (items) => { await log(items); }} />
+        <AddFoodSheet meal={adding} day={dayName} today={today} foods={foods} entries={entries} onClose={closeAdd} onAdd={async (items) => { await log(items); }} />
       )}
       {editing && (
         <EntrySheet entry={editing} onClose={closeEdit}

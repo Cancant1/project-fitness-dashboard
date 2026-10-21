@@ -1,23 +1,8 @@
-import { addDays } from "../lib/format";
 import { weeklyReport } from "./report";
-import { dayIn, monday, sunday, World } from "./testkit";
+import { dayIn, sunday, World } from "./testkit";
 import type { WeeklyReport } from "./types";
 
 const get = (r: WeeklyReport, id: string) => r.signals.find((s) => s.id === id);
-
-describe("recovery.sleep (≥ 4 nights logged)", () => {
-  const sleep = (hours: number, nights = 4) => {
-    const w = new World();
-    for (let i = 0; i < nights; i++) w.sleep(addDays(monday(1), i), hours);
-    return get(weeklyReport(w.data(), 1, sunday(1)), "recovery.sleep");
-  };
-  it("≥ 7 h good · 6–7 h watch · < 6 h act", () => {
-    expect(sleep(7.5)).toMatchObject({ status: "good", message: "Sleep 7.5 h a night." });
-    expect(sleep(6.5)).toMatchObject({ status: "watch", message: "Sleep 6.5 h. Under 7 h costs recovery; aim 7–9." });
-    expect(sleep(5.5)).toMatchObject({ status: "act", message: "Sleep 5.5 h. That will show in rep-outs before anything else." });
-    expect(sleep(5.5, 3)).toBeUndefined();
-  });
-});
 
 describe("recovery.energy", () => {
   it("a drop of ≥ 1 point against the 3 weeks before (≥ 3 rated sessions) → watch", () => {

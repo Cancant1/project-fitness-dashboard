@@ -29,7 +29,7 @@
 .watch-revoke { color: var(--bad); flex: none; }
 
 .watch-nights { display: flex; flex-direction: column; }
-.watch-night { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)); gap: 8px; align-items: center; min-height: 40px; font-size: 15px; }
+.watch-night { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, 1fr)); gap: 8px; align-items: center; min-height: 40px; font-size: 15px; }
 .watch-night > :not(:first-child) { text-align: right; }
 .watch-night + .watch-night { border-top: 1px solid var(--sep); }
 .watch-night-head { min-height: 28px; font-size: 13px; font-weight: 600; color: var(--fg2); }

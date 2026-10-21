@@ -63,11 +63,6 @@ export interface WeekNumbers {
     daysLogged: number; avgKcal: number | null; targetKcal: number | null;
     avgProtein: number | null; targetProtein: number | null; proteinPerKg: number | null; tdee: number | null;
   };
-  sleep: {
-    nights: number; avgHours: number | null;
-    /** C-SLEEP: nights before lifting days (dated the lifting day) and their average (target 7.5 h). */
-    beforeLifting?: { nights: number; avgHours: number | null };
-  };
   /** C-READINESS (info only): 7-day averages against a 60-day baseline. */
   heart?: { restingHr7d: number | null; restingHr60d: number | null; hrv7d: number | null; hrv60d: number | null };
   energy: { rated: number; avg: number | null; prevAvg: number | null };

@@ -3,6 +3,7 @@
 
 import { addDays, daysBetween, fmtNum, fmtShortDate } from "../lib/format";
 import { slopeWithSe, slopeWithoutOutliers, type Weigh } from "../lib/energy";
+import { bodyweight7d } from "../lib/nutrition";
 import { PLAN } from "../plan/bridge";
 import { isoWeekday, weekForDate } from "../plan/engine";
 import type { ProgramDefinition, ProgramWeek } from "../plan/types";
@@ -107,6 +108,62 @@ export function rateFit(data: CoachData, asOf: string): RateFit | NoRateFit {
 }
 
 const isFit = (f: ReturnType<typeof rateFit>): f is RateFit => "rate" in f;
+
+export type BodyweightSide = "below" | "on" | "above";
+
+export interface BodyweightStatus {
+  /** 7-day average (all weigh-ins) and the plan path's band on `date`. */
+  avg: number;
+  band: [number, number];
+  path: BodyweightSide;
+  /**
+   * Pace: least-squares kg/week over the 14 days up to `date` (≥ 5 weigh-ins over ≥ 7 days, readings 1.5 kg off a
+   * first fit dropped), against the plan's 0.10–0.25 plus the creatine water expected in those days (E16).
+   */
+  pace: { rate: number; lo: number; hi: number; side: BodyweightSide; n: number } | null;
+  /** Path and pace together: one off and the other on (or missing) → that side; the two pulling apart → on track. */
+  verdict: BodyweightSide;
+  /** Weeks 0–2: glycogen, water and creatine still move the scale (N-RATE), so this is an early read. */
+  early: boolean;
+}
+
+export const PACE_DAYS = 14;
+const PACE_MIN_WEIGH_INS = 5;
+const PACE_MIN_SPAN_DAYS = 7;
+
+/**
+ * Am I on track? The 7-day average against the plan's expected path, and the 2-week pace against the plan's rate.
+ * Shown every day from the plan start, also in weeks 0–2 (flagged `early`); the 2-weekly calorie rule stays in
+ * body.rate.
+ */
+export function bodyweightStatus(data: CoachData, date: string): BodyweightStatus | null {
+  const plan = data.plan;
+  const band = expectedBand(date, plan);
+  const avg = bodyweight7d(data.allMeasurements, date);
+  if (!band || avg == null) return null;
+  const side = (v: number, lo: number, hi: number): BodyweightSide => (v < lo - 1e-9 ? "below" : v > hi + 1e-9 ? "above" : "on");
+  const path = side(avg, Math.round(band[0] * 10) / 10, Math.round(band[1] * 10) / 10);
+
+  const from = addDays(date, -(PACE_DAYS - 1));
+  const points: Weigh[] = data.allMeasurements
+    .filter((m) => m.kind === "weight" && m.date >= from && m.date <= date)
+    .map((m) => ({ date: m.date, kg: m.unit === "lb" ? Number(m.value) * 0.45359237 : Number(m.value) }));
+  const fit = points.length >= 2 ? slopeWithoutOutliers(points, from, plan.bodyweightRate.outlierKg ?? Infinity) : null;
+  const span = fit ? daysBetween(fit.points[0]!.date, fit.points[fit.points.length - 1]!.date) : 0;
+  let pace: BodyweightStatus["pace"] = null;
+  if (fit && fit.points.length >= PACE_MIN_WEIGH_INS && span >= PACE_MIN_SPAN_DAYS) {
+    const water = ((creatineOffset(date, plan) - creatineOffset(from, plan)) / (PACE_DAYS - 1)) * 7;
+    const lo = plan.bodyweightRate.minKgPerWeek + water;
+    const hi = plan.bodyweightRate.maxKgPerWeek + water;
+    const rate = fit.fit.slope * 7;
+    pace = { rate, lo, hi, side: side(rate, lo, hi), n: fit.points.length };
+  }
+
+  const p = pace?.side ?? "on";
+  const verdict: BodyweightSide = path === p ? path : path === "on" ? p : p === "on" ? path : "on";
+  const week = weekForDate(plan, date);
+  return { avg, band, path, pace, verdict, early: !!week && week.weekNo <= 2 };
+}
 
 /** "Gaining 0.18 kg/week" / "Losing 0.05 kg/week". */
 const gaining = (r: number) => (r < 0 ? `Losing ${Math.abs(r).toFixed(2)} kg/week` : `Gaining ${r.toFixed(2)} kg/week`);

@@ -18,10 +18,10 @@ import { AREAS, type DailyCue, type Signal, type Verdict, type WeekNumbers, type
 /** Rule ids in priority order (most important first). A signal id matches its rule id or "rule.subject". */
 export const PRIORITY: readonly string[] = [
   "joints.swap", "joints.cut_sets", "consistency.long_break", "consistency.missed_week", "strength.checkpoint", "strength.misses",
-  "joints.trend", "body.rate", "fuel.kcal", "body.waist", "fuel.protein", "recovery.sleep", "consistency.sessions",
+  "joints.trend", "body.rate", "fuel.kcal", "body.waist", "fuel.protein", "consistency.sessions",
   "consistency.missed_twice", "muscle.volume", "muscle.overreach",
   "strength.tm", "strength.repout", "strength.checkpoint_ahead", "strength.step_pace", "strength.step",
-  "joints.sharp", "fuel.logging", "body.weighins", "body.path", "body.photos", "fuel.tdee", "recovery.sleep_lifting",
+  "joints.sharp", "fuel.logging", "body.weighins", "body.path", "body.photos", "fuel.tdee",
   "recovery.energy", "consistency.comeback", "consistency.habit", "joints.alternative", "conditioning.gassed",
   "muscle.progress", "muscle.effort", "muscle.by_muscle", "muscle.variety", "strength.calibration", "consistency.streak",
   "conditioning.week", "recovery.resting_hr", "recovery.hrv"
@@ -96,13 +96,12 @@ const emptyNumbers = (): WeekNumbers => ({
   bodyweight: { avg7d: null, band: null, weighIns: 0, rate: null, rateSe: null, rateN: 0 },
   waist: { latestCm: null, cmPerMonth: null },
   food: { daysLogged: 0, avgKcal: null, targetKcal: null, avgProtein: null, targetProtein: null, proteinPerKg: null, tdee: null },
-  sleep: { nights: 0, avgHours: null },
   energy: { rated: 0, avg: null, prevAvg: null },
   pain: [],
   conditioning: { rideMin: 0, rideTarget: null, boxing: false, rounds: null, roundsTarget: null, roundsNext: null }
 });
 
-/** Distinct days Monday … asOf with anything logged (session, weigh-in, food, conditioning, pain, sleep). */
+/** Distinct days Monday … asOf with anything logged (session, weigh-in, food, conditioning, pain, watch). */
 function daysWithData(ctx: WeekCtx): number {
   const { data } = ctx;
   const inWeek = (d: string) => d >= ctx.from && d <= ctx.asOf;

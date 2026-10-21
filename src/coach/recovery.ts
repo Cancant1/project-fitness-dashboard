@@ -1,10 +1,10 @@
-// §4.7 Recovery: sleep (health_daily), sleep before lifting days (C-SLEEP, R1-23), session energy, and resting
-// HR / HRV as information only (C-READINESS: no HRV-based training rule).
+// §4.7 Recovery: session energy, and resting HR / HRV as information only (C-READINESS: no HRV-based training rule).
+// Sleep isn't tracked (2026-10-21); the lights-out cue before lifting days stays.
 
 import { addDays, fmtNum } from "../lib/format";
 import { isoWeekday, weekForDate } from "../plan/engine";
 import {
-  LIGHTS_OUT_BEFORE_LIFTING, SLEEP_TARGET_BEFORE_LIFTING_H, sessionsIn, sig, sleepHoursOn, weekBounds, type AreaResult, type WeekCtx
+  LIGHTS_OUT_BEFORE_LIFTING, SLEEP_TARGET_BEFORE_LIFTING_H, sessionsIn, sig, weekBounds, type AreaResult, type WeekCtx
 } from "./common";
 import { liftingDayKeys } from "./consistency";
 import type { CoachData } from "./data";
@@ -19,35 +19,6 @@ const MIN_60D = 14;
 export function recoveryRules(ctx: WeekCtx): AreaResult {
   const { data } = ctx;
   const out: Signal[] = [];
-
-  // recovery.sleep: ≥ 4 nights logged this week.
-  const nights = data.health.filter((h) => h.date >= ctx.from && h.date <= ctx.asOf && (h.sleep_total_min ?? 0) > 0);
-  const avgHours = nights.length ? nights.reduce((s, h) => s + h.sleep_total_min!, 0) / nights.length / 60 : null;
-  if (avgHours != null && nights.length >= 4) {
-    const h = fmtNum(avgHours, 1);
-    const metric = { label: "Sleep h/night", value: h, target: "7–9" };
-    if (avgHours >= 7) out.push(sig("recovery.sleep", "recovery", "good", "Sleep on target", `Sleep ${h} h a night.`, ["C-SLEEP"], { metric }));
-    else if (avgHours >= 6) out.push(sig("recovery.sleep", "recovery", "watch", "Sleep a bit short", `Sleep ${h} h. Under 7 h costs recovery; aim 7–9.`, ["C-SLEEP"], { metric }));
-    else out.push(sig("recovery.sleep", "recovery", "act", "Sleep too short", `Sleep ${h} h. That will show in rep-outs before anything else.`, ["C-SLEEP"], { metric }));
-  }
-
-  // recovery.sleep_lifting (R1-23): nights before this week's lifting days (dated the lifting day), ≥ 2 logged.
-  const liftDates = liftingDayKeys(data.plan, ctx.week)
-    .map((k) => addDays(ctx.week.startDate, data.plan.days.find((d) => d.key === k)!.weekday - 1))
-    .filter((d) => d <= ctx.asOf);
-  const before = liftDates.map((d) => sleepHoursOn(data, d)).filter((h): h is number => h != null);
-  const beforeAvg = avg(before);
-  if (beforeAvg != null && before.length >= 2) {
-    const metric = { label: "Sleep before lifting days", value: fmtNum(beforeAvg, 1), target: `≥ ${SLEEP_TARGET_BEFORE_LIFTING_H}` };
-    if (beforeAvg >= SLEEP_TARGET_BEFORE_LIFTING_H - 1e-9) {
-      out.push(sig("recovery.sleep_lifting", "recovery", "good", "Rested for lifting days",
-        `Before lifting days: ${fmtNum(beforeAvg, 1)} h asleep (target ${SLEEP_TARGET_BEFORE_LIFTING_H}).`, ["C-SLEEP"], { metric }));
-    } else {
-      out.push(sig("recovery.sleep_lifting", "recovery", "watch", "Short before lifting days",
-        `Before lifting days: ${fmtNum(beforeAvg, 1)} h asleep (target ${SLEEP_TARGET_BEFORE_LIFTING_H}). Lights out ${LIGHTS_OUT_BEFORE_LIFTING} on Sun, Mon, Thu and Fri nights.`,
-        ["C-SLEEP"], { metric }));
-    }
-  }
 
   // recovery.energy: this week vs the 3 weeks before, ≥ 3 rated sessions each.
   const rated = ctx.sessions.filter((s) => s.energy != null);
@@ -80,7 +51,6 @@ export function recoveryRules(ctx: WeekCtx): AreaResult {
   return {
     signals: out,
     numbers: {
-      sleep: { nights: nights.length, avgHours, beforeLifting: { nights: before.length, avgHours: beforeAvg } },
       energy: { rated: rated.length, avg: eAvg, prevAvg },
       heart
     }

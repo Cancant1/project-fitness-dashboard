@@ -13,7 +13,7 @@ import { sessionDebrief, type Debrief } from "../coach/debrief";
 import type { PlanState, PrescribedDay } from "../plan/types";
 import { Card, Label, Pill, Ring, Sparkline, Stat } from "../ui/kit";
 import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
-import { answerPainCheck, currentWeekNo, dailyCues, ensurePlanProteinPerKg, saveElbowMonthly, savePhotosDone, saveSleep, weeklyReport, type DailyCue, type WeeklyReport } from "../coach";
+import { answerPainCheck, currentWeekNo, dailyCues, ensurePlanProteinPerKg, saveElbowMonthly, savePhotosDone, weeklyReport, bodyweightStatus, type BodyweightSide, type DailyCue, type WeeklyReport } from "../coach";
 import { useCoachData } from "../coach/hooks";
 import { ConditioningCard } from "./ConditioningCard";
 import { SetMaxes } from "./SetMaxes";
@@ -39,7 +39,6 @@ export function TodayPage() {
   const days = useRows("nutrition_days");
   const targets = useRows("nutrition_targets");
   const conditioning = useRows("conditioning");
-  const health = useRows("health_daily");
   const painChecks = useRows("pain_checks");
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -78,12 +77,13 @@ export function TodayPage() {
   const totals = dayTotals(today, entries, days);
   const weighIns = useMemo(() => weights.filter((w) => w.kind === "weight").sort((a, b) => a.date.localeCompare(b.date)), [weights]);
   const weightToday = weighIns.find((w) => w.date === today);
-  const sleptToday = health.find((h) => h.date === today)?.sleep_total_min;
 
   // The coach: today's cues and this week's verdict (week 0 before the plan, the last week after it).
   const coach = useCoachData();
   const hour = new Date().getHours();
   const cues = useMemo(() => dailyCues(coach, today, hour).filter((c) => c.id !== "checkin.ready"), [coach, today, hour]);
+  const lastWeigh = weighIns[weighIns.length - 1]?.date;
+  const track = useMemo(() => (lastWeigh && lastWeigh >= addDays(today, -7) ? bodyweightStatus(coach, lastWeigh)?.verdict ?? null : null), [coach, lastWeigh, today]);
   const report = useMemo((): WeeklyReport | null => {
     const n = currentWeekNo(coach, today) ?? (today < coach.start ? 0 : coach.plan.weeks[coach.plan.weeks.length - 1]!.weekNo);
     try { return weeklyReport(coach, n, today); } catch { return null; }
@@ -304,9 +304,8 @@ export function TodayPage() {
             </Card>
           </section>
 
-          <WeighIn weighIns={weighIns} todayValue={weightToday?.value} sleptMin={sleptToday ?? null} bw7={bw} onSave={async (kg, sleep) => {
-            if (kg != null) await local.save("body_measurements", { id: weightToday?.id, date: today, kind: "weight", value: kg, unit: "kg", source: "app", note: null });
-            if (sleep != null) await saveSleep(local, today, sleep);
+          <WeighIn weighIns={weighIns} todayValue={weightToday?.value} bw7={bw} track={track} onSave={async (kg) => {
+            await local.save("body_measurements", { id: weightToday?.id, date: today, kind: "weight", value: kg, unit: "kg", source: "app", note: null });
           }} />
 
           {squat && (
@@ -476,23 +475,22 @@ function ElbowMonthlyInput({ today, onDone }: { today: string; onDone: (m: strin
   );
 }
 
-function WeighIn({ weighIns, todayValue, sleptMin, bw7, onSave }: {
-  weighIns: { date: string; value: number }[]; todayValue?: number; sleptMin: number | null; bw7: number | null;
-  onSave: (kg: number | null, sleepHours: number | null) => Promise<void>;
+const TRACK: Record<BodyweightSide, { label: string; tone: "good" | "warm" }> = {
+  on: { label: "On track", tone: "good" }, above: { label: "Above target", tone: "warm" }, below: { label: "Below target", tone: "warm" }
+};
+
+function WeighIn({ weighIns, todayValue, bw7, track, onSave }: {
+  weighIns: { date: string; value: number }[]; todayValue?: number; bw7: number | null; track: BodyweightSide | null;
+  onSave: (kg: number) => Promise<void>;
 }) {
   const [text, setText] = useState("");
-  const [sleep, setSleep] = useState("");
   const recent = weighIns.slice(-30).map((w) => Number(w.value));
   const last = weighIns[weighIns.length - 1];
   async function save() {
     const v = parseDecimal(text);
-    const h = parseDecimal(sleep);
-    const kg = v != null && v >= 30 && v <= 250 ? v : null;
-    const hours = h != null && h > 0 && h <= 16 ? h : null;
-    if (kg == null && hours == null) return;
-    await onSave(kg, hours);
+    if (v == null || v < 30 || v > 250) return;
+    await onSave(v);
     setText("");
-    setSleep("");
   }
   return (
     <section>
@@ -502,6 +500,7 @@ function WeighIn({ weighIns, todayValue, sleptMin, bw7, onSave }: {
           <div className="k-stat">
             <span className="k-stat-value" style={{ fontSize: 34 }}>{fmtNum(bw7 ?? last?.value ?? null, 1)}<small>kg</small></span>
             <span className="k-stat-sub">{bw7 != null ? "7-day average" : last ? `last weigh-in · ${fmtShortDate(last.date)}` : "no weigh-ins yet"}</span>
+            {track && <Link to="/weight" className="today-track"><Pill tone={TRACK[track].tone}>{TRACK[track].label}</Pill></Link>}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}><Sparkline data={recent} color="var(--chart-1)" height={44} label="Last 30 weigh-ins" /></div>
         </div>
@@ -511,13 +510,7 @@ function WeighIn({ weighIns, todayValue, sleptMin, bw7, onSave }: {
             <input inputMode="decimal" className="num" placeholder={todayValue ? `${String(todayValue).replace(".", ",")} today` : "This morning, kg"}
               value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
           </label>
-          <label className="field today-sleep">
-            <span className="sr-only">Hours slept last night (optional)</span>
-            <input inputMode="decimal" className="num" placeholder={sleptMin ? fmtNum(sleptMin / 60, 1).replace(".", ",") : "Slept"}
-              value={sleep} onChange={(e) => setSleep(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void save()} />
-            <span className="field-suffix">h</span>
-          </label>
-          <button className="btn btn-tinted btn-icon" style={{ borderRadius: 14 }} aria-label="Save weight and sleep" onClick={() => void save()}><CheckIcon /></button>
+          <button className="btn btn-tinted btn-icon" style={{ borderRadius: 14 }} aria-label="Save weight" onClick={() => void save()}><CheckIcon /></button>
         </div>
       </Card>
     </section>

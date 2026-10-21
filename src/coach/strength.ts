@@ -2,7 +2,7 @@
 // provisional TMs and the step lifts (incline DB, weighted pull-up).
 
 import type { SetRow, TrainingMax } from "../data/types";
-import { addDays, fmtNum, fmtShortDate } from "../lib/format";
+import { addDays, fmtShortDate } from "../lib/format";
 import {
   PROVISIONAL_REPS, checkpointStatus, dumbbellStep, incrementAfterRepOut, isoWeekday, tmChangePercent, trainingMaxAfterRepOut,
   trainingMaxFromSet, weekForDate
@@ -11,7 +11,7 @@ import type { MainLiftKey, ProgramDefinition, StepLiftKey, TmLiftKey } from "../
 import { planRef } from "../plan/workout";
 import {
   LIFT_NAME, TRAINING_WEEK, bw7, fmtBw, fmtLoad, near25, nextMonday, plural, sessionsIn, sig, tmAt, tmRowAt, tmRows, weekBounds,
-  shortSleepBefore, workSets, type AreaResult, type WeekCtx
+  workSets, type AreaResult, type WeekCtx
 } from "./common";
 import type { CoachData } from "./data";
 import { laggingMuscles } from "./muscle";
@@ -139,15 +139,9 @@ export function strengthRules(ctx: WeekCtx): AreaResult {
           : `${head}: TM ${pct > 0 ? "+" : "−"}${Math.abs(pct)}% to ${fmtLoad(change.to)}.`;
         const metric = { label: `${name} rep-out`, value: String(r.reps), target: String(r.target) };
         const why: Signal["why"] = ["P-PROG-TM", "M-E1RM"];
-        // E18: a miss after a short night is read in context and doesn't count toward the early-deload rule.
-        const short = diff < 0 ? shortSleepBefore(data, r.date) : null;
-        const night = short != null
-          ? ` ${name} missed after a short night (${fmtNum(short, 1)} h); one-off misses after short nights don't count toward the early-deload rule.` : "";
         if (diff >= 0) out.push(sig(`strength.repout.${lift}`, "strength", "good", `${name} rep-out hit`, base, why, { metric }));
-        else if (diff === -1 || short != null) {
-          out.push(sig(`strength.repout.${lift}`, "strength", "watch", diff === -1 ? `${name} rep-out one short` : `${name} missed after short night`,
-            `${base}${night}`, short != null ? [...why, "C-SLEEP"] : why, { metric }));
-        } else out.push(sig(`strength.repout.${lift}`, "strength", "act", `${name} rep-out missed`, `${base} Note anything off: sleep, food, pain.`, why, { metric }));
+        else if (diff === -1) out.push(sig(`strength.repout.${lift}`, "strength", "watch", `${name} rep-out one short`, base, why, { metric }));
+        else out.push(sig(`strength.repout.${lift}`, "strength", "act", `${name} rep-out missed`, `${base} Note anything off: sleep, food, pain.`, why, { metric }));
       }
     }
   }
@@ -238,7 +232,7 @@ export function earlyDeloadRun(data: CoachData, lift: TmLiftKey, asOf: string, f
   const h = repOutHistory(data, lift, asOf).filter((r) => r.target != null && r.weekNo != null && planRef(r.set)?.calibration !== true);
   const latest = h.at(-1);
   if (!latest || latest.date < from) return null;
-  const deficit = (r: RepOutResult) => (shortSleepBefore(data, r.date) != null ? 0 : r.target! - r.reps);
+  const deficit = (r: RepOutResult) => r.target! - r.reps;
   const consecutive = (xs: RepOutResult[]) => xs.every((x, i) => i === 0
     || !data.plan.weeks.some((w) => w.weekNo > xs[i - 1]!.weekNo! && w.weekNo < x.weekNo! && TRAINING_WEEK.has(w.type)));
   const two = h.slice(-2);
@@ -262,12 +256,6 @@ function missesSignal(ctx: WeekCtx): Signal | null {
     return sig("strength.misses", "strength", "act", "Eat more: +100 kcal",
       `${running} and bodyweight is dropping. Eat first: +100 kcal.`, why,
       { action: { kind: "kcal", delta: 100, from: nextMonday(ctx.asOf) } });
-  }
-  const nights = data.health.filter((h) => h.date > addDays(ctx.asOf, -7) && h.date <= ctx.asOf && (h.sleep_total_min ?? 0) > 0);
-  const sleepH = nights.length >= 4 ? nights.reduce((s, h) => s + h.sleep_total_min!, 0) / nights.length / 60 : null;
-  if (sleepH != null && sleepH < 6) {
-    return sig("strength.misses", "strength", "watch", "Rep-outs missed, sleep short",
-      `${running}. Sleep ${fmtBw(sleepH)} h: fix sleep first.`, why);
   }
   // "Take the deload now": this week if most of it is still ahead (before Thursday), else next week.
   const applied = data.adjustments.find((a) => a.data.kind === "deload_now" && (a.data.weekNo === weekNo || a.data.weekNo === weekNo + 1));

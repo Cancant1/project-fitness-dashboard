@@ -1,5 +1,5 @@
 import type { Base, BodyMeasurement, Food, FoodEntry, Meal, NutritionDay, NutritionTarget, SavedMeal } from "../data/types";
-import { daysBetween, parseDecimal } from "./format";
+import { addDays, daysBetween, parseDecimal } from "./format";
 
 // Pure food logic: day totals, targets, ranking, and the one-time "set up your food list" proposal.
 // Food entries store totals (macros already multiplied by quantity); foods store one serving.
@@ -109,30 +109,51 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 export type AddGroup = "favorite" | "recent" | "all";
 
-/** Last date each food was eaten: by food_id, or by name for entries the old app logged without one. */
-export function lastUsedByFood(foods: Food[], entries: FoodEntry[]): Map<string, string> {
+/** Each entry's food: by food_id, or by name for entries the old app logged without one. */
+function foodIdOf(foods: Food[]): (e: FoodEntry) => string | undefined {
   const byName = new Map<string, string>();
   for (const f of foods) if (!f.archived && !byName.has(normName(f.name))) byName.set(normName(f.name), f.id);
+  return (e) => e.food_id ?? byName.get(normName(e.name));
+}
+
+/** Last date each food was eaten. */
+export function lastUsedByFood(foods: Food[], entries: FoodEntry[]): Map<string, string> {
+  const idOf = foodIdOf(foods);
   const last = new Map<string, string>();
   for (const e of entries) {
-    const id = e.food_id ?? byName.get(normName(e.name));
+    const id = idOf(e);
     if (id && (last.get(id) ?? "") < e.date) last.set(id, e.date);
   }
   return last;
 }
 
+/** Days in which "Favourites" counts what was logged (today and the 6 days before). */
+export const FAVOURITE_DAYS = 7;
+
 function matches(f: Food, needle: string): boolean {
   return !needle || normName(`${f.name} ${f.brand ?? ""} ${f.category ?? ""}`).includes(needle);
 }
 
-/** Foods for the Add sheet: favourites, then the most recent, then the rest A–Z. Archived foods never show. */
-export function rankFoodsForAdd(foods: Food[], entries: FoodEntry[], query: string, recentCount = 8): { food: Food; group: AddGroup }[] {
+/**
+ * Foods for the Add sheet: favourites (the 3 foods logged most often in the last 7 days, the latest first on a tie),
+ * then the most recent, then the rest A–Z. Archived foods never show.
+ */
+export function rankFoodsForAdd(foods: Food[], entries: FoodEntry[], query: string, today: string, favCount = 3, recentCount = 8): { food: Food; group: AddGroup }[] {
   const needle = normName(query);
   const last = lastUsedByFood(foods, entries);
+  const idOf = foodIdOf(foods);
+  const times = new Map<string, number>();
+  for (const e of entries) {
+    const id = e.date > addDays(today, -FAVOURITE_DAYS) && e.date <= today ? idOf(e) : undefined;
+    if (id) times.set(id, (times.get(id) ?? 0) + 1);
+  }
   const live = foods.filter((f) => !f.archived && matches(f, needle));
   const az = (a: Food, b: Food) => a.name.localeCompare(b.name, "nl", { sensitivity: "base" });
-  const favs = live.filter((f) => f.favorite).sort(az);
-  const recent = live.filter((f) => !f.favorite && last.has(f.id))
+  const favs = live.filter((f) => times.has(f.id))
+    .sort((a, b) => times.get(b.id)! - times.get(a.id)! || last.get(b.id)!.localeCompare(last.get(a.id)!) || az(a, b))
+    .slice(0, favCount);
+  const favIds = new Set(favs.map((f) => f.id));
+  const recent = live.filter((f) => !favIds.has(f.id) && last.has(f.id))
     .sort((a, b) => last.get(b.id)!.localeCompare(last.get(a.id)!) || az(a, b))
     .slice(0, needle ? Infinity : recentCount);
   const used = new Set([...favs, ...recent].map((f) => f.id));
@@ -193,8 +214,6 @@ export interface PlanFoodSpec {
   note: string;
   /** Normalised names of existing foods that are the same thing. */
   matches: string[];
-  /** Where it sits in the plan's usual day. */
-  usual: { meal: Meal; quantity: number }[];
 }
 
 // "Your day" in docs/plan/Strength_Return_Plan.md. Combined lines are split:
@@ -202,15 +221,15 @@ export interface PlanFoodSpec {
 //  lunch 558 / 46 = AH sausage roll 328 / 6.4 (AH label 88 g) + magere kwark 500 g 230 / 39.6;
 //  evening 235 / 6 = 25 g nuts 160 / 5.5 + a piece of fruit (pear 80 / 0.5).
 export const PLAN_FOODS: PlanFoodSpec[] = [
-  { key: "skyr", name: "Jumbo Skyr vanille 500 ml", brand: "Jumbo", serving: "1 tub (500 ml)", kcal: 365, protein: 47.5, carbs: 41.5, fat: 1, source: "plan", note: "Jumbo label.", matches: ["skyr 500ml vanille", "jumbo skyr vanille 500 ml", "jumbo skyr vanille 500ml"], usual: [{ meal: "breakfast", quantity: 1 }] },
-  { key: "banana", name: "Banaan", brand: null, serving: "1 medium", kcal: 105, protein: 1.3, carbs: 27, fat: 0.4, source: "plan-estimate", note: "Split from the plan's breakfast line.", matches: ["banaan", "banana"], usual: [{ meal: "breakfast", quantity: 1 }] },
-  { key: "sausage-roll", name: "AH saucijzenbroodje", brand: "AH", serving: "1 roll (88 g)", kcal: 325.6, protein: 6.7, carbs: 24.6, fat: 22, source: "plan", note: "ah.nl wi230724 (fresh, baked in store): 370 kcal, 7.6 g protein, 28 g carbs, 25 g fat per 100 g.", matches: ["ah saucijzenbroodje", "saucijzenbroodje", "ah sausage roll"], usual: [{ meal: "lunch", quantity: 1 }] },
-  { key: "kwark", name: "Magere kwark", brand: null, serving: "500 g", kcal: 230, protein: 39.6, carbs: 17.5, fat: 1, source: "plan-estimate", note: "Split from the plan's lunch line. Check your tub.", matches: ["magere kwark", "magere kwark 500 g", "magere kwark 500g"], usual: [{ meal: "lunch", quantity: 1 }] },
-  { key: "apple", name: "Appel", brand: null, serving: "1 medium", kcal: 80, protein: 0.3, carbs: 19, fat: 0.2, source: "plan", note: "Typical values.", matches: ["appel", "apple"], usual: [{ meal: "snacks", quantity: 1 }] },
-  { key: "pear", name: "Peer", brand: null, serving: "1 medium", kcal: 80, protein: 0.5, carbs: 19, fat: 0.2, source: "plan-estimate", note: "Typical values for a medium pear.", matches: ["peer", "pear"], usual: [{ meal: "snacks", quantity: 1 }] },
-  { key: "winegums", name: "Winegums", brand: null, serving: "Handful (40 g)", kcal: 135, protein: 2, carbs: 30, fat: 0.1, source: "plan", note: "Typical values. Check the pack.", matches: ["winegums", "wine gums", "winegums 40 g"], usual: [{ meal: "snacks", quantity: 1 }] },
-  { key: "shake", name: "Bulk shake chocolade", brand: "Bulk", serving: "1 scoop in water", kcal: 114, protein: 22, carbs: 2.6, fat: 1.7, source: "plan", note: "Bulk label. The plan's shake is 2 scoops.", matches: ["shake bulk chocolade 1 sc", "bulk shake chocolade", "shake bulk chocolade"], usual: [{ meal: "snacks", quantity: 2 }] },
-  { key: "nuts", name: "Ongezouten noten met walnoten", brand: null, serving: "25 g", kcal: 160, protein: 5.5, carbs: 4, fat: 14, source: "plan-estimate", note: "Split from the plan's 'nuts + fruit' line. Typical values.", matches: ["ongezouten noten met walnoten", "ongezouten noten", "unsalted nuts"], usual: [{ meal: "snacks", quantity: 1 }] }
+  { key: "skyr", name: "Jumbo Skyr vanille 500 ml", brand: "Jumbo", serving: "1 tub (500 ml)", kcal: 365, protein: 47.5, carbs: 41.5, fat: 1, source: "plan", note: "Jumbo label.", matches: ["skyr 500ml vanille", "jumbo skyr vanille 500 ml", "jumbo skyr vanille 500ml"] },
+  { key: "banana", name: "Banaan", brand: null, serving: "1 medium", kcal: 105, protein: 1.3, carbs: 27, fat: 0.4, source: "plan-estimate", note: "Split from the plan's breakfast line.", matches: ["banaan", "banana"] },
+  { key: "sausage-roll", name: "AH saucijzenbroodje", brand: "AH", serving: "1 roll (88 g)", kcal: 325.6, protein: 6.7, carbs: 24.6, fat: 22, source: "plan", note: "ah.nl wi230724 (fresh, baked in store): 370 kcal, 7.6 g protein, 28 g carbs, 25 g fat per 100 g.", matches: ["ah saucijzenbroodje", "saucijzenbroodje", "ah sausage roll"] },
+  { key: "kwark", name: "Magere kwark", brand: null, serving: "500 g", kcal: 230, protein: 39.6, carbs: 17.5, fat: 1, source: "plan-estimate", note: "Split from the plan's lunch line. Check your tub.", matches: ["magere kwark", "magere kwark 500 g", "magere kwark 500g"] },
+  { key: "apple", name: "Appel", brand: null, serving: "1 medium", kcal: 80, protein: 0.3, carbs: 19, fat: 0.2, source: "plan", note: "Typical values.", matches: ["appel", "apple"] },
+  { key: "pear", name: "Peer", brand: null, serving: "1 medium", kcal: 80, protein: 0.5, carbs: 19, fat: 0.2, source: "plan-estimate", note: "Typical values for a medium pear.", matches: ["peer", "pear"] },
+  { key: "winegums", name: "Winegums", brand: null, serving: "Handful (40 g)", kcal: 135, protein: 2, carbs: 30, fat: 0.1, source: "plan", note: "Typical values. Check the pack.", matches: ["winegums", "wine gums", "winegums 40 g"] },
+  { key: "shake", name: "Bulk shake chocolade", brand: "Bulk", serving: "1 scoop in water", kcal: 114, protein: 22, carbs: 2.6, fat: 1.7, source: "plan", note: "Bulk label. The plan's shake is 2 scoops.", matches: ["shake bulk chocolade 1 sc", "bulk shake chocolade", "shake bulk chocolade"] },
+  { key: "nuts", name: "Ongezouten noten met walnoten", brand: null, serving: "25 g", kcal: 160, protein: 5.5, carbs: 4, fat: 14, source: "plan-estimate", note: "Split from the plan's 'nuts + fruit' line. Typical values.", matches: ["ongezouten noten met walnoten", "ongezouten noten", "unsalted nuts"] }
 ];
 
 /** Foods already in the library that fit the plan's dinner rule (chicken, eggs, legumes, rice, potatoes, vegetables) or fruit. */
@@ -226,6 +245,7 @@ export const PLAN_EXTRAS: { match: string; reason: string }[] = [
 ];
 
 export const PLAN_TARGET_FROM = "2026-10-12";
+/** The old "usual day" saved meal (removed 21 Oct 2026): hidden from Quick log. */
 export const PLAN_DAY_NAME = "Plan: usual day";
 
 export function hasPlanTarget(targets: NutritionTarget[]): boolean {
@@ -235,28 +255,6 @@ export function hasPlanTarget(targets: NutritionTarget[]): boolean {
 export function planTargetRow(): Omit<NutritionTarget, keyof Base> {
   return { effective_from: PLAN_TARGET_FROM, phase: "lean bulk", kcal: 2800, protein: 150, protein_per_kg: 2.0, carbs: 310, fat: 80, per_weekday: null, target_weight: 77,
     note: "Strength Return Plan. Protein 2.0 g/kg bodyweight (Morton 2018: benefit levels off ≈1.6, upper bound 2.2 g/kg)." };
-}
-
-/** The plan's usual day (everything but dinner) as one saved meal; uses your foods where they exist. */
-export function planDaySavedMeal(foods: Food[]): SavedMealDraft {
-  const live = foods.filter((f) => !f.archived);
-  const items: SavedMeal["items"] = [];
-  for (const spec of PLAN_FOODS) {
-    const food = findByNames(live, spec.matches) ?? findByNames(live, [normName(spec.name)]);
-    for (const u of spec.usual) {
-      const base = food ? entryFromFood(food, u.quantity, u.meal) : {
-        meal: u.meal, food_id: null, name: spec.name, serving_label: spec.serving, quantity: u.quantity,
-        kcal: round1(spec.kcal * u.quantity), protein: round1(spec.protein * u.quantity), carbs: round1(spec.carbs * u.quantity), fat: round1(spec.fat * u.quantity), note: null
-      };
-      items.push({ ...base, legacy_ref: {} });
-    }
-  }
-  return { name: PLAN_DAY_NAME, default_meal: null, position: 0, items };
-}
-
-function findByNames(foods: Food[], names: string[]): Food | undefined {
-  const set = new Set(names);
-  return foods.find((f) => set.has(normName(f.name)));
 }
 
 // ------------------------------------------------------------------ "set up your food list"

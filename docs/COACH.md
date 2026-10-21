@@ -1,7 +1,7 @@
 # Coach: specification
 
 The coach reads what Mario enters (sets, rep-outs, weigh-ins, food, waist, pain checks, conditioning,
-sleep, session energy) and tells him how he is doing against the Strength Return Plan:
+session energy; sleep is no longer tracked since 21 Oct 2026) and tells him how he is doing against the Strength Return Plan:
 - whether he is on track,
 - what to change,
 - why.
@@ -28,7 +28,7 @@ Rules are pure functions in `src/coach/`, unit-tested and free of React. The sam
 | Pain during a set (none / ache / sharp) | Pain sheet in the logger | `pain_checks.during_set` |
 | Pain next morning (normal / sore) | Today prompt (**NEW**) | `pain_checks.next_morning` |
 | Session energy 1–5 | Finish-workout sheet (**NEW**) | `sessions.energy` |
-| Sleep hours (optional; Apple Watch later) | Weigh-in card (**NEW**) | `health_daily.sleep_total_min`, source `manual` |
+| ~~Sleep hours~~ (removed 21 Oct 2026: not tracked) | — | — |
 | Ride, boxing, rounds | Conditioning card | `conditioning` |
 | Coach adjustments he accepted | "Apply" buttons (**NEW**) | `programs.rules.adjustments[]` |
 
@@ -138,7 +138,7 @@ each at week 19. Deload and taper weeks still count toward the line.
 |---|---|---|
 | `strength.tm.{lift}` | The latest TM vs the plan line at the current week. | Within 2.5% below it or above: `good` "{Lift} TM {tm}, plan line {line}." · 2.5–5% below: `watch` "{Lift} TM {tm} is {x} kg under the plan line ({line})." · More than 5% below: `act` "{Lift} TM {tm} is {x} kg behind. Check sessions, sleep and bodyweight first." |
 | `strength.repout.{lift}` | This week's rep-out: clean reps vs target and the TM change applied. | Hit or over: `good` "{Lift} {load} × {reps} (target {t}): TM {±p}% to {new}." · 1 under: `watch` · ≥2 under: `act` (same template plus "Note anything off: sleep, food, pain."). |
-| `strength.misses` | Squat or deadlift rep-out under target in two consecutive weeks (non-deload) **and** bodyweight is not falling and sleep is not poor. | `act` "Rep-outs missed two weeks running. Take the deload now; the plan allows it early." action `deload_now`. If bodyweight is falling: `act` "Rep-outs missed two weeks running and bodyweight is dropping. Eat first: +100 kcal." action `kcal +100`. |
+| `strength.misses` | Squat or deadlift rep-out under target in two consecutive weeks (non-deload) **and** bodyweight is not falling. | `act` "Rep-outs missed two weeks running. Take the deload now; the plan allows it early." action `deload_now`. If bodyweight is falling: `act` "Rep-outs missed two weeks running and bodyweight is dropping. Eat first: +100 kcal." action `kcal +100`. |
 | `strength.checkpoint` | In a checkpoint week (6, 14) once it is complete: `checkpointStatus()`. | Met: `good` "Checkpoint {n} met: squat {s}/{S}, deadlift {d}/{D}, bodyweight {b}/{B}." action `extra_sets` (two most lagging muscles; §4.3) for checkpoint 1 only. · Behind with bodyweight short: `act` "Checkpoint {n} missed. Bodyweight {b} vs {B}: fix food first, +100 kcal." · Behind with sessions and bodyweight fine: `act` "Checkpoint {n} missed on {lifts}. Add one normal set to each main lift." action `main_lift_set`. |
 | `strength.checkpoint_ahead` | 1–3 weeks before a checkpoint: projection = TM + (average TM change per rep-out week over the last 3) × rep-out weeks left. | ≥ target `good` "On course for checkpoint {n}: squat ≈{p} by {date} (needs {S})." · < target `watch` "Checkpoint {n} in {k} weeks: squat ≈{p}, needs {S}." |
 | `strength.calibration` | Week 0 or the first rep-out: rep-out over 12 clean reps → provisional TM (§6.2). | `info` "{Lift} {load} × {reps}: past 12 reps the formula is rough, so the TM is provisional ({tm}). The next rep-outs correct it." |
@@ -174,6 +174,7 @@ The expected path is the plan's table, interpolated linearly between its points:
 | id | Rule | Status and message |
 |---|---|---|
 | `body.weighins` | Weigh-ins this week. | ≥5 `good` · 3–4 `watch` "Only {k} weigh-ins. The average needs most mornings." · ≤2 `act` "{k} weigh-ins: not enough to judge the bulk." |
+| Weight page "On track" (`bodyweightStatus`) | Every day from the plan start, weeks 0–2 included (marked "Early read"): the 7-day average vs the expected band, and the least-squares pace of the last 14 days' weigh-ins (≥ 5 over ≥ 7 days) vs 0.10–0.25 kg/week plus the creatine water expected in those days. Verdict: both inside → on track; one off → that side; one above and one below → on track (already correcting). Information only: calories still change only through `body.rate`. | "On track" / "Above target" (eating a bit much) / "Below target" (room to eat more), also as a pill on Today's weight card. |
 | `body.path` | The 7-day average vs the expected band on the week's last day. | Inside: `good` "7-day average {avg} kg, plan range {lo}–{hi}." · Below: `watch` · Above: `watch` (text names the direction). |
 | `body.rate` | **Every 2 weeks from week 3**, on weeks 3, 5, 7, 9, 11, 13, 15, 17 (complete): the least-squares slope of all weigh-ins in the last 28 days (≥10 weigh-ins over ≥21 days), in kg/week, with its standard error. Weeks 0–2 are skipped (glycogen and water). Bands: <+0.10 → +100 kcal · +0.10 to +0.25 → keep · >+0.25 → −100 kcal. **Science check A3:** act only when the slope is past the band edge by more than 1 SE; otherwise watch and re-check in 2 weeks. | `act` "Gaining {r} kg/week (target 0.10–0.25). Add 100 kcal of carbs from Monday." action `kcal +100` (or −100 with "Remove 100 kcal."). · Clear but within 1 SE: `watch` "Gaining {r} kg/week, close to the edge. Same calories; re-check in 2 weeks." · In band: `good` "Gaining {r} kg/week: right in the lean-bulk range." · Off weeks: `info` "Next rate check: Sunday {date}." |
 | `body.waist` | Waist entries: change per 30 days over the last ≥28 days. Rising >1 cm/month **and** no squat/deadlift TM increase in the same period. | `act` "Waist +{x} cm/month while lifts stall. Remove 100 kcal." action `kcal −100`. · Due (none in 14 days): cue "Waist check due: tape at the navel, morning." |
@@ -216,7 +217,7 @@ The swap list (Part 1):
 
 | id | Rule | Status and message |
 |---|---|---|
-| `recovery.sleep` | Average sleep this week (from `health_daily`) when ≥4 nights are logged. | ≥7 h `good` · 6–7 h `watch` "Sleep {h} h. Under 7 h costs recovery; aim 7–9." · <6 h `act` "Sleep {h} h. That will show in rep-outs before anything else." |
+| ~~`recovery.sleep`~~ | Removed 21 Oct 2026 with sleep tracking (also `recovery.sleep_lifting`, the short-night flag on rep-outs and the "fix sleep first" branch of `strength.misses`). | — |
 | `recovery.energy` | Average session energy (1–5) this week vs the previous 3 weeks. | A drop of ≥1 point with ≥3 rated sessions: `watch` "Sessions feel harder (energy {a} vs {b}). Check sleep and food." |
 | `recovery.caffeine` | Static info (science check A1). | "Evening sessions: ~150 mg caffeine or none; the 3–6 mg/kg dose needs ≥12 h before bed." |
 
@@ -328,6 +329,6 @@ These replace the matching rules above where they differ.
 | `body.photos` | New: photo weeks 0, 4, 8, 12, 16, 19; Thursday cue until done (`body_measurements` kind `other`, value 1, note `photos`). |
 | `fuel.tdee` | "Maintenance (as logged)": ≥ 24 of 28 days, 6,000 kcal/kg, window after week 4. |
 | `joints.*` | Pain 0–10 (`pain_score`, `morning_score`): swap when the morning is ≥ the site's 14-day median + 2 (start load in the action); ≥ 6 counts as sharp; aches rising 2 weeks → `deload_now`; morning means rising 2 weeks → `joints.cut_sets` (sets × 2/3 for 2 weeks, red flags); 4 weeks at 0–3 → `joints.alternative` (incline hammer curl). |
-| `recovery.*` | `sleep_lifting` (≥ 7.5 h before lifting days, lights out 23:15); `resting_hr` and `hrv` as info only (7-day vs 60-day). |
+| `recovery.*` | `resting_hr` and `hrv` as info only (7-day vs 60-day); the lights-out cue (23:15 before lifting days) stays, sleep itself isn't tracked. |
 | `conditioning.gassed` | New: Thursday "gassed" 1–5 trend over 6 weeks; pacing tip from week 8. |
 | Daily cues | Pain prompt (0–10) → if-then cues (missed yesterday, Thursday floor, minimum session, first exercise after 17:00, Sunday planning) → pending action → floor (Fri+) → weigh-in → photos → caffeine/candy (from 15:00) → protein → monthly elbow check → waist → lights out → check-in. |

@@ -112,7 +112,6 @@ function render(r: WeeklyReport): string {
   lines.push(`| Food logged | ${f.daysLogged} days |`);
   lines.push(`| Energy | ${fmt(f.avgKcal, 0)} kcal avg / target ${fmt(f.targetKcal, 0)}${f.tdee != null ? ` · measured maintenance ≈${f.tdee.toFixed(0)}` : ""} |`);
   lines.push(`| Protein | ${fmt(f.avgProtein, 0)} g avg / target ${fmt(f.targetProtein, 0)} (${fmt(f.proteinPerKg, 2)} g/kg) |`);
-  lines.push(`| Sleep | ${fmt(n.sleep.avgHours)} h over ${n.sleep.nights} nights |`);
   lines.push(`| Session energy | ${fmt(n.energy.avg)} (prev ${fmt(n.energy.prevAvg)}), ${n.energy.rated} rated |`);
   lines.push(`| Pain | ${n.pain.length ? n.pain.map((p) => `${p.site}: ${p.sessions} sessions${p.sharp ? `, ${p.sharp} sharp` : ""}`).join("; ") : "none logged"} |`);
   const c = n.conditioning;
