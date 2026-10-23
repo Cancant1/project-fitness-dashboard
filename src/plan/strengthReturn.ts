@@ -103,9 +103,11 @@ const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', 
   ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.'],
   { alternatives: ['db_lateral_raise'] });
 const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
-  ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.'], { alternatives: ['heel_elevated_goblet_squat'] });
+  ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.',
+    'Pulley at 7, no higher: full pull in the stretch. Same height every week.'], { alternatives: ['heel_elevated_goblet_squat'] });
 const CALF_RAISE = (): ProgramSlot => isolation('cable_calf_raise', failure(2, 10, 15), 250, 'lb', 'total', // 125 + 125 lb ≈ 113 kg (plan 120 kg; no pin for it)
-  ['Bar between the two pulleys; knees straight; pause 1–2 s in the stretch. Half reps in the bottom after failure.'],
+  ['Bar between the two pulleys; knees straight; pause 1–2 s in the stretch. Half reps in the bottom after failure.',
+    'Two stacked 10 kg plates per foot, in line with the pulleys. Straps.'],
   { alternatives: ['single_leg_db_calf_raise'] });
 const FLYE = (): ProgramSlot => isolation('chest_cable_flye', failure(2, 10, 15), 50, 'lb', 'per_arm', // 50 lb per side = the plan's 23 kg
   ['Pulleys at chest height, 1 s pause in the stretch. Right shoulder: stop the stretch a little earlier.'],
@@ -189,7 +191,8 @@ const DAYS: ProgramDay[] = [
       compound('bulgarian_split_squat', repOutLast(3, 8, 12), 14, 'kg', 'per_hand', ['Straps if grip limits.', '90 s between legs.'],
         { alternatives: ['db_reverse_lunge'] }),
       // June 30 lb −10% → 20 (no 25 pin)
-      isolation('seated_cable_leg_curl', failure(2, 10, 15), 20, 'lb', 'per_leg', ['Torso leaning slightly forward, hips bent.'],
+      isolation('seated_cable_leg_curl', failure(2, 10, 15), 20, 'lb', 'per_leg', ['Torso leaning slightly forward, hips bent.',
+          'Pulley at 7; crunch bench as the seat so the toes clear the floor.'],
         { alternatives: ['lying_db_hamstring_curl'] }),
       LEG_EXTENSION(1),
       CALF_RAISE(),
