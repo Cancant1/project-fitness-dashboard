@@ -11,7 +11,8 @@ import { Card, Pill } from "../ui/kit";
 import { CheckIcon } from "../ui/icons";
 import "./conditioning.css";
 
-const KIND: Record<string, Conditioning["kind"]> = { easy_ride: "ride", boxing: "boxing", rounds: "rounds" };
+/** The conditioning row kind each plan day logs. */
+export const CONDITIONING_KIND: Record<string, Conditioning["kind"]> = { easy_ride: "ride", boxing: "boxing", rounds: "rounds" };
 type Gassed = 1 | 2 | 3 | 4 | 5;
 
 /** Wed ride (+ the wrist ladder at home), Thu boxing (+ how gassed), Sun rounds (+ burst rounds): what the plan asks and a quick log. */
@@ -28,7 +29,7 @@ export function ConditioningCard({ date, dayKey, weekNo, existing }: { date: str
     trainingMaxes: { squat: 1, deadlift: 1 }, currentLoads: {},
     ...(sundayRounds !== undefined ? { sundayRounds } : {}), ...(wrist ? { wristLadder: wrist } : {})
   }).conditioning;
-  const kind = KIND[dayKey] ?? "other";
+  const kind = CONDITIONING_KIND[dayKey] ?? "other";
   const logged = existing.find((c) => c.kind === kind && c.done);
   const [f, setF] = useState({
     minutes: p?.minutes ? String(p.minutes) : "", loop: "", rounds: p?.rounds ? String(p.rounds) : "", first: "", last: "",

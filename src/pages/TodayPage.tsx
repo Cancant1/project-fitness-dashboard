@@ -8,18 +8,21 @@ import { countsForStrength, e1rm } from "../lib/analysis";
 import { dayForDate, prescribeDay, prescribeMinimum } from "../plan/engine";
 import { PLAN, PLAN_KEY, activeProgram, ensurePlanExercises, equipmentFrom, latestMaxes, planState, usePlan, usePlanIds } from "../plan/bridge";
 import { planRef, startWorkout } from "../plan/workout";
-import { nextPlanned } from "./plan/planView";
+import { DAY_SHORT, doneSession as sessionForSlot, doneSlots, nextPlanned, tryDay, usePlanContext } from "./plan/planView";
+import { DayBody } from "./plan/WeekDetail";
 import { sessionDebrief, type Debrief } from "../coach/debrief";
-import type { PlanState, PrescribedDay } from "../plan/types";
+import type { DayKey, PlanState, PrescribedDay } from "../plan/types";
 import { Card, Label, Pill, Ring, Sparkline, Stat } from "../ui/kit";
+import { Sheet } from "../ui/Sheet";
 import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
 import { answerPainCheck, currentWeekNo, dailyCues, ensurePlanProteinPerKg, saveElbowMonthly, savePhotosDone, weeklyReport, bodyweightStatus, type BodyweightSide, type DailyCue, type WeeklyReport } from "../coach";
 import { useCoachData } from "../coach/hooks";
-import { ConditioningCard } from "./ConditioningCard";
+import { CONDITIONING_KIND, ConditioningCard } from "./ConditioningCard";
 import { SetMaxes } from "./SetMaxes";
 import { ApplyButton, Dot, VERDICT_TONE, VERDICT_WORD } from "./checkin/coachUi";
 import { useToast } from "./food/ui";
 import "./today.css";
+import "./plan/plan.css";
 import { ThemeSwitch } from "../ui/theme";
 
 const DAY_LETTER = ["M", "T", "W", "T", "F", "S", "S"];
@@ -41,6 +44,8 @@ export function TodayPage() {
   const conditioning = useRows("conditioning");
   const painChecks = useRows("pain_checks");
   const [busy, setBusy] = useState(false);
+  // A plan day opened in a sheet: today's workout (View) or a day of the week strip.
+  const [sheet, setSheet] = useState<{ weekNo: number; dayKey: DayKey; date: string } | null>(null);
   const toast = useToast();
 
   const today = useToday();
@@ -58,6 +63,7 @@ export function TodayPage() {
   const slot = dayForDate(plan, planDate);
   const dayLabel = planDate === today ? "Today" : planDate === addDays(today, 1) ? "Tomorrow" : fmtShortDate(planDate);
   const doneToday = sessions.some((s) => s.date === today && s.status === "completed" && s.program_id === program?.id);
+  const { slots } = useMemo(() => doneSlots(sessions, program), [sessions, program]);
 
   const prescription = useMemo((): { day: PrescribedDay | null; state: PlanState | null; error: string | null } => {
     if (!slot) return { day: null, state: null, error: null };
@@ -204,6 +210,11 @@ export function TodayPage() {
               <div className="today-hero-top">
                 <Pill tone="plain">{dayLabel}</Pill>
                 {doneToday && <Pill tone="plain"><CheckIcon /> Done</Pill>}
+                {!doneToday && slot && (
+                  <button type="button" className="today-hero-view" onClick={() => setSheet({ weekNo: slot.week.weekNo, dayKey: slot.day.key, date: planDate })}>
+                    View <ChevronRight />
+                  </button>
+                )}
               </div>
               <h2 className="today-hero-title">{day.title}</h2>
               {doneToday && doneMain ? (
@@ -255,14 +266,22 @@ export function TodayPage() {
               <div className="today-week">
                 {PLAN.days.slice().sort((a, b) => a.weekday - b.weekday).map((d) => {
                   const date = addDays(slot.week.startDate, d.weekday - 1);
-                  const done = sessions.some((s) => s.date === date && s.status === "completed") || conditioning.some((c) => c.date === date && c.done && c.kind !== "other");
+                  // Done by plan slot, not by date: a session moved to another day ticks the day it was planned for.
+                  // Lifting: the session logged for this week's day (or an off-plan session on the date); conditioning:
+                  // that kind logged anywhere in the week.
+                  const weekEnd = addDays(slot.week.startDate, 6);
+                  const done = d.kind === "lifting"
+                    ? slots.has(`${slot.week.weekNo}:${d.key}`) || sessions.some((s) => s.date === date && s.status === "completed" && !planDayKey(s))
+                    : conditioning.some((c) => c.kind === CONDITIONING_KIND[d.key] && c.done && !c.deleted_at && c.date >= slot.week.startDate && c.date <= weekEnd);
                   const cls = [d.kind === "lifting" ? "lift" : "cardio", date === planDate ? "now" : "", done ? "done" : ""].join(" ");
+                  const logged = d.kind === "lifting" ? sessionForSlot(sessions, program, slot.week.weekNo, d.key) : undefined;
                   return (
-                    <div key={d.key} className={`today-day ${cls}`}>
+                    <button key={d.key} type="button" className={`today-day ${cls}`} aria-label={`${DAY_SHORT[d.weekday - 1]} ${d.title}${done ? ", done" : ""}`}
+                      onClick={() => logged ? navigate(`/session/${logged.id}`) : setSheet({ weekNo: slot.week.weekNo, dayKey: d.key, date })}>
                       <span className="today-day-letter">{DAY_LETTER[d.weekday - 1]}</span>
                       <span className="today-day-dot">{done ? <CheckIcon /> : Number(date.slice(8))}</span>
                       <span className="today-day-name">{shortName(d.key)}</span>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -323,8 +342,45 @@ export function TodayPage() {
           )}
         </div>
       </div>
+      {sheet && (
+        <PlanDaySheet {...sheet} onClose={() => setSheet(null)}
+          day={slot && sheet.weekNo === slot.week.weekNo && sheet.dayKey === slot.day.key ? day : null}
+          onStart={program && day?.kind === "lifting" && !doneToday && sheet.date === planDate ? () => { setSheet(null); void start(day); } : undefined}
+          startLabel={planDate === today ? "Start workout" : "Start early"} />
+      )}
       {toast.node}
     </main>
+  );
+}
+
+const planDayKey = (s: { legacy_ref: unknown }) => (s.legacy_ref as { plan?: { dayKey?: string } } | null)?.plan?.dayKey;
+
+/**
+ * One plan day in a sheet. Lifting: the prescription (the hero's own day when given, so the loads match it).
+ * Conditioning: the log card for that date, so a missed tick (boxing yesterday) can be logged afterwards.
+ */
+function PlanDaySheet({ weekNo, dayKey, date, day, onStart, startLabel, onClose }: {
+  weekNo: number; dayKey: DayKey; date: string; day: PrescribedDay | null; onStart?: () => void; startLabel: string; onClose: () => void;
+}) {
+  const ctx = usePlanContext();
+  const conditioning = useRows("conditioning");
+  const def = ctx.plan.days.find((d) => d.key === dayKey)!;
+  const when = `${DAY_SHORT[def.weekday - 1]} ${fmtShortDate(date)}`;
+  if (def.kind === "conditioning") {
+    return (
+      <Sheet title={when} onClose={onClose}>
+        <ConditioningCard date={date} dayKey={dayKey} weekNo={weekNo} existing={conditioning.filter((c) => c.date === date && !c.deleted_at)} />
+      </Sheet>
+    );
+  }
+  const p = day ?? tryDay(weekNo, dayKey, ctx.state, ctx.equipment, ctx.plan);
+  return (
+    <Sheet title={`${def.title} · ${when}`} onClose={onClose}>
+      {p && p.kind === "lifting"
+        ? <div className="k-card today-sheet-day"><DayBody day={p} ctx={ctx} /></div>
+        : <p className="k-muted">No lifting this week.</p>}
+      {onStart && <button type="button" className="btn btn-primary" onClick={onStart}><PlayIcon /> {startLabel}</button>}
+    </Sheet>
   );
 }
 
