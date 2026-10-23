@@ -321,7 +321,6 @@ describe('week shapes', () => {
       expect(e.sets).toHaveLength(1);
       expect(e.sets[0]!.kind).toBe('working');
     });
-    expect(ex(7, 'upper_a', 'cable_external_rotation').sets).toHaveLength(2); // shoulder care unchanged
     expect(ex(7, 'lower_b', 'wrist_extension').sets).toHaveLength(3); // elbow care unchanged (the ladder keeps its 3 sets)
     expect(prescribeWeek(P, 7, STATE).map((d) => d.workingSetCount)).toEqual([10, 11, 0, 0, 8, 8, 0]);
   });
@@ -343,7 +342,6 @@ describe('week shapes', () => {
     const tue = week[1]!;
     expect(tue.exercises.filter((e) => e.role === 'main').map((e) => [e.exerciseKey, e.sets.at(-1)?.load, e.sets.at(-1)?.target]))
       .toEqual([['incline_db_press', 37.5, 8], ['weighted_pullup', 20, 8]]);
-    expect(tue.exercises.filter((e) => e.role === 'shoulder')).toHaveLength(2);
     expect(week[4]!.exercises.map((e) => [e.exerciseKey, e.sets.at(-1)?.load])).toEqual([['deadlift', 205]]);
     expect(week[5]).toMatchObject({ kind: 'rest', exercises: [] });
     expect(week[6]).toMatchObject({ kind: 'rest', conditioning: { skipped: true, rounds: 0 } });
@@ -368,8 +366,8 @@ describe('extra sets and checkpoint fallbacks', () => {
   it('places +1 set on the first isolation slot of each lagging muscle (default 7)', () => {
     expect(extraSetTargets(P, ['triceps', 'rear_delts', 'back'])).toEqual([
       { muscle: 'triceps', dayKey: 'lower_a', slotIndex: 7, exerciseKey: 'cross_body_triceps_extension' },
-      { muscle: 'rear_delts', dayKey: 'upper_b', slotIndex: 7, exerciseKey: 'cable_rear_delt_fly' },
-      { muscle: 'back', dayKey: 'upper_a', slotIndex: 4, exerciseKey: 'seated_cable_row' },
+      { muscle: 'rear_delts', dayKey: 'upper_b', slotIndex: 5, exerciseKey: 'cable_rear_delt_fly' },
+      { muscle: 'back', dayKey: 'upper_a', slotIndex: 2, exerciseKey: 'seated_cable_row' },
     ]);
   });
 

@@ -65,14 +65,13 @@ describe('days', () => {
 
   it('lists every exercise in plan order', () => {
     const order = (key: string) => P.days.find((d) => d.key === key)!.slots.map((s) => s.exerciseKey);
-    const shoulder = ['cable_external_rotation', 'cable_serratus_punch'];
     expect(order('lower_a')).toEqual(['squat', 'romanian_deadlift', 'lying_db_hamstring_curl', 'cable_leg_extension',
       'cable_calf_raise', 'kneeling_cable_crunch', 'cable_lateral_raise', 'cross_body_triceps_extension', 'wrist_extension']);
-    expect(order('upper_a')).toEqual([...shoulder, 'incline_db_press', 'weighted_pullup', 'seated_cable_row',
+    expect(order('upper_a')).toEqual(['incline_db_press', 'weighted_pullup', 'seated_cable_row',
       'chest_cable_flye', 'cable_lateral_raise', 'bayesian_curl', 'overhead_cable_triceps_extension', 'cable_rear_delt_fly']);
     expect(order('lower_b')).toEqual(['deadlift', 'bulgarian_split_squat', 'seated_cable_leg_curl', 'cable_leg_extension',
       'cable_calf_raise', 'hanging_knee_raise', 'cable_lateral_raise', 'preacher_curl', 'wrist_extension']);
-    expect(order('upper_b')).toEqual([...shoulder, 'barbell_row', 'db_bench_press', 'lat_pulldown', 'chest_cable_flye',
+    expect(order('upper_b')).toEqual(['barbell_row', 'db_bench_press', 'lat_pulldown', 'chest_cable_flye',
       'cable_lateral_raise', 'cable_rear_delt_fly', 'single_arm_cable_curl', 'rope_pushdown']);
   });
 
@@ -125,7 +124,7 @@ describe('days', () => {
 
   it('records the session lengths', () => {
     const len = (k: string) => { const d = P.days.find((x) => x.key === k)!; return [d.minutes, d.minutesAlternating]; };
-    expect([len('lower_a'), len('upper_a'), len('lower_b'), len('upper_b')]).toEqual([[75, undefined], [80, undefined], [70, undefined], [80, undefined]]); // no supersets (19 Oct 2026)
+    expect([len('lower_a'), len('upper_a'), len('lower_b'), len('upper_b')]).toEqual([[75, undefined], [75, undefined], [70, undefined], [75, undefined]]); // no supersets (19 Oct), no shoulder block (23 Oct 2026)
   });
 });
 

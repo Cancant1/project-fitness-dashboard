@@ -18,16 +18,4 @@ describe("progression from ticked sets", () => {
     w.session(dayIn(0, "lower_a"), "lower_a", { reps: (e, p) => (e.exerciseKey === "lying_db_hamstring_curl" && p.repRange ? p.repRange[1] + 2 : undefined) });
     expect(w.data().state.currentLoads.lying_db_hamstring_curl).toBeGreaterThan(25);
   });
-  it("shoulder block: filled in at the range bottom, so a plain tick keeps the load", () => {
-    const tue = prescribeDay(PLAN, 1, "upper_a", STATE);
-    const er = tue.exercises.find((e) => e.exerciseKey === "cable_external_rotation")!;
-    expect(er.sets.map((s) => s.reps)).toEqual([12, 12]);
-    const w = new World();
-    w.session(dayIn(1, "upper_a"), "upper_a");
-    w.session(dayIn(1, "upper_b"), "upper_b");
-    expect(w.data().state.currentLoads.cable_external_rotation).toBe(10);
-    const w2 = new World();
-    w2.session(dayIn(1, "upper_a"), "upper_a", { reps: (e, p) => (e.role === "shoulder" ? p.repRange?.[1] : undefined) });
-    expect(w2.data().state.currentLoads.cable_external_rotation).toBeGreaterThan(10);
-  });
 });

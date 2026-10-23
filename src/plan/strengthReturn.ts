@@ -84,20 +84,8 @@ const isolation = (exerciseKey: string, s: AccessoryScheme, startLoad: number, u
 const failure = (sets: number, min: number, max: number) => scheme(sets, min, max, { toFailure: true });
 const repOutLast = (sets: number, min: number, max: number) => scheme(sets, min, max, { lastSetRepOut: true });
 
-// Shoulder care block, Tue and Sat before the first main lift: not failure sets, 45–60 s rest, 3 s down.
-// Face pull dropped 13 Oct 2026 (DECISIONS; no specific evidence, K-FACEPULL), prone Y-raise dropped 17 Oct 2026
-// (Mario doesn't like it). Their definitions stay for history.
-const SHOULDER_BLOCK: ProgramSlot[] = [
-  { exerciseKey: 'cable_external_rotation', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 12, 15),
-    startLoad: 10, unit: 'lb', loadBasis: 'per_arm', // plan said 5 lb; the lightest pin is 10
-    notes: ['Single pulley at elbow height, towel between elbow and ribs.', '3 s back. Not to failure.'] },
-  { exerciseKey: 'cable_serratus_punch', role: 'shoulder', group: 'shoulder_care', scheme: scheme(2, 12, 12),
-    startLoad: 10, unit: 'lb', loadBasis: 'per_arm',
-    notes: ['One arm at a time. Single pulley at chest height; stand facing away from it, handle in one hand.',
-      'Arm straight out in front at shoulder height, elbow locked the whole time.',
-      'Reach the handle a few cm further forward by letting the shoulder blade slide around the ribs, then let it slide back.',
-      'Small movement. If your elbow bends, you are doing a press. 12 per arm.'] },
-];
+// Shoulder care block dropped 23 Oct 2026 (DECISIONS: Mario, sessions run long and the shoulder is fine). Face pull
+// (13 Oct), prone Y-raise (17 Oct), external rotation and serratus punch: their definitions stay for history.
 
 const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
   ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.'],
@@ -145,10 +133,9 @@ const DAYS: ProgramDay[] = [
     ],
   },
   {
-    key: 'upper_a', weekday: 2, title: 'Upper A', focus: 'Press and pull-up day', kind: 'lifting', minutes: 80,
-    notes: ['Lunch walk.', 'Shoulder care block first, about 5 minutes.'],
+    key: 'upper_a', weekday: 2, title: 'Upper A', focus: 'Press and pull-up day', kind: 'lifting', minutes: 75,
+    notes: ['Lunch walk.'],
     slots: [
-      ...SHOULDER_BLOCK,
       main('incline_db_press', 'incline_db_press', 22.5, 'per_hand',
         ['Bench ~30°, palms facing. Soft lockout. Right shoulder pinching: stop that side a little higher.']),
       main('weighted_pullup', 'weighted_pullup', 5, 'added',
@@ -208,10 +195,9 @@ const DAYS: ProgramDay[] = [
     ],
   },
   {
-    key: 'upper_b', weekday: 6, title: 'Upper B', focus: 'Volume day', kind: 'lifting', minutes: 80,
-    notes: ['Shoulder care block first, about 5 minutes.'],
+    key: 'upper_b', weekday: 6, title: 'Upper B', focus: 'Volume day', kind: 'lifting', minutes: 75,
+    notes: [],
     slots: [
-      ...SHOULDER_BLOCK,
       compound('barbell_row', repOutLast(3, 6, 10), 70, 'kg', 'total', ['Straps. Elbow flares: try an underhand grip.'],
         { warmup: true, alternatives: ['chest_supported_db_row'] }),
       compound('db_bench_press', repOutLast(3, 6, 10), 25, 'kg', 'per_hand', ['Neutral grip, soft lockout.'],
