@@ -60,7 +60,8 @@ function sessionLengthSignal(ctx: WeekCtx): Signal | null {
   if (!from) return null;
   const byDay = new Map<string, number[]>();
   for (const s of data.planSessions) {
-    if (s.date < from || s.date > ctx.to || s.duration_min == null) continue;
+    // Minimum sessions (~30 min) are a different session; they'd drag the median down.
+    if (s.date < from || s.date > ctx.to || s.duration_min == null || isMinimumSession(s)) continue;
     const key = (s.legacy_ref as { plan?: { dayKey?: string } } | null)?.plan?.dayKey;
     if (!key) continue;
     byDay.set(key, [...(byDay.get(key) ?? []), Number(s.duration_min)]);

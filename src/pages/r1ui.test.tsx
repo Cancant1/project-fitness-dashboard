@@ -2,7 +2,7 @@
 // rep-outs and timed holds in the logger; the minimum-session start; the Thursday and Wednesday conditioning inputs;
 // the check-in habit meter. A real LocalStore on fake IndexedDB; no network.
 import "fake-indexeddb/auto";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
@@ -17,6 +17,9 @@ import { planRef, startWorkout } from "../plan/workout";
 import type { PlanState } from "../plan/types";
 import { CheckinPage } from "./CheckinPage";
 import { TodayPage } from "./TodayPage";
+import { ConditioningCard } from "./ConditioningCard";
+import type { Conditioning } from "../data/types";
+import type { DayKey } from "../plan/types";
 import { TrainPage } from "./TrainPage";
 import { WorkoutPage } from "./WorkoutPage";
 
@@ -289,5 +292,48 @@ describe("Check-in (Part U)", () => {
     await render(<CheckinPage />);
     expect(host.querySelector(".ci-habit")?.textContent).toContain("Habit");
     expect(host.querySelectorAll(".ci-meter i")).toHaveLength(6);
+  });
+});
+
+describe("Conditioning card: review fixes (24 Oct 2026)", () => {
+  /** One card instance whose day changes, as the Today hero does at midnight. */
+  function Switch({ days, existing = () => [] }: { days: [string, DayKey][]; existing?: (i: number) => Conditioning[] }) {
+    const [i, setI] = useState(0);
+    const [date, dayKey] = days[i]!;
+    return (
+      <>
+        <button type="button" onClick={() => setI(i + 1)}>next</button>
+        <ConditioningCard date={date} dayKey={dayKey} weekNo={1} existing={existing(i)} />
+      </>
+    );
+  }
+  it("a free day turning into boxing (Wed → Thu at midnight) renders the boxing card without a hooks error", async () => {
+    await render(<Switch days={[["2026-10-21", "easy_ride"], ["2026-10-22", "boxing"]]} />);
+    expect(host.textContent).toContain("Nothing planned");
+    await click(button("next", host));
+    expect(host.querySelector(".cd-scale")).toBeTruthy();
+  });
+  it("the note box follows the saved note when it arrives after the first render, and offers Clear when emptied", async () => {
+    const note: Conditioning = {
+      id: "n1", user_id: "u", created_at: "x", updated_at: "x", date: "2026-10-21", kind: "other", minutes: 40, loop_time_s: null,
+      rounds: null, first_round_count: null, last_round_count: null, done: true, note: "Ride", rating: null
+    } as Conditioning;
+    await render(<Switch days={[["2026-10-21", "easy_ride"], ["2026-10-21", "easy_ride"]]} existing={(i) => (i ? [note] : [])} />);
+    expect(host.querySelector<HTMLTextAreaElement>("#c-free")!.value).toBe("");
+    await click(button("next", host));
+    expect(host.querySelector<HTMLTextAreaElement>("#c-free")!.value).toBe("Ride");
+    expect(button("Update", host)).toBeTruthy();
+    const box = host.querySelector<HTMLTextAreaElement>("#c-free")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(box, "");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(button("Clear note", host)).toBeTruthy();
+  });
+  it("England (week 10) shows a rest-week note box, not the boxing card", async () => {
+    vi.setSystemTime(new Date(2026, 11, 24, 9, 0)); // Thursday 24 Dec
+    await render(<TodayPage />);
+    const card = host.querySelector(".cd");
+    expect(card?.textContent ?? "").not.toContain("Gassed?");
   });
 });

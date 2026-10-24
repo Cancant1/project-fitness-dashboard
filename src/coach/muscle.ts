@@ -5,7 +5,8 @@ import type { Exercise, SetRow } from "../data/types";
 import { fractionalVolume } from "../lib/analysis";
 import { addDays } from "../lib/format";
 import { PLAN } from "../plan/bridge";
-import { OVERSHOOT_REPS, weekForDate } from "../plan/engine";
+import { OVERSHOOT_REPS, bigJumpEarned, isBigJump, stepLoad, weekForDate } from "../plan/engine";
+import { weightsFor } from "../plan/equipment";
 import { VARIETY_NOTE } from "../plan/strengthReturn";
 import type { Muscle, ProgramSlot } from "../plan/types";
 
@@ -192,15 +193,28 @@ function lateralDecision(ctx: WeekCtx): Signal[] {
   const { data } = ctx;
   const d = LATERAL_DECISION;
   if (d.date < ctx.from || d.date > ctx.to || ctx.asOf < d.date) return [];
-  const held = data.state.bigJump?.[d.exerciseKey];
-  const load = data.state.currentLoads[d.exerciseKey];
   const why: Signal["why"] = ["P-PROG-DOUBLE", "P-EXERCISE"];
+  // Judged on that week's own lateral sets (not today's engine state), so the verdict holds when the report is read later.
+  const id = data.ids.get(d.exerciseKey);
+  const slot = ACCESSORIES.find((s) => s.exerciseKey === d.exerciseKey);
+  const failure = ctx.sets.filter((s) => s.exercise_id === id && s.kind === "failure" && s.reps != null && s.load != null);
+  const lastSession = failure.at(-1)?.session_id;
+  const sets = failure.filter((s) => s.session_id === lastSession);
+  if (!slot?.scheme || !sets.length) {
+    return [sig("muscle.lateral_decision", "muscle", "info", "Lateral raise decision",
+      "No cable laterals logged this week: decide cable or DB laterals at the check-in.", why)];
+  }
+  const load = Math.max(...sets.map((s) => Number(s.load)));
+  const pins = weightsFor(d.exerciseKey);
+  const next = pins ? stepLoad(load, pins, 1) : load;
+  const range = slot.scheme.repRange;
+  const held = isBigJump(load, next) && !bigJumpEarned(sets.map((s) => ({ load: Number(s.load), reps: s.reps })), range, true);
   if (held) {
     return [sig("muscle.lateral_decision", "muscle", "act", "Switch to DB laterals",
-      `Cable laterals are still at ${fmtLoad(load ?? 20)} lb: the next pin (${fmtLoad(held.next)} lb) needs a ${held.reps}-rep average. Switch to DB laterals (1–2 kg steps) from Monday; Claude updates the plan at the check-in.`, why)];
+      `Cable laterals are still at ${fmtLoad(load)} lb: the next pin (${fmtLoad(next)} lb) needs a ${range[1] + OVERSHOOT_REPS}-rep average. Switch to DB laterals (1–2 kg steps) from Monday; Claude updates the plan at the check-in.`, why)];
   }
   return [sig("muscle.lateral_decision", "muscle", "good", "Keep the cable laterals",
-    `Cable laterals moved past the big pin jump${load != null ? ` (now ${fmtLoad(load)} lb)` : ""}: keep them.`, why)];
+    `Cable laterals at ${fmtLoad(load)} lb are past the big pin jump: keep them.`, why)];
 }
 
 // ---------- muscle.breath (R2-05, D-BREATH-STOP) ----------

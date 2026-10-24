@@ -517,12 +517,23 @@ export function shiftAfterMissedWeek(program: ProgramDefinition, missedWeekNo: n
     ...(checkpoint ? { checkpoint: moveCheckpoint(checkpoint, 1) } : {}),
   };
   delete repeat.missed;
-  const weeks = [
+  const shifted = [
     ...program.weeks.filter((w) => w.weekNo < missedWeekNo),
     { ...missedWithoutCheckpoint, missed: true },
     repeat,
     ...program.weeks.filter((w) => w.weekNo > missedWeekNo).map(later),
   ];
+  // A rest week is tied to its dates (the England trip stays fixed, R1-01): it stays on its Monday with its notes,
+  // and the week that moved off it loses the flag and those notes.
+  const rests = new Map(program.weeks.filter((w) => w.rest).map((w) => [w.startDate, w.notes] as const));
+  const restNotes = new Set([...rests.values()].flat());
+  const weeks = shifted.map((w): ProgramWeek => {
+    const notes = rests.get(w.startDate);
+    if (notes) return { ...w, rest: true, notes: [...notes] };
+    if (!w.rest) return w;
+    const { rest: _rest, ...rest } = w;
+    return { ...rest, notes: w.notes.filter((n) => !restNotes.has(n)) };
+  });
   return { ...program, weeks };
 }
 

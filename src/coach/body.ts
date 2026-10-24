@@ -44,11 +44,12 @@ export function pathAnchor(data: Pick<CoachData, "plan" | "allMeasurements">, as
 
 /**
  * The expected 7-day average on a date: the plan's path, interpolated, shifted up by the creatine water (E16).
- * With an anchor (R2-14), dates from the anchor on are shifted so the band's middle passes through it.
+ * With an anchor (R2-14), the whole path is shifted so the band's middle passes through it on the anchor date (no step
+ * in the drawn band).
  */
 export function expectedBand(date: string, plan: ProgramDefinition = PLAN, anchor: { date: string; kg: number } | null = null): [number, number] | null {
   const base = rawBand(date, plan);
-  if (!base || !anchor || date < anchor.date) return base;
+  if (!base || !anchor) return base;
   const at = rawBand(anchor.date, plan);
   const shift = at ? anchor.kg - (at[0] + at[1]) / 2 : 0;
   return [base[0] + shift, base[1] + shift];
@@ -134,7 +135,7 @@ const isFit = (f: ReturnType<typeof rateFit>): f is RateFit => "rate" in f;
 export type BodyweightSide = "below" | "on" | "above";
 
 export interface BodyweightStatus {
-  /** 7-day average (all weigh-ins) and the plan path's band on `date`. */
+  /** 7-day average (all weigh-ins) and the plan path's band on `date` (in the early weeks with the +2.5 kg allowance). */
   avg: number;
   band: [number, number];
   path: BodyweightSide;
@@ -169,7 +170,8 @@ export function bodyweightStatus(data: CoachData, date: string): BodyweightStatu
   // R2-14: before the anchor, the early jump is expected: "above" only past the path + earlyAboveKg, and no pace verdict.
   const early = !!week && week.weekNo <= (plan.bodyweightRate.anchorWeek ?? 2) && !anchor;
   const slack = early ? plan.bodyweightRate.earlyAboveKg ?? 0 : 0;
-  const path = side(avg, Math.round(band[0] * 10) / 10, Math.round((band[1] + slack) * 10) / 10);
+  const shown: [number, number] = [band[0], band[1] + slack];
+  const path = side(avg, Math.round(shown[0] * 10) / 10, Math.round(shown[1] * 10) / 10);
 
   const from = addDays(date, -(PACE_DAYS - 1));
   const points: Weigh[] = data.allMeasurements
@@ -188,7 +190,7 @@ export function bodyweightStatus(data: CoachData, date: string): BodyweightStatu
 
   const p = early ? "on" : pace?.side ?? "on";
   const verdict: BodyweightSide = path === p ? path : path === "on" ? p : p === "on" ? path : "on";
-  return { avg, band, path, pace, verdict, early };
+  return { avg, band: shown, path, pace, verdict, early };
 }
 
 /** "Gaining 0.18 kg/week" / "Losing 0.05 kg/week". */

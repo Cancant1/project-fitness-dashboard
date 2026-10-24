@@ -3,7 +3,7 @@
 import { dayIn, World } from "../coach/testkit";
 import { planState, PLAN, sundayRoundsFrom } from "./bridge";
 import type { ProgramDefinition } from "./types";
-import { DEFAULT_EQUIPMENT, prescribeDay, prescribeWeek } from "./engine";
+import { DEFAULT_EQUIPMENT, prescribeDay, prescribeWeek, shiftAfterMissedWeek } from "./engine";
 
 function stateOf(w: World) {
   const t = w.tables;
@@ -137,5 +137,24 @@ describe("planState: adjustments and rounds", () => {
       equipment: DEFAULT_EQUIPMENT, painChecks: w.tables.pain_checks });
     expect(held.wristLadder?.earned).toBe(1);
     expect(ex(held, 4).sets[0]!.reps).toBe(12);
+  });
+});
+
+describe("review fixes (24 Oct 2026)", () => {
+  it("a first failure set below the range steps one pin back (catch-up overshoot safety net)", () => {
+    const w = new World();
+    w.session(dayIn(1, "lower_a"), "lower_a", {
+      load: (ex, p) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? 40 : undefined),
+      reps: (ex, p, i) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? [8, 6][i] : undefined)
+    });
+    expect(stateOf(w).currentLoads.cable_lateral_raise).toBe(30);
+  });
+  it("a repeated week leaves the England rest week on its dates", () => {
+    const shifted = shiftAfterMissedWeek(PLAN, 3);
+    const england = shifted.weeks.find((w) => w.startDate === "2026-12-21")!;
+    expect(england.rest).toBe(true);
+    expect(england.notes[0]).toContain("England");
+    expect(shifted.weeks.filter((w) => w.rest).map((w) => w.startDate)).toEqual(["2026-12-21"]);
+    expect(shifted.weeks.find((w) => w.startDate === "2026-12-28")!.notes.some((n) => n.includes("England"))).toBe(false);
   });
 });

@@ -9,7 +9,7 @@ import { addDays, fmtNum, fmtShortDate } from "../lib/format";
 import { swapHistory } from "../plan/bridge";
 import { isoWeekday } from "../plan/engine";
 import {
-  ELBOW_MONTHLY_SITE, PAIN_HOLD, duringScore, hurtDuring, isElbowSite, isMorningFlare, isSharp, morningBaseline
+  ELBOW_MONTHLY_SITE, PAIN_HOLD, duringScore, elbowMonthlyOf, hurtDuring, isElbowSite, isMorningFlare, isSharp, morningBaseline
 } from "../plan/pain";
 import { nextSwap, swapLabel, swapStartLoad } from "../plan/swaps";
 import { TRAINING_WEEK, WEEKDAY, bw7, cap, exerciseLabel, lcFirst, sig, siteName, weekBounds, type AreaResult, type WeekCtx } from "./common";
@@ -129,15 +129,8 @@ export function jointsRules(ctx: WeekCtx): AreaResult {
   return { signals: out, numbers: { pain: [...now].map(([site, e]) => ({ site, sessions: e.sessions.size, sharp: e.sharp })) } };
 }
 
-/** The monthly elbow check's total (note JSON { worst, grip, daily, total }), or null. */
-function monthlyTotal(p: PainCheck): number | null {
-  try {
-    const t = (JSON.parse(p.note ?? "{}") as { total?: unknown }).total;
-    return typeof t === "number" ? t : null;
-  } catch {
-    return null;
-  }
-}
+/** The monthly elbow check's total (worst + grip + daily), or null. */
+const monthlyTotal = (p: PainCheck): number | null => elbowMonthlyOf(p)?.total ?? null;
 
 /**
  * R2-16 (DECISIONS 2026-10-23/24): the shoulder care block was dropped; it comes back when the elbow flares (≥ 4/10

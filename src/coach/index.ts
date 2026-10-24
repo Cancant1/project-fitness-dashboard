@@ -18,6 +18,7 @@ export {
 export { planLine, goalTm, stepsTo, earlyDeloadRun } from "./strength";
 export { laggingMuscles, muscleSets, OVERREACH_FACTOR } from "./muscle";
 export { targetOn, measuredTdee, sessionFuelCue, PLAN_MAINTENANCE, PROTEIN_FLOOR_G_PER_KG, TDEE_MIN_DAYS, TDEE_FROM_WEEK } from "./fuel";
+export { HOME_TASK_IDS, isFreeDayNote } from "./conditioning";
 export { JOINT_RED_FLAGS, RED_FLAG_REMINDER, HAMMER_CURL_AFTER_DAYS, painPromptCue, elbowMonthlyCue } from "./joints";
 export { CAFFEINE_NOTE, ALCOHOL_NOTE, heartNumbers, lightsOutCue } from "./recovery";
 export {

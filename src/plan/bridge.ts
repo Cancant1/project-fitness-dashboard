@@ -180,7 +180,8 @@ const weekTypeOf = (s: Session | undefined): string | undefined => (s?.legacy_re
  *   the jumps are +5% / +2.5%;
  * - the wrist ladder progresses at its rung's reps (the logged sets' rep range); isometric holds don't count;
  *   R2-15: a rung is earned by a clean session (every set at the reps, pain within the step rule);
- * - R2-04 catch-up: set 1 of a non-elbow failure isolation at ≥ 35 reps → two steps up, past the jump cap;
+ * - R2-04 catch-up: set 1 of a non-elbow failure isolation at ≥ 35 reps → two steps up, past the jump cap; a first
+ *   failure set below the range steps one back (the overshoot safety net);
  * - E14 hold: an exercise whose latest pain check was ≥ 4/10 (and not trained since) keeps its load;
  * - E5 stuck incline: normalReps from the incline rep-out history;
  * - from the programme row's adjustments: extra sets, extra main-lift sets (§7), recalibration (E3);
@@ -271,9 +272,14 @@ export function planState(args: {
       const average = !slot.elbowLoading;
       next = capJump(lastLoad, next, logged, ownRange, step, { average });
       // R2-04: a first set at 35+ reps is far too light: two steps once, past the cap (not elbow work).
+      const first = [...last].filter((s) => s.kind === "failure").sort((a, b) => a.set_no - b.set_no)[0];
       if (slot.scheme?.toFailure && !slot.elbowLoading && weekType !== "calibration") {
-        const first = [...last].filter((s) => s.kind === "failure").sort((a, b) => a.set_no - b.set_no)[0];
         next = catchUpLoad(lastLoad, next, first?.reps ?? null, step);
+      }
+      // Safety net (review of R2-04): a first failure set below the range means the load overshot (a catch-up on a
+      // coarse stack, say 20 → 40 lb). Double progression never steps down, so one step back here.
+      if (slot.scheme?.toFailure && weekType !== "calibration" && first?.reps != null && first.reps < ownRange[0]) {
+        next = stepLoad(lastLoad, step, -1);
       }
       const oneUp = stepLoad(lastLoad, step, 1);
       if (Math.abs(next - lastLoad) < 1e-9 && isBigJump(lastLoad, oneUp)) bigJump[key] = { next: oneUp, reps: ownRange[1] + OVERSHOOT_REPS, average };

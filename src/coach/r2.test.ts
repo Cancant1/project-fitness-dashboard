@@ -1,6 +1,7 @@
 // Round-2 proposals accepted on 24 Oct 2026 (DECISIONS): the coach side.
 import { describe, expect, it } from "vitest";
 import { addDays } from "../lib/format";
+import { expectedBand, pathAnchor } from "./body";
 import { weeklyReport } from "./report";
 import { fitRegainK } from "./strength";
 import { dayIn, monday, sunday, World } from "./testkit";
@@ -109,5 +110,35 @@ describe("R2-07 pull-up on system mass", () => {
     w.session(dayIn(1, "upper_a"), "upper_a", { reps: (e, p) => (e.mainLift === "weighted_pullup" && p.kind === "rep_out" ? 8 : undefined) });
     const s = get(weeklyReport(w.data(), 1, sunday(1)), "strength.step.weighted_pullup");
     expect(s?.message).toMatch(/\+5 kg × 8 \(80 kg system, e1RM 101\)/);
+  });
+});
+
+describe("review fixes (24 Oct 2026)", () => {
+  it("rest week: conditioning reads 'Rest week', not 'Boxing done'", () => {
+    const s = get(weeklyReport(new World().data(), 10, sunday(10)), "conditioning.week");
+    expect(s).toMatchObject({ status: "info", title: "Rest week", message: "Nothing planned · 0 free-day notes." });
+  });
+  it("lateral decision: judged on that week's sets; nothing logged → decide at the check-in", () => {
+    const none = new World();
+    none.week(4, { only: ["squat"] }, ["lower_a"]);
+    expect(get(weeklyReport(none.data(), 4, sunday(4)), "muscle.lateral_decision")).toMatchObject({ status: "info", title: "Lateral raise decision" });
+  });
+  it("session lengths leave minimum sessions out", () => {
+    const w = new World();
+    for (const n of [2, 3, 4]) w.week(n);
+    for (const s of w.tables.sessions.filter((x) => (x.legacy_ref as { plan?: { dayKey?: string } }).plan?.dayKey === "lower_b").slice(0, 2)) {
+      s.duration_min = 30;
+      (s.legacy_ref as { plan: { minimum?: boolean } }).plan.minimum = true;
+    }
+    expect(get(weeklyReport(w.data(), 4, sunday(4)), "consistency.session_length")?.message).toContain("Lower B 75 (plan 70)");
+  });
+  it("the anchored weight band has no step at the anchor date (the whole path shifts)", () => {
+    const w = new World();
+    w.weighDaily(addDays(monday(3), -3), 21, 76.5, 0);
+    const data = w.data();
+    const anchor = pathAnchor(data, sunday(4))!;
+    const shift = (d: string) => expectedBand(d, data.plan, anchor)![0] - expectedBand(d, data.plan)![0];
+    expect(shift(addDays(anchor.date, -1))).toBeCloseTo(shift(anchor.date), 9);
+    expect(shift(anchor.date)).toBeGreaterThan(0.5);
   });
 });

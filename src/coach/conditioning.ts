@@ -1,11 +1,19 @@
 // §4.8 Conditioning: Thursday boxing (+ the "gassed" rating, E22) and the free-day notes (Wed, Sun; the ride and the
 // rounds were dropped on 24 Oct 2026). Ride and rounds rules, if a plan still has them, are judged as before.
 
+import type { Conditioning } from "../data/types";
 import { addDays, fmtNum } from "../lib/format";
 import { roundsNextWeek } from "../plan/engine";
 import type { RoundsRule } from "../plan/types";
 import { sig, type AreaResult, type WeekCtx } from "./common";
 import type { Signal } from "./types";
+
+/** Home-task ids stored as "other" conditioning rows (their ticks, not free-day notes). */
+export const HOME_TASK_IDS: ReadonlySet<string> = new Set(["wrist_ladder"]);
+
+/** A free-day note (24 Oct 2026): an "other" row with his text that isn't a home-task tick. */
+export const isFreeDayNote = (c: Conditioning): boolean =>
+  c.kind === "other" && !!c.note && !HOME_TASK_IDS.has(c.note) && c.done && !c.deleted_at;
 
 /** E22: the gassed trend looks back this many days (6 weeks). */
 const GASSED_WINDOW_DAYS = 42;
@@ -19,7 +27,7 @@ export function conditioningRules(ctx: WeekCtx): AreaResult {
   const ride = p("easy_ride")?.kind === "ride" ? p("easy_ride") : undefined;
   const rounds = p("rounds")?.kind === "rounds" ? p("rounds") : undefined;
   // Free days: an "other" row with his note (home-task ticks carry their task id instead).
-  const notes = rows.filter((c) => c.kind === "other" && !!c.note && c.note !== "wrist_ladder");
+  const notes = rows.filter(isFreeDayNote);
   const freeMin = notes.reduce((s, c) => s + Number(c.minutes ?? 0), 0);
 
   const rideRows = rows.filter((c) => c.kind === "ride");
@@ -47,7 +55,10 @@ export function conditioningRules(ctx: WeekCtx): AreaResult {
     : `Boxing ${boxing ? "✓" : "–"} · ${freeText}.`;
   const why: Signal["why"] = ride || rounds ? ["C-CONCURRENT", "C-ROUNDS"] : ["C-CONCURRENT"];
   const signals: Signal[] = [];
-  if (ctx.days.length) {
+  if (ctx.week.rest) {
+    // A full rest week (England): nothing was planned, so nothing is "done" or "missed".
+    signals.push(sig("conditioning.week", "conditioning", "info", "Rest week", `Nothing planned · ${freeText}.`, why));
+  } else if (ctx.days.length) {
     if (missing === 0) signals.push(sig("conditioning.week", "conditioning", "good", ride || rounds ? "Conditioning done" : "Boxing done", text, why));
     else if (!ctx.complete) signals.push(sig("conditioning.week", "conditioning", "pending", "Conditioning so far", text, why));
     else signals.push(sig("conditioning.week", "conditioning", "info", ride || rounds ? (missing === 1 ? "One conditioning day missed" : "Conditioning days missed") : "No boxing this week", text, why));
