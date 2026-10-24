@@ -243,7 +243,7 @@ describe("E8 extra sets at checkpoint 1 (R1-08)", () => {
     expect(ex(8, "upper_a", "bayesian_curl", arms).sets).toHaveLength(3);
     expect(ex(8, "upper_a", "overhead_cable_triceps_extension", arms).sets).toHaveLength(3);
     expect(ex(9, "upper_b", "single_arm_cable_curl", arms).sets).toHaveLength(3);
-    expect(ex(9, "upper_b", "rope_pushdown", arms).sets).toHaveLength(3);
+    expect(ex(9, "upper_b", "bar_pushdown", arms).sets).toHaveLength(3);
     const total = (s: PlanState, n: number) => prescribeWeek(PLAN, n, s).reduce((k, d) => k + d.workingSetCount, 0);
     expect(total(arms, 8)).toBe(76);
     expect(total(arms, 11)).toBe(76);
@@ -289,7 +289,7 @@ describe("E9 effort rule for the elbow and bad days", () => {
 
 describe("E10 triceps ranges 12–20", () => {
   it("reverse-grip pushdown, overhead and cross-body extension", () => {
-    for (const [d, k] of [["lower_a", "cross_body_triceps_extension"], ["upper_a", "overhead_cable_triceps_extension"], ["upper_b", "rope_pushdown"]] as const) {
+    for (const [d, k] of [["lower_a", "cross_body_triceps_extension"], ["upper_a", "overhead_cable_triceps_extension"], ["upper_b", "bar_pushdown"]] as const) {
       expect(ex(1, d, k).sets[0]!.repRange).toEqual([12, 20]);
     }
   });

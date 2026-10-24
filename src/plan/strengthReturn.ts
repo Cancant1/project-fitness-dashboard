@@ -42,7 +42,7 @@ const EXERCISES: ExerciseDefinition[] = [
   // His gym's preacher substitute (DECISIONS 2026-10-11 evening): same loads, cable, lb.
   { key: 'preacher_curl', name: 'Kneeling cable curl, elbow on knee (preacher-style)', equipment: 'cable', muscles: ['biceps'] },
   { key: 'wrist_extension', name: 'Slow wrist extension', equipment: 'dumbbell', muscles: ['forearms'] },
-  { key: 'barbell_row', name: 'Barbell or Pendlay row', equipment: 'barbell', muscles: ['back', 'rear_delts', 'biceps'] },
+  { key: 'barbell_row', name: 'Barbell row, bent over', equipment: 'barbell', muscles: ['back', 'rear_delts', 'biceps'] },
   { key: 'db_bench_press', name: 'DB bench press, neutral grip', equipment: 'dumbbell', muscles: ['chest', 'triceps', 'front_delts'] },
   { key: 'lat_pulldown', name: 'Lat pulldown, neutral handle', equipment: 'cable', muscles: ['back', 'biceps'] },
   { key: 'cable_rear_delt_fly', name: 'Cable rear delt fly', equipment: 'cable', muscles: ['rear_delts'] },
@@ -52,6 +52,8 @@ const EXERCISES: ExerciseDefinition[] = [
   // pinky side of the right wrist. The two above stay for history and as alternatives.
   { key: 'single_arm_cable_curl', name: 'Single-arm cable curl, D-handle', equipment: 'cable', muscles: ['biceps'] },
   { key: 'rope_pushdown', name: 'Rope pushdown', equipment: 'cable', muscles: ['triceps'] },
+  // Saturday's pushdown from 24 Oct 2026 (DECISIONS): Mario prefers it to the rope.
+  { key: 'bar_pushdown', name: 'Straight-bar pushdown, overhand', equipment: 'cable', muscles: ['triceps'] },
   // Not a default: an alternative to the Saturday cable curl once the elbow is at 0–3 for 4 weeks (E23).
   { key: 'incline_hammer_curl', name: 'Seated high-incline hammer curl', equipment: 'dumbbell', muscles: ['biceps', 'forearms'] },
 ];
@@ -88,7 +90,8 @@ const repOutLast = (sets: number, min: number, max: number) => scheme(sets, min,
 // (13 Oct), prone Y-raise (17 Oct), external rotation and serratus punch: their definitions stay for history.
 
 const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
-  ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.'],
+  ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.',
+    'One set = left then right, no rest between; the 90 s rest comes after both arms.'],
   { alternatives: ['db_lateral_raise'] });
 const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
   ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.',
@@ -198,7 +201,9 @@ const DAYS: ProgramDay[] = [
     key: 'upper_b', weekday: 6, title: 'Upper B', focus: 'Volume day', kind: 'lifting', minutes: 75,
     notes: [],
     slots: [
-      compound('barbell_row', repOutLast(3, 6, 10), 70, 'kg', 'total', ['Straps. Elbow flares: try an underhand grip.'],
+      compound('barbell_row', repOutLast(3, 6, 10), 70, 'kg', 'total',
+        ['Straps. Torso 30–45°, the same every set; the bar hangs just above the floor between reps, no touch-down.',
+          'Elbow flares: try an underhand grip.'],
         { warmup: true, alternatives: ['chest_supported_db_row'] }),
       compound('db_bench_press', repOutLast(3, 6, 10), 25, 'kg', 'per_hand', ['Neutral grip, soft lockout.'],
         { warmup: true, alternatives: ['db_floor_press'] }),
@@ -215,8 +220,10 @@ const DAYS: ProgramDay[] = [
         ['D-handle, one arm at a time. Let the wrist turn where it is comfortable: palm up or a little thumb-up.',
           'Soft lockout at the bottom.'],
         { elbowLoading: true, alternatives: ['underhand_cable_curl', 'incline_hammer_curl', 'preacher_curl'] }),
-      isolation('rope_pushdown', failure(2, 12, 20), 70, 'lb', 'total', ['Neutral grip; spread the rope at the bottom. Soft lockout.'],
-        { elbowLoading: true, alternatives: ['reverse_grip_pushdown'] }),
+      // 24 Oct 2026: straight bar, overhand (his pick over the rope; 80 lb × 28, 16 that day).
+      isolation('bar_pushdown', failure(2, 12, 20), 80, 'lb', 'total',
+        ['Thumbless overhand grip; don’t squeeze the bar. Soft lockout.', 'Elbow aches: back to the rope.'],
+        { elbowLoading: true, alternatives: ['rope_pushdown'] }),
     ],
   },
   {
@@ -380,7 +387,7 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
         { dayKey: 'upper_a', exerciseKey: 'bayesian_curl' },
         { dayKey: 'upper_a', exerciseKey: 'overhead_cable_triceps_extension' },
         { dayKey: 'upper_b', exerciseKey: 'single_arm_cable_curl' },
-        { dayKey: 'upper_b', exerciseKey: 'rope_pushdown' },
+        { dayKey: 'upper_b', exerciseKey: 'bar_pushdown' },
       ],
     },
     rearDelt: { muscles: ['rear_delts'], targets: [{ dayKey: 'upper_a', exerciseKey: 'cable_rear_delt_fly' }] },

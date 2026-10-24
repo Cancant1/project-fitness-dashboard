@@ -48,14 +48,19 @@ export class World {
   readonly ids = new Map<string, string>();
 
   constructor(opts: { started?: boolean } = {}) {
-    const exercises: Exercise[] = Object.values(PLAN.exercises).map((def) => {
+    // Keys that share a history name (bar and rope pushdown) share one row, as in the database.
+    const byName = new Map<string, Exercise>();
+    const exercises: Exercise[] = Object.values(PLAN.exercises).flatMap((def) => {
+      const shared = byName.get(HISTORY_NAME[def.key] ?? def.name);
+      if (shared) { this.ids.set(def.key, shared.id); return []; }
       const e: Exercise = {
         ...base("ex"), name: HISTORY_NAME[def.key] ?? def.name, aliases: [], equipment: def.equipment, default_unit: "kg", kind: "isolation",
         muscle_direct: def.muscles[0] ?? null, muscle_indirect: def.muscles.slice(1), available: true, cues: null, archived: false,
         legacy_ref: { plan_key: def.key }
       };
       this.ids.set(def.key, e.id);
-      return e;
+      byName.set(e.name, e);
+      return [e];
     });
     this.program = {
       ...base("prog"), name: "Strength Return Plan", start_date: PLAN.startDate, weeks: PLAN.weeks.length, status: "active",

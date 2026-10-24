@@ -56,6 +56,8 @@ export const HISTORY_NAME: Record<string, string> = {
   single_arm_cable_curl: "Single-Arm Cable Curl",
   // His rope pushdowns (≈200 sets, to Jun 2025) are logged under "Triceps Pushdown".
   rope_pushdown: "Triceps Pushdown",
+  // Bar and rope pushdowns share that history ("Cable Tricep Bar Pushdown" is one of its aliases).
+  bar_pushdown: "Triceps Pushdown",
   // Alternatives and swap targets with history (start loads, R1-17). The incline hammer curl's last logged
   // set (12 kg × 12, Sep 2026) is under "Hammer Curl".
   incline_hammer_curl: "Hammer Curl",
