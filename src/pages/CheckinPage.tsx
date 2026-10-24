@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useToday } from "../lib/useToday";
 import { useSearchParams } from "react-router-dom";
-import { AREAS, EVIDENCE, currentWeekNo, expectedBand, planLine, weeklyReport, type Area, type CoachData, type Signal, type WeeklyReport } from "../coach";
+import { AREAS, EVIDENCE, currentWeekNo, expectedBand, pathAnchor, planLine, weeklyReport, type Area, type CoachData, type Signal, type WeeklyReport } from "../coach";
 import { useCoachData } from "../coach/hooks";
 import { addDays, daysBetween, fmtNum, fmtShortDate, todayIso } from "../lib/format";
 import type { TmLiftKey } from "../plan/types";
@@ -211,8 +211,8 @@ function tileFor(area: Area, r: WeeklyReport, data: CoachData, today: string): T
     case "conditioning": {
       const c = n.conditioning;
       return {
-        value: fmtNum(c.rideMin, 0), unit: "min ride",
-        foot: caption(`Boxing ${c.boxing ? "✓" : "–"} · rounds ${c.rounds ?? "–"}`)
+        value: c.boxing ? "✓" : "–", unit: "boxing",
+        foot: caption(`${c.freeNotes ?? 0} free-day ${(c.freeNotes ?? 0) === 1 ? "note" : "notes"}`)
       };
     }
   }
@@ -316,8 +316,9 @@ function BodyCard({ report, data, today }: { report: WeeklyReport; data: CoachDa
       return { x: daysBetween(start, w.date), y: win.reduce((s, q) => s + q.kg, 0) / win.length };
     });
     const band: { x: number; lo: number; hi: number }[] = [];
+    const anchor = pathAnchor(data, end);
     for (let i = 0; i <= 27; i++) {
-      const b = expectedBand(addDays(start, i));
+      const b = expectedBand(addDays(start, i), data.plan, anchor);
       if (b) band.push({ x: i, lo: b[0], hi: b[1] });
     }
     return { avg, raw: raw.map((w) => ({ x: daysBetween(start, w.date), y: w.kg })), band };

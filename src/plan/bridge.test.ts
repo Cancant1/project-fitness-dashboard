@@ -1,7 +1,8 @@
 // planState from the log: APRE jumps (§6.1), isolation overshoot (§6.3), deload carry-forward, adjustments (§7)
 // and Sunday rounds.
 import { dayIn, World } from "../coach/testkit";
-import { planState, PLAN } from "./bridge";
+import { planState, PLAN, sundayRoundsFrom } from "./bridge";
+import type { ProgramDefinition } from "./types";
 import { DEFAULT_EQUIPMENT, prescribeDay, prescribeWeek } from "./engine";
 
 function stateOf(w: World) {
@@ -47,8 +48,11 @@ describe("planState: accessories", () => {
     // 20 lb → 30 is +50%: top + 5 (25) earns one pin, not two.
     expect(at("cable_lateral_raise", [25, 25]).currentLoads.cable_lateral_raise).toBe(30);
     expect(at("cable_lateral_raise", [25, 25]).bigJump?.cable_lateral_raise).toBeUndefined();
-    // 19 Oct 2026: the average counts, because set 2 after a failure set always loses reps. 35 + 20 → up.
-    expect(at("cable_lateral_raise", [35, 20]).currentLoads.cable_lateral_raise).toBe(30);
+    // 19 Oct 2026: the average counts, because set 2 after a failure set always loses reps. 34 + 20 → up one pin.
+    expect(at("cable_lateral_raise", [34, 20]).currentLoads.cable_lateral_raise).toBe(30);
+    // R2-04 catch-up: a first set of 35+ reps → two pins at once, past the cap.
+    expect(at("cable_lateral_raise", [35, 20]).currentLoads.cable_lateral_raise).toBe(40);
+    expect(at("cable_leg_extension", [50, 30]).currentLoads.cable_leg_extension).toBe(50);
     // His 19 Oct session, 25 + 18 (average 21.5): stays, with a note for the next session.
     const s = at("cable_lateral_raise", [25, 18]);
     expect(s.currentLoads.cable_lateral_raise).toBe(20);
@@ -99,16 +103,39 @@ describe("planState: adjustments and rounds", () => {
     expect(total).toBe(72 + 2 + 2 + 2);
   });
 
-  it("Sunday rounds follow the log: +1 when the last round is within 10% of the first; deloads hold", () => {
+  it("Sunday rounds follow the log in a plan that still has them: +1 within 10%; deloads hold", () => {
+    // The rounds left this plan on 24 Oct 2026: no state from the log any more.
     const w = new World();
-    expect(stateOf(w).sundayRounds).toBeUndefined();
     w.cond(dayIn(1, "rounds"), "rounds", { rounds: 6, first_round_count: 50, last_round_count: 46 });
-    expect(stateOf(w).sundayRounds).toBe(7);
+    expect(stateOf(w).sundayRounds).toBeUndefined();
+    const withRounds: ProgramDefinition = {
+      ...PLAN, days: PLAN.days.map((d) => (d.key === "rounds" ? { ...d, conditioning: { kind: "rounds", workSec: 120, easySec: 60, warmupMin: 5, startRounds: 6, maxRounds: 10, dropOffFraction: 0.1 } } : d))
+    };
+    const rounds = () => sundayRoundsFrom(w.tables.conditioning, withRounds);
+    expect(rounds()).toBe(7);
     w.cond(dayIn(2, "rounds"), "rounds", { rounds: 7, first_round_count: 50, last_round_count: 40 });
-    expect(stateOf(w).sundayRounds).toBe(7);
+    expect(rounds()).toBe(7);
     w.cond(dayIn(7, "rounds"), "rounds", { rounds: 4, first_round_count: 50, last_round_count: 50 }); // deload: half rounds
-    expect(stateOf(w).sundayRounds).toBe(7);
+    expect(rounds()).toBe(7);
     w.cond(dayIn(8, "rounds"), "rounds", { rounds: 7 }); // no counts: hold what was done
-    expect(stateOf(w).sundayRounds).toBe(7);
+    expect(rounds()).toBe(7);
+  });
+
+  it("R2-15 wrist ladder: a clean session earns the next rung; pain above 3 holds it", () => {
+    const w = new World();
+    w.session(dayIn(0, "lower_a"), "lower_a");
+    w.session(dayIn(1, "lower_a"), "lower_a");
+    expect(stateOf(w).wristLadder?.earned).toBe(1);
+    // Week 2 (rung 12 from the schedule) is allowed: earned 1.
+    const ex = (st: ReturnType<typeof stateOf>, week: number) => prescribeDay(PLAN, week, "lower_a", { ...st, trainingMaxes: { squat: 140, deadlift: 200 } })
+      .exercises.find((e) => e.exerciseKey === "wrist_extension")!;
+    expect(ex(stateOf(w), 2).sets[0]!.reps).toBe(12);
+    // A 12-rep session with pain 5/10 holds the ladder at 12 in week 4 (schedule says 10).
+    const s = w.session(dayIn(2, "lower_a"), "lower_a");
+    w.pain(s.date, "right_elbow", "wrist_extension", { pain_score: 5 });
+    const held = planState({ program: w.program, ids: w.ids, maxes: w.tables.training_maxes, sessions: w.tables.sessions, sets: w.tables.sets,
+      equipment: DEFAULT_EQUIPMENT, painChecks: w.tables.pain_checks });
+    expect(held.wristLadder?.earned).toBe(1);
+    expect(ex(held, 4).sets[0]!.reps).toBe(12);
   });
 });

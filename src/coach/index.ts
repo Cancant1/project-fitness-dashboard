@@ -13,7 +13,7 @@ export { nextSwap, swapLabel, swapStartLoad, SWAP_CHAINS, type SwapStartLoad, ty
 export { REFERENCE, muscleKey, type MuscleReference } from "./reference";
 export { EVIDENCE, type EvidenceId } from "./evidence";
 export {
-  expectedBand, creatineOffset, BODYWEIGHT_PATH, bodyweightStatus, PACE_DAYS, type BodyweightStatus, type BodyweightSide, rateFit, isRateWeek, waistTrend, photoStatus, photosCue, isPhotosRow, WAIST_MIN_READINGS
+  expectedBand, pathAnchor, creatineOffset, BODYWEIGHT_PATH, bodyweightStatus, PACE_DAYS, type BodyweightStatus, type BodyweightSide, rateFit, isRateWeek, waistTrend, photoStatus, photosCue, isPhotosRow, WAIST_MIN_READINGS
 } from "./body";
 export { planLine, goalTm, stepsTo, earlyDeloadRun } from "./strength";
 export { laggingMuscles, muscleSets, OVERREACH_FACTOR } from "./muscle";

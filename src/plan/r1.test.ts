@@ -191,7 +191,7 @@ describe("E5 step jumps and the stuck rule", () => {
     expect(stuckNormalReps(h([[22.5, 7], [22.5, 8], [22.5, 9]]), def)).toBe(6);
     expect(stuckNormalReps(h([[22.5, 7], [22.5, 8], [22.5, 9], [22.5, 6]]), def)).toBe(7);
     expect(stuckNormalReps(h([[20, 7], [20, 8], [22.5, 9]]), def)).toBeUndefined();
-    expect(stuckNormalReps(h([[22.5, 7], [22.5, 8], [22.5, 9]]), PLAN.mainLifts.weighted_pullup)).toBeUndefined(); // incline only
+    expect(stuckNormalReps(h([[7.5, 7], [7.5, 8], [7.5, 9]]), PLAN.mainLifts.weighted_pullup)).toBe(6); // R2-08: the pull-up too
     const sets = notWarmup(ex(4, "upper_a", "incline_db_press", { ...STATE, normalReps: { incline_db_press: 6 } }).sets);
     expect(shape(sets)).toEqual([["working", 22.5, 6], ["working", 22.5, 6], ["working", 22.5, 6], ["rep_out", 22.5, null]]);
   });
@@ -378,11 +378,9 @@ describe("E13 wrist ladder", () => {
     w2.session(dayIn(1, "lower_a"), "lower_a", { only: ["wrist_extension"], load: () => 5, reps: (_e, _s, i) => (i === 2 ? 13 : undefined) });
     expect(ex(2, "lower_a", "wrist_extension", withLadder(w2.data().state)).sets[0]!.load).toBe(5); // missed reps: stay
   });
-  it("Wednesday: the home task on the ride card (none in maintenance)", () => {
-    expect(day(1, "easy_ride").conditioning?.homeTasks).toEqual([
-      { id: "wrist_ladder", text: "Wrist ladder at home: 3 × 15, dumbbell or water bottle", sets: 3, reps: 15 }
-    ]);
-    expect(day(13, "easy_ride").conditioning?.homeTasks).toBeUndefined();
+  it("Wednesday: no home session since 24 Oct 2026 (a free day)", () => {
+    expect(day(1, "easy_ride").conditioning).toEqual({ kind: "open" });
+    expect(PLAN.wristLadder?.homeDayKey).toBeUndefined();
   });
   it("flare-up: morning elbow ≥ usual + 2 → isometric holds for 3–7 days, then one rung lower", () => {
     const flare = pain("2026-10-26", "right_elbow", { pain_score: 3, morning_score: 5 });
@@ -393,7 +391,6 @@ describe("E13 wrist ladder", () => {
     expect(fri).toMatchObject({ effort: "easy" });
     expect(fri.sets).toHaveLength(5);
     expect(fri.sets[0]).toMatchObject({ kind: "timed", durationSec: 45, reps: null });
-    expect(day(2, "easy_ride", s).conditioning?.homeTasks?.[0]?.text).toBe("Wrist isometric holds at home: 5 × 30–45 s, palm down, mid-range");
     expect(ex(3, "lower_a", "wrist_extension", s).sets[0]!.kind).toBe("timed"); // Mon 2 Nov: still in the window
     expect(shape(ex(3, "lower_b", "wrist_extension", s).sets)[0]).toEqual(["working", 4, 15]); // week 3 rung 12, one back → 15
     // A settled morning from day 3 ends the holds early (the day before it).
@@ -485,15 +482,25 @@ describe("E15 swap start loads", () => {
   });
 });
 
-describe("E22 conditioning prescription", () => {
+describe("E22 conditioning prescription (a plan that still has Sunday rounds)", () => {
+  // The rounds left this plan on 24 Oct 2026; the rule still works for a plan that has it.
+  const withRounds: ProgramDefinition = {
+    ...PLAN, days: PLAN.days.map((d) => (d.key === "rounds" ? {
+      ...d, conditioning: {
+        kind: "rounds", workSec: 120, easySec: 60, warmupMin: 5, startRounds: 6, maxRounds: 10, dropOffFraction: 0.1,
+        burstFromWeek: 4, burstRounds: 2, burstWorkSec: 5, burstEasySec: 10, finishBy: "14:00"
+      }
+    } : d))
+  };
+  const sun = (weekNo: number, s: PlanState = STATE) => prescribeDay(withRounds, weekNo, "rounds", s).conditioning;
   it("Sunday from week 4: 2 burst rounds; deload half with none; finish by 14:00", () => {
-    expect(day(3, "rounds").conditioning).toMatchObject({ rounds: 6, finishBy: "14:00", text: "6 rounds, 2 min hard / 1 min easy" });
-    expect(day(3, "rounds").conditioning?.burstRounds).toBeUndefined();
-    expect(day(4, "rounds", { ...STATE, sundayRounds: 8 }).conditioning).toMatchObject({
+    expect(sun(3)).toMatchObject({ rounds: 6, finishBy: "14:00", text: "6 rounds, 2 min hard / 1 min easy" });
+    expect(sun(3)?.burstRounds).toBeUndefined();
+    expect(sun(4, { ...STATE, sundayRounds: 8 })).toMatchObject({
       rounds: 8, burstRounds: 2, burstWorkSec: 5, burstEasySec: 10, notes: ["Finish by 14:00."],
       text: "8 rounds, of which 2 are burst rounds: 5 s all-out / 10 s easy for 2 min (rope or shadow-boxing, no bag)"
     });
-    const deload = day(7, "rounds", { ...STATE, sundayRounds: 8 }).conditioning!;
+    const deload = sun(7, { ...STATE, sundayRounds: 8 })!;
     expect(deload).toMatchObject({ rounds: 4, text: "4 rounds, 2 min hard / 1 min easy (deload: half, no burst rounds)" });
     expect(deload.burstRounds).toBeUndefined();
   });
@@ -508,8 +515,8 @@ describe("E23 / E24 plan data", () => {
     expect(PLAN.days.flatMap((d) => d.slots).some((s) => s.exerciseKey === "incline_hammer_curl")).toBe(false);
     expect(ex(1, "upper_b", "single_arm_cable_curl").alternatives).toContain("incline_hammer_curl");
   });
-  it("deload weeks 7 and 10 carry the variety note; accessories list equivalents", () => {
-    expect(PLAN.weeks.filter((w) => w.notes.includes(VARIETY_NOTE)).map((w) => w.weekNo)).toEqual([7, 10]);
+  it("the week-7 deload carries the variety note (week 10 is a rest week); accessories list equivalents", () => {
+    expect(PLAN.weeks.filter((w) => w.notes.includes(VARIETY_NOTE)).map((w) => w.weekNo)).toEqual([7]);
     expect(VARIETY_NOTE).toBe("You may swap up to 2 accessories for a listed equivalent this week (same muscle).");
     const missing = PLAN.days.flatMap((d) => d.slots).filter((s) => (s.role === "compound" || s.role === "isolation") && !s.rehab && !s.extraOnly && !s.alternatives?.length);
     expect(missing.map((s) => s.exerciseKey)).toEqual([]);

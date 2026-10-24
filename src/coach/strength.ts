@@ -139,8 +139,10 @@ export function strengthRules(ctx: WeekCtx): AreaResult {
           : `${head}: TM ${pct > 0 ? "+" : "−"}${Math.abs(pct)}% to ${fmtLoad(change.to)}.`;
         const metric = { label: `${name} rep-out`, value: String(r.reps), target: String(r.target) };
         const why: Signal["why"] = ["P-PROG-TM", "M-E1RM"];
-        if (diff >= 0) out.push(sig(`strength.repout.${lift}`, "strength", "good", `${name} rep-out hit`, base, why, { metric }));
-        else if (diff === -1) out.push(sig(`strength.repout.${lift}`, "strength", "watch", `${name} rep-out one short`, base, why, { metric }));
+        // R2-01: a rep-out repeats within about 1 rep week to week (Mitter 2022), so ±1 is day-to-day noise.
+        const noise = Math.abs(diff) === 1 ? " Within ±1 rep: day-to-day noise." : "";
+        if (diff >= 0) out.push(sig(`strength.repout.${lift}`, "strength", "good", `${name} rep-out hit`, base + noise, why, { metric }));
+        else if (diff === -1) out.push(sig(`strength.repout.${lift}`, "strength", "info", `${name} rep-out within noise`, base + noise, why, { metric }));
         else out.push(sig(`strength.repout.${lift}`, "strength", "act", `${name} rep-out missed`, `${base} Note anything off: sleep, food, pain.`, why, { metric }));
       }
     }
@@ -149,6 +151,7 @@ export function strengthRules(ctx: WeekCtx): AreaResult {
   const misses = missesSignal(ctx);
   if (misses) out.push(misses);
   out.push(...checkpointSignals(ctx));
+  out.push(...checkpointReads(ctx));
   out.push(...checkpointAhead(ctx));
 
   // ---- incline DB and pull-up
@@ -172,10 +175,12 @@ export function strengthRules(ctx: WeekCtx): AreaResult {
       const l = Number(ro.load);
       const reps = ro.reps!;
       const r = incrementAfterRepOut(lift, l, reps, data.equipment, def);
-      const head = `${name} ${stepFmt(lift, l)} × ${reps}`;
-      const why: Signal["why"] = ["P-PROG-STEP"];
+      const sys = lift === "weighted_pullup" ? systemMass(data, ro, l) : null;
+      const head = `${name} ${stepFmt(lift, l)} × ${reps}${sys ? ` (${fmtLoad(sys.mass)} kg system, e1RM ${fmtLoad(Math.round(sys.e1rm))})` : ""}`;
+      const why: Signal["why"] = sys ? ["P-PROG-STEP", "M-E1RM"] : ["P-PROG-STEP"];
       if (r.direction > 0) out.push(sig(`strength.step.${lift}`, "strength", "good", `${name}: step up`, `${head}: next ${stepFmt(lift, r.load)}.`, why));
-      else if (r.direction === 0) out.push(sig(`strength.step.${lift}`, "strength", "info", `${name}: same load`, `${head}: same load next week.`, why));
+      else if (r.direction === 0) out.push(sig(`strength.step.${lift}`, "strength", "info", `${name}: same load`,
+        `${head}: same load next week.${sys?.heavier ? ` You're ${fmtLoad(sys.heavier)} kg heavier than at the last rep-out at this load: a rep fewer is the bodyweight, not a miss.` : ""}`, why));
       else out.push(sig(`strength.step.${lift}`, "strength", "watch", `${name}: step down`, `${head}: one step down to ${stepFmt(lift, r.load)}.`, why));
     }
 
@@ -196,7 +201,7 @@ export function strengthRules(ctx: WeekCtx): AreaResult {
       out.push(sig(`strength.step_pace.${lift}`, "strength", "good", `${name} at goal load`, `${name} is at the goal load (${stepFmt(lift, goal)}).`, why, { metric }));
     } else if (steps <= weeksLeft) {
       out.push(sig(`strength.step_pace.${lift}`, "strength", "good", `${name} on pace`,
-        `${steps} ${plural(steps, "step")} to ${stepFmt(lift, goal)}, ${weeksLeft} rep-out ${plural(weeksLeft, "week")} left.`, why, { metric }));
+        `${steps} ${plural(steps, "step")} to ${stepFmt(lift, goal)}${lift === "weighted_pullup" ? goalSystemText(data, ctx.asOf, goal) : ""}, ${weeksLeft} rep-out ${plural(weeksLeft, "week")} left.`, why, { metric }));
     } else {
       out.push(sig(`strength.step_pace.${lift}`, "strength", "watch", `${name} behind pace`,
         `${steps} ${plural(steps, "step")} to ${stepFmt(lift, goal)} with ${weeksLeft} rep-out ${plural(weeksLeft, "week")} left: behind pace.`, why, { metric }));
@@ -277,6 +282,83 @@ function missesSignal(ctx: WeekCtx): Signal | null {
 
 const orDash = (x: number | null, f: (v: number) => string) => (x == null ? "–" : f(x));
 
+/**
+ * R2-07 (D-SYSTEM-MASS): a pull-up moves bodyweight + belt. System mass from the 7-day bodyweight on the rep-out's
+ * date, its e1RM, and how much heavier he is than at the previous rep-out at the same belt load (≥ 1.5 kg counts).
+ */
+function systemMass(data: CoachData, ro: SetRow, load: number): { mass: number; e1rm: number; heavier: number | null } | null {
+  const date = data.planSessions.find((s) => s.id === ro.session_id)?.date;
+  const bw = date ? bw7(data, date) : null;
+  if (!date || bw == null) return null;
+  const mass = bw + load;
+  const prev = repOutHistory(data, "weighted_pullup", addDays(date, -1)).filter((h) => Math.abs(h.load - load) < 1e-9).at(-1);
+  const prevBw = prev ? bw7(data, prev.date) : null;
+  const gained = prevBw != null ? bw - prevBw : null;
+  return { mass, e1rm: mass * (1 + ro.reps! / 30), heavier: gained != null && gained >= 1.5 ? gained : null };
+}
+
+/** R2-07: the pull-up goal read as system mass at today's 7-day bodyweight. */
+function goalSystemText(data: CoachData, asOf: string, goal: number): string {
+  const bw = bw7(data, asOf);
+  return bw == null ? "" : ` (≈ ${fmtLoad(Math.round(bw + goal))} kg system at ${fmtBw(bw)} kg)`;
+}
+
+/** Population SD. */
+const sd = (xs: readonly number[]) => {
+  const m = xs.reduce((a, b) => a + b, 0) / xs.length;
+  return Math.sqrt(xs.reduce((a, b) => a + (b - m) ** 2, 0) / xs.length);
+};
+
+/** R2-03: best k for S(t) = P − (P − S₀)·e^(−k·t) through the TMs from week 2 on (grid 0.02–0.60). */
+export function fitRegainK(points: readonly { week: number; tm: number }[], s0: number, p: number): number | null {
+  const pts = points.filter((x) => x.week >= 2);
+  if (pts.length < 2 || p <= s0) return null;
+  let best: { k: number; e: number } | null = null;
+  for (let i = 2; i <= 60; i++) {
+    const k = i / 100;
+    const e = pts.reduce((a, x) => a + (x.tm - (p - (p - s0) * Math.exp(-k * x.week))) ** 2, 0);
+    if (!best || e < best.e) best = { k, e };
+  }
+  return best ? best.k : null;
+}
+
+/**
+ * At checkpoint 1 (complete week): K-REPOUT-NOISE (R2-02) and K-REGAIN-FIT (R2-03), as information for the check-in.
+ * Rep-out spread: SD of (reps − target) over the squat and deadlift rep-outs from week 1; ≤ 1.2 → the table stands,
+ * ≥ 1.5 → −1…+1 counts as a hit (Mario decides). Regain: k fitted on the TMs from week 2 (week 1 carries a practice
+ * effect), against the plan's 0.17; k > 0.25 means the TM cap at the old best arrives earlier.
+ */
+function checkpointReads(ctx: WeekCtx): Signal[] {
+  const { data, week, weekNo } = ctx;
+  if (!week.checkpoint || !ctx.complete) return [];
+  if (data.plan.weeks.filter((w) => w.checkpoint)[0]?.weekNo !== weekNo) return [];
+  const out: Signal[] = [];
+  const diffs = TM_LIFTS.flatMap((lift) => repOutHistory(data, lift, ctx.to)
+    .filter((r) => r.weekNo != null && r.weekNo >= 1 && r.target != null).map((r) => r.reps - r.target!));
+  if (diffs.length >= 4) {
+    const s = sd(diffs);
+    const verdict = s <= 1.2 ? "the rep-out table stands" : s >= 1.5 ? "count −1 to +1 as a hit (decide at the check-in)"
+      : "in between: keep the table and look again at checkpoint 2";
+    out.push(sig("strength.repout_noise", "strength", "info", "Rep-out spread",
+      `Your rep-outs land within ±${s.toFixed(1)} reps of target (SD over ${diffs.length} rep-outs; research: about 1). So ${verdict}.`,
+      ["P-PROG-TM", "M-E1RM"], { metric: { label: "Rep-out SD (reps)", value: s.toFixed(1), target: "≤ 1.2" } }));
+  }
+  for (const lift of TM_LIFTS) {
+    const rows = tmRows(data, lift).filter((m) => m.effective_date >= data.start && m.effective_date <= ctx.to);
+    const best = data.plan.oldBestE1rm?.[lift];
+    if (rows.length < 3 || best == null) continue;
+    const pts = rows.map((m) => ({ week: weekForDate(data.plan, m.effective_date)?.weekNo ?? 0, tm: Number(m.value_kg) }));
+    const k = fitRegainK(pts, Number(rows[0]!.value_kg), best);
+    if (k == null) continue;
+    const pace = k > 0.25 ? " Faster than planned: the TM cap at your old best comes sooner."
+      : k < 0.1 ? " Slower than planned: the goal leans on the later weeks." : "";
+    out.push(sig(`strength.regain_fit.${lift}`, "strength", "info", `${LIFT_NAME[lift]} regain pace`,
+      `${LIFT_NAME[lift]}: regain fitted from week 2, k ≈ ${k.toFixed(2)} (plan 0.17).${pace}`,
+      ["M-REGAIN"], { metric: { label: "Regain k", value: k.toFixed(2), target: "0.17" } }));
+  }
+  return out;
+}
+
 function checkpointSignals(ctx: WeekCtx): Signal[] {
   const { data, week, weekNo } = ctx;
   const cp = week.checkpoint;
@@ -327,7 +409,7 @@ function checkpointSignals(ctx: WeekCtx): Signal[] {
   // Behind on lifts with bodyweight fine: sessions first ("check sessions done and bodyweight first").
   const prevCp = plan.weeks.filter((w) => w.checkpoint && w.weekNo < weekNo).at(-1)?.weekNo ?? 0;
   const span = plan.weeks.filter((w) => w.weekNo > prevCp && w.weekNo <= weekNo);
-  const planned = span.reduce((n, w) => n + (w.type === "test" ? 3 : 4), 0);
+  const planned = span.reduce((n, w) => n + (w.rest ? 0 : w.type === "test" ? 3 : 4), 0);
   const done = span.reduce((n, w) => { const { from, to } = weekBounds(w); return n + sessionsIn(data, from, to).length; }, 0);
   const lifts = st.behind.join(" and ");
   if (done < 0.9 * planned) {

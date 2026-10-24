@@ -71,6 +71,8 @@ export interface WeekNumbers {
   conditioning: {
     rideMin: number; rideTarget: number | null; boxing: boolean;
     rounds: number | null; roundsTarget: number | null; roundsNext: number | null;
+    /** Free-day notes this week (Wed, Sun since 24 Oct 2026) and the minutes he put on them. */
+    freeNotes?: number; freeMin?: number;
     /** E22: this week's "gassed" rating (1–5) and fade round from the boxing row. */
     gassed?: number | null; fadeRound?: number | null;
   };

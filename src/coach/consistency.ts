@@ -48,6 +48,34 @@ export function plannedDays(data: CoachData, to: string): PlannedDay[] {
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** R2-12 (DECISIONS 2026-10-24): after week 4, the planned session lengths come from his logged times (weeks 2–4). */
+export const SESSION_LENGTH_WEEKS = [2, 4] as const;
+
+/** Median logged minutes per lifting day over the session-length weeks, once the last of them is complete. */
+function sessionLengthSignal(ctx: WeekCtx): Signal | null {
+  const { data, weekNo } = ctx;
+  if (weekNo !== SESSION_LENGTH_WEEKS[1] || !ctx.complete) return null;
+  const [w0, w1] = SESSION_LENGTH_WEEKS;
+  const from = data.plan.weeks.find((w) => w.weekNo === w0)?.startDate;
+  if (!from) return null;
+  const byDay = new Map<string, number[]>();
+  for (const s of data.planSessions) {
+    if (s.date < from || s.date > ctx.to || s.duration_min == null) continue;
+    const key = (s.legacy_ref as { plan?: { dayKey?: string } } | null)?.plan?.dayKey;
+    if (!key) continue;
+    byDay.set(key, [...(byDay.get(key) ?? []), Number(s.duration_min)]);
+  }
+  const parts = data.plan.days.filter((d) => d.kind === "lifting" && byDay.has(d.key)).map((d) => {
+    const xs = [...byDay.get(d.key)!].sort((a, b) => a - b);
+    const mid = Math.floor(xs.length / 2);
+    const med = xs.length % 2 ? xs[mid]! : (xs[mid - 1]! + xs[mid]!) / 2;
+    return `${d.title} ${Math.round(med / 5) * 5} (plan ${d.minutes ?? "–"})`;
+  });
+  if (!parts.length) return null;
+  return sig("consistency.session_length", "consistency", "info", "Session lengths from your log",
+    `Logged minutes, weeks ${w0}–${w1}: ${parts.join(" · ")}. These become the planned times at this check-in.`, ["P-TIMESAVE"]);
+}
+
 export function consistencyRules(ctx: WeekCtx): AreaResult {
   const { data, week } = ctx;
   const out: Signal[] = [];
@@ -69,7 +97,7 @@ export function consistencyRules(ctx: WeekCtx): AreaResult {
       out.push(sig("consistency.sessions", "consistency", "watch", "The floor held",
         `${done} of ${planned} sessions: the floor held. Aim for ${planned} next week.`, [...why, "P-MINIMUM"], { metric }));
     } else {
-      // Deload weeks are light (week 10 is the England trip: "No gym: rest and walk a lot"), so a short one is a watch.
+      // Deload weeks are light, so a short one is a watch (week 10, England, is a rest week with nothing planned).
       out.push(sig("consistency.sessions", "consistency", week.type === "deload" ? "watch" : "act", "Under the floor",
         `${done} of ${planned} sessions. Bad week? The floor is Lower A + Upper A; minimum sessions count.`, [...why, "P-MINIMUM"], { metric }));
     }
@@ -148,6 +176,9 @@ export function consistencyRules(ctx: WeekCtx): AreaResult {
       `${n} weeks in a row with 3+ sessions. Your longest since 2023 was ${LONGEST_STREAK_SINCE_2023}.`, ["P-ADHERENCE"],
       { metric: { label: "Weeks with 3+ sessions", value: String(n), target: String(LONGEST_STREAK_SINCE_2023) } }));
   }
+
+  const length = sessionLengthSignal(ctx);
+  if (length) out.push(length);
 
   return {
     signals: out,

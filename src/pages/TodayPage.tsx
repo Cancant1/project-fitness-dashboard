@@ -17,7 +17,7 @@ import { Sheet } from "../ui/Sheet";
 import { CheckIcon, ChevronRight, PlayIcon } from "../ui/icons";
 import { answerPainCheck, currentWeekNo, dailyCues, ensurePlanProteinPerKg, saveElbowMonthly, savePhotosDone, weeklyReport, bodyweightStatus, type BodyweightSide, type DailyCue, type WeeklyReport } from "../coach";
 import { useCoachData } from "../coach/hooks";
-import { CONDITIONING_KIND, ConditioningCard } from "./ConditioningCard";
+import { CONDITIONING_KIND, ConditioningCard, isFreeDayNote } from "./ConditioningCard";
 import { SetMaxes } from "./SetMaxes";
 import { ApplyButton, Dot, VERDICT_TONE, VERDICT_WORD } from "./checkin/coachUi";
 import { useToast } from "./food/ui";
@@ -244,7 +244,7 @@ export function TodayPage() {
                 !doneToday && (
                   <div className="today-hero-starts">
                     <button className="btn today-hero-btn" disabled={busy} onClick={() => void start(day)}><PlayIcon /> {planDate === today ? "Start workout" : "Start early"}</button>
-                    <button className="btn today-hero-min" disabled={busy} onClick={() => void start(day, true)}>Minimum session · 30 min</button>
+                    <button className="btn today-hero-min" disabled={busy} onClick={() => void start(day, true)}>Busy or tired? 30-min minimum</button>
                   </div>
                 )
               ) : (
@@ -268,11 +268,13 @@ export function TodayPage() {
                   const date = addDays(slot.week.startDate, d.weekday - 1);
                   // Done by plan slot, not by date: a session moved to another day ticks the day it was planned for.
                   // Lifting: the session logged for this week's day (or an off-plan session on the date); conditioning:
-                  // that kind logged anywhere in the week.
+                  // that kind logged anywhere in the week; a free day: a note on that date.
                   const weekEnd = addDays(slot.week.startDate, 6);
                   const done = d.kind === "lifting"
                     ? slots.has(`${slot.week.weekNo}:${d.key}`) || sessions.some((s) => s.date === date && s.status === "completed" && !planDayKey(s))
-                    : conditioning.some((c) => c.kind === CONDITIONING_KIND[d.key] && c.done && !c.deleted_at && c.date >= slot.week.startDate && c.date <= weekEnd);
+                    : d.conditioning?.kind === "open"
+                      ? conditioning.some((c) => isFreeDayNote(c) && c.date === date)
+                      : conditioning.some((c) => c.kind === CONDITIONING_KIND[d.key] && c.done && !c.deleted_at && c.date >= slot.week.startDate && c.date <= weekEnd);
                   const cls = [d.kind === "lifting" ? "lift" : "cardio", date === planDate ? "now" : "", done ? "done" : ""].join(" ");
                   const logged = d.kind === "lifting" ? sessionForSlot(sessions, program, slot.week.weekNo, d.key) : undefined;
                   return (
@@ -574,5 +576,5 @@ function WeighIn({ weighIns, todayValue, bw7, track, onSave }: {
 }
 
 function shortName(key: string): string {
-  return ({ lower_a: "Lower", upper_a: "Upper", lower_b: "Lower", upper_b: "Upper", easy_ride: "Ride", boxing: "Box", rounds: "Rounds" } as Record<string, string>)[key] ?? key;
+  return ({ lower_a: "Lower", upper_a: "Upper", lower_b: "Lower", upper_b: "Upper", easy_ride: "Free", boxing: "Box", rounds: "Free" } as Record<string, string>)[key] ?? key;
 }

@@ -1,5 +1,5 @@
 import { addDays } from "../lib/format";
-import { bodyweightStatus, creatineOffset, expectedBand, photoStatus, photosCue, rateFit, waistDueCue } from "./body";
+import { bodyweightStatus, creatineOffset, expectedBand, pathAnchor, photoStatus, photosCue, rateFit, waistDueCue } from "./body";
 import { weeklyReport } from "./report";
 import { dayIn, monday, sunday, World } from "./testkit";
 import type { WeeklyReport } from "./types";
@@ -67,19 +67,25 @@ describe("bodyweightStatus (Weight page: on track, above, below)", () => {
     expect(s.pace!.lo).toBeCloseTo(0.275, 6);
     expect(s.pace!.hi).toBeCloseTo(0.425, 6);
   });
-  it("above the path and gaining fast → above; below and flat → below", () => {
-    expect(at(74.3, 0.9)).toMatchObject({ path: "above", pace: { side: "above" }, verdict: "above" });
-    expect(at(73.5, 0)).toMatchObject({ path: "below", pace: { side: "below" }, verdict: "below" });
+  it("R2-14 before the week-3 anchor: the early jump reads as expected (above only past the path + 2.5 kg), pace ignored", () => {
+    expect(at(74.3, 0.9)).toMatchObject({ path: "on", verdict: "on", early: true });
+    expect(at(77.6, 0)).toMatchObject({ path: "above", verdict: "above", early: true });
+    expect(at(75.5, 0, 4)).toMatchObject({ path: "on", pace: null, verdict: "on" });
   });
-  it("one on, one off → the off side; pulling apart (above but flat) → on track", () => {
-    expect(at(74.0, 0.6)).toMatchObject({ path: "on", pace: { side: "above" }, verdict: "above" });
-    expect(at(75.5, 0)).toMatchObject({ path: "above", pace: { side: "below" }, verdict: "on" });
+  it("after the anchor: the band passes through the week-3 average; fast gain → above, flat → below", () => {
+    const after = addDays(monday(5), 2);
+    const fast = at(75.0, 0.9, 21, after);
+    expect(fast).toMatchObject({ early: false, pace: { side: "above" }, verdict: "above" });
+    const w = new World();
+    w.weighDaily(addDays(after, -20), 21, 75.0, 0.9);
+    const anchor = pathAnchor(w.data(), after)!;
+    expect(anchor.date).toBe(addDays(monday(3), 6));
+    const b = expectedBand(anchor.date, w.data().plan, anchor)!;
+    expect((b[0] + b[1]) / 2).toBeCloseTo(anchor.kg, 6);
+    expect(at(75.0, 0, 21, after)).toMatchObject({ pace: { side: "below" }, verdict: "below" });
   });
-  it("too few weigh-ins for a pace → the path alone", () => {
-    expect(at(75.5, 0, 4)).toMatchObject({ path: "above", pace: null, verdict: "above" });
-  });
-  it("from week 3 not early; before the plan nothing", () => {
-    expect(at(75.5, 0.2, 14, addDays(monday(3), 3)).early).toBe(false);
+  it("from the anchor on not early; before the plan nothing", () => {
+    expect(at(75.5, 0.2, 14, addDays(monday(4), 3)).early).toBe(false);
     expect(at(74, 0, 14, addDays(monday(0), -1))).toBeNull();
   });
 });

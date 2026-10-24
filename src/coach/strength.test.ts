@@ -53,8 +53,8 @@ describe("strength.repout", () => {
     expect(week1(10)).toMatchObject({ status: "good", message: "Squat 100 × 10 (target 10): TM +1% to 142.5." });
     expect(week1(13)?.message).toBe("Squat 100 × 13 (target 10): TM +4% to 145.");
   });
-  it("one under: watch", () => {
-    expect(week1(9)).toMatchObject({ status: "watch", message: "Squat 100 × 9 (target 10): TM −2% to 137.5." });
+  it("one under: info, day-to-day noise (R2-01)", () => {
+    expect(week1(9)).toMatchObject({ status: "info", message: "Squat 100 × 9 (target 10): TM −2% to 137.5. Within ±1 rep: day-to-day noise." });
   });
   it("two or more under: act, with the note", () => {
     expect(week1(8)).toMatchObject({ status: "act", message: "Squat 100 × 8 (target 10): TM −5% to 132.5. Note anything off: sleep, food, pain." });

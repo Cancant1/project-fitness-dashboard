@@ -28,11 +28,16 @@ const ACCESSORIES: ProgramSlot[] = (() => {
   return [...seen.values()];
 })();
 
+/** R2-09 (24 Oct 2026): horizontal rows count ½ set for the rear delts, as Pelland counts synergists. */
+const isHorizontalRow = (name: string) => /\brows?\b/i.test(name) && !/upright/i.test(name);
+
 /** Exercises with muscle names normalised so "side_delts" (plan-created) and "Side delts" (history) match. */
 function normalisedExercises(data: CoachData): Map<string, Pick<Exercise, "muscle_direct" | "muscle_indirect">> {
   const m = new Map<string, Pick<Exercise, "muscle_direct" | "muscle_indirect">>();
   for (const [id, e] of data.exercises) {
-    m.set(id, { muscle_direct: e.muscle_direct ? muscleKey(e.muscle_direct) : null, muscle_indirect: (e.muscle_indirect ?? []).map(muscleKey) });
+    const indirect = (e.muscle_indirect ?? []).map(muscleKey);
+    if (isHorizontalRow(e.name) && !indirect.includes("rear delts") && muscleKey(e.muscle_direct ?? "") !== "rear delts") indirect.push("rear delts");
+    m.set(id, { muscle_direct: e.muscle_direct ? muscleKey(e.muscle_direct) : null, muscle_indirect: indirect });
   }
   return m;
 }
@@ -107,6 +112,8 @@ export function muscleRules(ctx: WeekCtx): AreaResult {
 
   out.push(...progressSignals(ctx));
   out.push(...effortSignals(ctx));
+  out.push(...breathSignal(ctx));
+  out.push(...lateralDecision(ctx));
 
   return { signals: out, numbers: { workingSets: { done, planned }, muscles } };
 }
@@ -174,6 +181,39 @@ function progressSignals(ctx: WeekCtx): Signal[] {
       { metric: { label: "Accessories progressed", value: String(moved), target: String(tracked) } }));
   }
   return out;
+}
+
+// ---------- muscle.lateral_decision (R2-06) ----------
+
+/** R2-06 (DECISIONS 2026-10-24): on this date, cable laterals still held by the jump cap → switch to DB laterals. */
+export const LATERAL_DECISION = { date: "2026-11-14", exerciseKey: "cable_lateral_raise", to: "db_lateral_raise" } as const;
+
+function lateralDecision(ctx: WeekCtx): Signal[] {
+  const { data } = ctx;
+  const d = LATERAL_DECISION;
+  if (d.date < ctx.from || d.date > ctx.to || ctx.asOf < d.date) return [];
+  const held = data.state.bigJump?.[d.exerciseKey];
+  const load = data.state.currentLoads[d.exerciseKey];
+  const why: Signal["why"] = ["P-PROG-DOUBLE", "P-EXERCISE"];
+  if (held) {
+    return [sig("muscle.lateral_decision", "muscle", "act", "Switch to DB laterals",
+      `Cable laterals are still at ${fmtLoad(load ?? 20)} lb: the next pin (${fmtLoad(held.next)} lb) needs a ${held.reps}-rep average. Switch to DB laterals (1–2 kg steps) from Monday; Claude updates the plan at the check-in.`, why)];
+  }
+  return [sig("muscle.lateral_decision", "muscle", "good", "Keep the cable laterals",
+    `Cable laterals moved past the big pin jump${load != null ? ` (now ${fmtLoad(load)} lb)` : ""}: keep them.`, why)];
+}
+
+// ---------- muscle.breath (R2-05, D-BREATH-STOP) ----------
+
+/** Sets he tagged "breath" this week: breathing ended them, so they may be short of failure. */
+function breathSignal(ctx: WeekCtx): Signal[] {
+  const { data } = ctx;
+  const tagged = ctx.sets.filter((s) => s.flags?.includes("breath"));
+  if (!tagged.length) return [];
+  const names = [...new Set(tagged.map((s) => { const k = keyOfSet(data, s); return k ? titleName(exerciseLabel(data, k)) : "a set"; }))];
+  return [sig("muscle.breath", "muscle", "info", "Breath ended sets",
+    `${tagged.length} ${plural(tagged.length, "set")} ended on breathing (${names.join(", ")}): read as possibly short of failure. Rest until you can talk (up to 2 min); if it keeps happening in range, add load rather than reps.`,
+    ["P-EFFORT", "P-REST-TEMPO"])];
 }
 
 // ---------- muscle.effort (§6.3 overshoot) ----------

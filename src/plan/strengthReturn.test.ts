@@ -55,11 +55,11 @@ describe('calendar', () => {
 });
 
 describe('days', () => {
-  it('maps weekdays: Mon Lower A, Tue Upper A, Wed ride, Thu boxing, Fri Lower B, Sat Upper B, Sun rounds', () => {
+  it('maps weekdays: Mon Lower A, Tue Upper A, Wed free, Thu boxing, Fri Lower B, Sat Upper B, Sun free', () => {
     const byWeekday = [...P.days].sort((a, b) => a.weekday - b.weekday).map((d) => [d.weekday, d.key, d.title]);
     expect(byWeekday).toEqual([
-      [1, 'lower_a', 'Lower A'], [2, 'upper_a', 'Upper A'], [3, 'easy_ride', 'Easy ride'], [4, 'boxing', 'Boxing'],
-      [5, 'lower_b', 'Lower B'], [6, 'upper_b', 'Upper B'], [7, 'rounds', 'Rounds'],
+      [1, 'lower_a', 'Lower A'], [2, 'upper_a', 'Upper A'], [3, 'easy_ride', 'Free day'], [4, 'boxing', 'Boxing'],
+      [5, 'lower_b', 'Lower B'], [6, 'upper_b', 'Upper B'], [7, 'rounds', 'Free day'],
     ]);
   });
 

@@ -8,12 +8,13 @@ import { isFlagged } from "../lib/analysis";
 import { todayIso } from "../lib/format";
 import { adjustmentState, adjustmentsOf, applyAdjustments } from "./adjustments";
 import {
-  apreNextLoad, capJump, doubleProgression, DEFAULT_EQUIPMENT, dumbbellFloor, failureProgression, isBigJump, OVERSHOOT_REPS,
+  apreNextLoad, capJump, catchUpLoad, doubleProgression, DEFAULT_EQUIPMENT, dumbbellFloor, failureProgression, isBigJump, OVERSHOOT_REPS,
   progressionStep, roundBarbell, stepLoad,
   roundsNextWeek, stuckNormalReps, weekForDate
 } from "./engine";
 import { STRENGTH_RETURN_PLAN } from "./strengthReturn";
 import { GYM, snapDown, weightsFor } from "./equipment";
+import { duringScore, isElbowSite, morningBaseline } from "./pain";
 import { effortState, holdLoadState, lastLoggedWorkingLoad, recalibrateState, restartState, wristLadderState } from "./stateRules";
 import type { SwapHistory } from "./swaps";
 import type { EquipmentProfile, PlanState, PrescribedDay, ProgramDefinition, ProgramSlot, RoundsRule, Unit } from "./types";
@@ -178,6 +179,8 @@ const weekTypeOf = (s: Session | undefined): string | undefined => (s?.legacy_re
  * - APRE taper (R1-05): once the rep-out load ≥ the last logged working load (12 months before the plan),
  *   the jumps are +5% / +2.5%;
  * - the wrist ladder progresses at its rung's reps (the logged sets' rep range); isometric holds don't count;
+ *   R2-15: a rung is earned by a clean session (every set at the reps, pain within the step rule);
+ * - R2-04 catch-up: set 1 of a non-elbow failure isolation at ≥ 35 reps → two steps up, past the jump cap;
  * - E14 hold: an exercise whose latest pain check was ≥ 4/10 (and not trained since) keeps its load;
  * - E5 stuck incline: normalReps from the incline rep-out history;
  * - from the programme row's adjustments: extra sets, extra main-lift sets (§7), recalibration (E3);
@@ -267,6 +270,11 @@ export function planState(args: {
       const ownRange = slot.scheme?.repRange ?? range;
       const average = !slot.elbowLoading;
       next = capJump(lastLoad, next, logged, ownRange, step, { average });
+      // R2-04: a first set at 35+ reps is far too light: two steps once, past the cap (not elbow work).
+      if (slot.scheme?.toFailure && !slot.elbowLoading && weekType !== "calibration") {
+        const first = [...last].filter((s) => s.kind === "failure").sort((a, b) => a.set_no - b.set_no)[0];
+        next = catchUpLoad(lastLoad, next, first?.reps ?? null, step);
+      }
       const oneUp = stepLoad(lastLoad, step, 1);
       if (Math.abs(next - lastLoad) < 1e-9 && isBigJump(lastLoad, oneUp)) bigJump[key] = { next: oneUp, reps: ownRange[1] + OVERSHOOT_REPS, average };
     }
@@ -293,7 +301,9 @@ export function planState(args: {
   const restart = restartState(completedPlan.map((s) => s.date), plan, args.today);
   const effort = effortState(completedPlan, pain, plan);
   const wristLadderPain = wristLadderState(pain, plan);
-  const wristLadder = wristLadderPain || ladderLast ? { ...(wristLadderPain ?? {}), ...(ladderLast ? { last: ladderLast } : {}) } : undefined;
+  const earned = wristRungsEarned(plan, completedPlan, sets, ids, pain);
+  const wristLadder = wristLadderPain || ladderLast || earned != null
+    ? { ...(wristLadderPain ?? {}), ...(ladderLast ? { last: ladderLast } : {}), ...(earned != null ? { earned } : {}) } : undefined;
   const rounds = args.conditioning ? sundayRoundsFrom(args.conditioning, plan) : undefined;
   return {
     trainingMaxes: {
@@ -360,6 +370,36 @@ export function swapHistory(args: {
 }
 
 
+
+/**
+ * R2-15: wrist-ladder rungs earned, oldest session first. A session at rung i that is clean (every set at the rung's
+ * reps, no wrist-extension pain above stepRule.maxPain that day, and no elbow morning score above the baseline +
+ * stepRule.morningRise the morning after) earns rung i + 1; otherwise the ladder holds at rung i. Isometric
+ * sessions don't count. Undefined without a step rule or before the first ladder session.
+ */
+export function wristRungsEarned(plan: ProgramDefinition, completedPlan: readonly Session[], sets: readonly SetRow[],
+  ids: Map<string, string>, pain: readonly PainCheck[]): number | undefined {
+  const ladder = plan.wristLadder;
+  const id = ladder ? ids.get(ladder.exerciseKey) : undefined;
+  if (!ladder?.stepRule || !id) return undefined;
+  const rule = ladder.stepRule;
+  let earned: number | undefined;
+  for (const sess of completedPlan) {
+    const mine = sets.filter((x) => x.session_id === sess.id && x.exercise_id === id && x.completed && x.kind === "working"
+      && x.reps != null && !x.deleted_at);
+    if (!mine.length) continue;
+    const reps = refOf(mine[0]!)?.repRange?.[1] ?? Math.max(...mine.map((x) => x.reps!));
+    const rung = ladder.rungs.findIndex((r) => r.reps === reps);
+    if (rung < 0) continue;
+    const allHit = mine.every((x) => x.reps! >= reps);
+    const hurt = pain.some((p) => p.date === sess.date && p.exercise_id === id && (duringScore(p) ?? 0) > rule.maxPain);
+    const morning = pain.some((p) => p.date === sess.date && isElbowSite(p.site) && p.morning_score != null
+      && Number(p.morning_score) > morningBaseline(pain, p.site, p.date) + rule.morningRise);
+    const clean = allHit && !hurt && !morning;
+    earned = Math.max(earned ?? 0, clean ? rung + 1 : rung);
+  }
+  return earned == null ? undefined : Math.min(earned, ladder.rungs.length - 1);
+}
 
 /**
  * This week's planned Sunday rounds from the rounds log, oldest first: after a normal week,

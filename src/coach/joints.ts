@@ -121,10 +121,42 @@ export function jointsRules(ctx: WeekCtx): AreaResult {
   }
 
   out.push(...cutSetsSignals(ctx, upTo));
+  const block = shoulderBlockBack(ctx, week);
+  if (block) out.push(block);
   const alt = hammerCurlOffer(ctx);
   if (alt) out.push(alt);
 
   return { signals: out, numbers: { pain: [...now].map(([site, e]) => ({ site, sessions: e.sessions.size, sharp: e.sharp })) } };
+}
+
+/** The monthly elbow check's total (note JSON { worst, grip, daily, total }), or null. */
+function monthlyTotal(p: PainCheck): number | null {
+  try {
+    const t = (JSON.parse(p.note ?? "{}") as { total?: unknown }).total;
+    return typeof t === "number" ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * R2-16 (DECISIONS 2026-10-23/24): the shoulder care block was dropped; it comes back when the elbow flares (≥ 4/10
+ * during a set or a morning flare this week) or the monthly elbow score rises against the previous check. Cuff and
+ * shoulder-blade work helped chronic lateral elbow pain in an RCT (Tiryaki 2026). Information for Mario; no auto-change.
+ */
+function shoulderBlockBack(ctx: WeekCtx, week: readonly PainCheck[]): Signal | null {
+  const { data } = ctx;
+  const elbow = week.filter((p) => isElbowSite(p.site));
+  const flare = elbow.some((p) => (duringScore(p) ?? 0) >= PAIN_HOLD || (p.morning_score != null && isMorningFlare(p, data.pain)));
+  const monthly = data.pain.filter((p) => p.site === ELBOW_MONTHLY_SITE && p.date <= ctx.asOf && monthlyTotal(p) != null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const [prev, last] = monthly.slice(-2);
+  const rising = prev && last && last.date >= ctx.from && monthlyTotal(last)! > monthlyTotal(prev)!;
+  if (!flare && !rising) return null;
+  const why = rising ? `monthly elbow score up (${monthlyTotal(prev!)} → ${monthlyTotal(last!)})` : "elbow pain at 4/10 or more this week";
+  return sig("joints.shoulder_block", "joints", "watch", "Bring back the shoulder block",
+    `${cap(why)}. Add the shoulder care block back on Tue and Sat: cable external rotation and serratus punch, 2 × 12–15, not to failure (about 5 min).`,
+    ["J-SHOULDER", "J-ELBOW", "J-PAINRULE"]);
 }
 
 /**

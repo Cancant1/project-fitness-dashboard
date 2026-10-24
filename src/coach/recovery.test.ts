@@ -18,23 +18,22 @@ describe("recovery.energy", () => {
   });
 });
 
-describe("conditioning.week", () => {
-  it("all done good, with next week's rounds from roundsNextWeek", () => {
+describe("conditioning.week (24 Oct 2026: boxing + free-day notes)", () => {
+  it("boxing done, with the free-day notes and their minutes", () => {
     const w = new World();
-    w.cond(dayIn(1, "easy_ride"), "ride", { minutes: 30 });
+    w.cond(dayIn(1, "easy_ride"), "other", { note: "Ride to work and back", minutes: 40 });
     w.cond(dayIn(1, "boxing"), "boxing", { minutes: 45 });
-    w.cond(dayIn(1, "rounds"), "rounds", { rounds: 6, first_round_count: 50, last_round_count: 46 });
-    expect(get(weeklyReport(w.data(), 1, sunday(1)), "conditioning.week")).toMatchObject({
-      status: "good", message: "Ride 30/30 min · boxing ✓ · rounds 6 (next week 7)."
-    });
+    w.cond(dayIn(1, "easy_ride"), "other", { note: "wrist_ladder" }); // a home-task tick is not a note
+    const r = weeklyReport(w.data(), 1, sunday(1));
+    expect(get(r, "conditioning.week")).toMatchObject({ status: "good", title: "Boxing done", message: "Boxing ✓ · 1 free-day note (40 min)." });
+    expect(r.numbers.conditioning).toMatchObject({ boxing: true, freeNotes: 1, freeMin: 40 });
   });
-  it("one missing → info; pending while the week runs", () => {
+  it("no boxing → info; pending while the week runs", () => {
     const w = new World();
-    w.cond(dayIn(1, "easy_ride"), "ride", { minutes: 30 });
-    w.cond(dayIn(1, "rounds"), "rounds", { rounds: 6, first_round_count: 50, last_round_count: 40 });
     expect(get(weeklyReport(w.data(), 1, sunday(1)), "conditioning.week")).toMatchObject({
-      status: "info", message: "Ride 30/30 min · boxing – · rounds 6 (next week 6)."
+      status: "info", title: "No boxing this week", message: "Boxing – · 0 free-day notes."
     });
     expect(get(weeklyReport(w.data(), 1, dayIn(1, "lower_b")), "conditioning.week")?.status).toBe("pending");
   });
 });
+

@@ -31,8 +31,30 @@ export function creatineOffset(date: string, plan: ProgramDefinition = PLAN): nu
   return kg * Math.max(0, Math.min(1, f));
 }
 
-/** The expected 7-day average on a date: the plan's path, interpolated, shifted up by the creatine water (E16). */
-export function expectedBand(date: string, plan: ProgramDefinition = PLAN): [number, number] | null {
+/** R2-14: the anchor week's 7-day average on its Sunday, once that Sunday has passed (`asOf`); else null. */
+export function pathAnchor(data: Pick<CoachData, "plan" | "allMeasurements">, asOf: string): { date: string; kg: number } | null {
+  const w = data.plan.bodyweightRate.anchorWeek;
+  const week = w == null ? undefined : data.plan.weeks.find((x) => x.weekNo === w);
+  if (!week) return null;
+  const date = addDays(week.startDate, 6);
+  if (asOf < date) return null;
+  const kg = bodyweight7d(data.allMeasurements, date);
+  return kg == null ? null : { date, kg };
+}
+
+/**
+ * The expected 7-day average on a date: the plan's path, interpolated, shifted up by the creatine water (E16).
+ * With an anchor (R2-14), dates from the anchor on are shifted so the band's middle passes through it.
+ */
+export function expectedBand(date: string, plan: ProgramDefinition = PLAN, anchor: { date: string; kg: number } | null = null): [number, number] | null {
+  const base = rawBand(date, plan);
+  if (!base || !anchor || date < anchor.date) return base;
+  const at = rawBand(anchor.date, plan);
+  const shift = at ? anchor.kg - (at[0] + at[1]) / 2 : 0;
+  return [base[0] + shift, base[1] + shift];
+}
+
+function rawBand(date: string, plan: ProgramDefinition): [number, number] | null {
   const p = BODYWEIGHT_PATH;
   if (date < p[0]!.date) return null;
   const c = creatineOffset(date, plan);
@@ -123,7 +145,7 @@ export interface BodyweightStatus {
   pace: { rate: number; lo: number; hi: number; side: BodyweightSide; n: number } | null;
   /** Path and pace together: one off and the other on (or missing) → that side; the two pulling apart → on track. */
   verdict: BodyweightSide;
-  /** Weeks 0–2: glycogen, water and creatine still move the scale (N-RATE), so this is an early read. */
+  /** Until the path is anchored (weeks 0–3): glycogen, water and creatine still move the scale, so an early read. */
   early: boolean;
 }
 
@@ -138,11 +160,16 @@ const PACE_MIN_SPAN_DAYS = 7;
  */
 export function bodyweightStatus(data: CoachData, date: string): BodyweightStatus | null {
   const plan = data.plan;
-  const band = expectedBand(date, plan);
+  const anchor = pathAnchor(data, date);
+  const band = expectedBand(date, plan, anchor);
   const avg = bodyweight7d(data.allMeasurements, date);
   if (!band || avg == null) return null;
   const side = (v: number, lo: number, hi: number): BodyweightSide => (v < lo - 1e-9 ? "below" : v > hi + 1e-9 ? "above" : "on");
-  const path = side(avg, Math.round(band[0] * 10) / 10, Math.round(band[1] * 10) / 10);
+  const week = weekForDate(plan, date);
+  // R2-14: before the anchor, the early jump is expected: "above" only past the path + earlyAboveKg, and no pace verdict.
+  const early = !!week && week.weekNo <= (plan.bodyweightRate.anchorWeek ?? 2) && !anchor;
+  const slack = early ? plan.bodyweightRate.earlyAboveKg ?? 0 : 0;
+  const path = side(avg, Math.round(band[0] * 10) / 10, Math.round((band[1] + slack) * 10) / 10);
 
   const from = addDays(date, -(PACE_DAYS - 1));
   const points: Weigh[] = data.allMeasurements
@@ -159,10 +186,9 @@ export function bodyweightStatus(data: CoachData, date: string): BodyweightStatu
     pace = { rate, lo, hi, side: side(rate, lo, hi), n: fit.points.length };
   }
 
-  const p = pace?.side ?? "on";
+  const p = early ? "on" : pace?.side ?? "on";
   const verdict: BodyweightSide = path === p ? path : path === "on" ? p : p === "on" ? path : "on";
-  const week = weekForDate(plan, date);
-  return { avg, band, path, pace, verdict, early: !!week && week.weekNo <= 2 };
+  return { avg, band, path, pace, verdict, early };
 }
 
 /** "Gaining 0.18 kg/week" / "Losing 0.05 kg/week". */
@@ -184,17 +210,17 @@ export function bodyRules(ctx: WeekCtx): AreaResult {
 
   // body.path
   const avg = bw7(data, ctx.asOf);
-  const band = expectedBand(ctx.asOf, plan);
+  const band = expectedBand(ctx.asOf, plan, pathAnchor(data, ctx.asOf));
   if (avg != null && band) {
     const [lo, hi] = band;
     const range = `${fmtBw(lo)}–${fmtBw(hi)}`;
     const metric = { label: "7-day average", value: fmtBw(avg), target: range };
     const why: Signal["why"] = ["N-RATE", "M-STRENGTH-BW"];
-    // Weeks 0–2: glycogen and creatine water move the scale; the path is shown, never judged (N-RATE).
-    const early = ctx.weekNo <= 2;
+    // Until the week-3 anchor: glycogen and creatine water move the scale; the path is shown, never judged (N-RATE, R2-14).
+    const early = ctx.weekNo <= (plan.bodyweightRate.anchorWeek ?? 2) && !pathAnchor(data, ctx.asOf);
     if (early) {
       const where = avg < lo ? "below" : avg > hi ? "above" : "inside";
-      out.push(sig("body.path", "body", "info", "Bodyweight settling", `7-day average ${fmtBw(avg)} kg (${where} the plan range ${range}). Weeks 0–2 aren't judged: water and creatine still settling.`, why, { metric }));
+      out.push(sig("body.path", "body", "info", "Bodyweight settling", `7-day average ${fmtBw(avg)} kg (${where} the plan range ${range}). Not judged until the week-3 average sets the path: water and creatine still settling.`, why, { metric }));
     } else if (avg < Math.round(lo * 10) / 10 - 1e-9) {
       out.push(sig("body.path", "body", "watch", "Bodyweight below the path", `7-day average ${fmtBw(avg)} kg, below the plan range ${range}.`, why, { metric }));
     } else if (avg > Math.round(hi * 10) / 10 + 1e-9) {

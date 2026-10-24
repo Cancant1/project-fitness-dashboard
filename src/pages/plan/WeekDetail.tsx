@@ -244,10 +244,10 @@ function SwapPill({ ex }: { ex: PrescribedExercise }) {
 
 function CardioChip({ day, isToday }: { day: PrescribedDay; isToday: boolean }) {
   const c = day.conditioning;
-  const value = !c || c.skipped ? "Rest"
+  const value = !c || c.skipped ? "Rest" : c.kind === "open" ? "–"
     : c.kind === "rounds" ? `${c.rounds} × ${fmtNum((c.workSec ?? 120) / 60)} min`
       : `${c.minutes} min`;
-  const name = { easy_ride: "Ride", boxing: "Boxing", rounds: "Rounds" }[day.dayKey as "easy_ride" | "boxing" | "rounds"] ?? day.title;
+  const name = c?.kind === "open" ? "Free" : { easy_ride: "Ride", boxing: "Boxing", rounds: "Rounds" }[day.dayKey as "easy_ride" | "boxing" | "rounds"] ?? day.title;
   const home = c?.homeTasks?.[0];
   const sub = c && !c.skipped
     ? c.kind === "rounds"

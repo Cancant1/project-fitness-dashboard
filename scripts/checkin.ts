@@ -115,7 +115,7 @@ function render(r: WeeklyReport): string {
   lines.push(`| Session energy | ${fmt(n.energy.avg)} (prev ${fmt(n.energy.prevAvg)}), ${n.energy.rated} rated |`);
   lines.push(`| Pain | ${n.pain.length ? n.pain.map((p) => `${p.site}: ${p.sessions} sessions${p.sharp ? `, ${p.sharp} sharp` : ""}`).join("; ") : "none logged"} |`);
   const c = n.conditioning;
-  lines.push(`| Conditioning | ride ${c.rideMin}${c.rideTarget != null ? `/${c.rideTarget}` : ""} min · boxing ${c.boxing ? "yes" : "no"} · rounds ${c.rounds ?? "–"}${c.roundsNext != null ? ` (next ${c.roundsNext})` : ""} |`);
+  lines.push(`| Conditioning | boxing ${c.boxing ? "yes" : "no"} · free-day notes ${c.freeNotes ?? 0}${c.freeMin ? ` (${c.freeMin} min)` : ""} |`);
   lines.push("");
   if (n.muscles.length) {
     lines.push("### Fractional sets per muscle", "", "| Muscle | Sets | Plan | Good weeks | % of good |", "|---|---|---|---|---|");

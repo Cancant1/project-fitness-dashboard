@@ -3,7 +3,7 @@ import { useDayPick, useToday } from "../lib/useToday";
 import { useRows, useStore } from "../data/store";
 import { addDays, daysBetween, fmtNum, fmtShortDate, fmtShortDateYear, parseDecimal } from "../lib/format";
 import { KCAL_PER_KG_LEAN_BULK, adaptiveTdee, type Weigh } from "../lib/energy";
-import { PACE_DAYS, TDEE_MIN_DAYS, bodyweightStatus, expectedBand, photoStatus, saveWaist, type BodyweightSide, type BodyweightStatus } from "../coach";
+import { PACE_DAYS, TDEE_MIN_DAYS, bodyweightStatus, expectedBand, pathAnchor, photoStatus, saveWaist, type BodyweightSide, type BodyweightStatus } from "../coach";
 import { useCoachData } from "../coach/hooks";
 import { AreaChart, Card, Delta, Label, PageHead, Pill, Segmented, Stat } from "../ui/kit";
 import { Sheet } from "../ui/Sheet";
@@ -74,13 +74,14 @@ export function WeightPage() {
   // The plan's expected path (with the creatine water), from the plan start up to the last weigh-in.
   const pathTo = last && last.date < today ? last.date : today;
   const pathBand = useMemo(() => {
+    const anchor = pathAnchor(coach, pathTo);
     const pts: { x: number; lo: number; hi: number }[] = [];
     for (let d = [coach.start, from, base].sort().at(-1)!; d <= pathTo; d = addDays(d, 1)) {
-      const b = expectedBand(d, coach.plan);
+      const b = expectedBand(d, coach.plan, anchor);
       if (b) pts.push({ x: daysBetween(base, d), lo: b[0], hi: b[1] });
     }
     return pts;
-  }, [coach.start, coach.plan, from, base, pathTo]);
+  }, [coach, from, base, pathTo]);
 
   /** Tap on the chart: open the weigh-in nearest to that day. */
   function pick(p: { x: number }) {

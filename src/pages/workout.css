@@ -130,3 +130,8 @@
 .wk-pins::-webkit-scrollbar { display: none; }
 .wk-pins > .btn { flex: none; min-width: 64px; height: 44px; border-radius: 22px; }
 .wk-pins > .btn:not(.btn-primary) { background: var(--surface); color: var(--fg); box-shadow: var(--elev); }
+
+/* R2-05: the set letter on a finished failure set or rep-out toggles "breath ended it". */
+.wk-breath { position: relative; padding: 0; border: 0; background: none; cursor: pointer; display: inline-flex; border-radius: 10px; }
+.wk-breath[aria-pressed="true"] .wk-setno { box-shadow: 0 0 0 2px var(--accent); }
+.wk-breath-dot { position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }

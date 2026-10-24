@@ -57,6 +57,8 @@ export interface ProgramWeek {
   isolationSetDelta?: number;
   /** A–D weeks 8–17 (not the deloads): the checkpoint-1 extra sets apply if checkpoint 1 was met. */
   extraSetsEligible?: boolean;
+  /** A full rest week: every day is rest (week 10, England, DECISIONS 24 Oct 2026). */
+  rest?: boolean;
   checkpoint?: Checkpoint;
   /** Set by shiftAfterMissedWeek. */
   missed?: boolean;
@@ -124,9 +126,15 @@ export interface WristLadder {
   /** Reps per set from this plan week on: 0–1: 15 · 2–3: 12 · 4–5: 10 · 6–8: 8 · 9–12: 6. */
   rungs: { fromWeek: number; reps: number }[];
   sets: number;
-  /** Lifting days that carry the ladder (Mon, Fri); the home session is on `homeDayKey` (Wed). */
+  /** Lifting days that carry the ladder (Mon, Fri); an optional home session on `homeDayKey` (Wed until 24 Oct 2026). */
   dayKeys: LiftingDayKey[];
-  homeDayKey: ConditioningDayKey;
+  homeDayKey?: ConditioningDayKey;
+  /**
+   * R2-15 step rule: a rung is earned when every set of a ladder session reached the rung's reps with pain ≤ this
+   * during the set and the next morning ≤ `morningRise` over the elbow baseline. The week schedule (`rungs`) is the
+   * earliest a rung can start; without an earned rung the ladder holds.
+   */
+  stepRule?: { maxPain: number; morningRise: number };
   /** From this week: maintenance, once a week on maintain.dayKey. */
   maintainFromWeek: number;
   maintain: { dayKey: LiftingDayKey; sets: number; reps: number };
@@ -160,7 +168,9 @@ export interface RoundsRule {
   /** "Finish by 14:00" (~30 h before Monday's squat). */
   finishBy?: string;
 }
-export type ConditioningRule = RideRule | BoxingRule | RoundsRule;
+/** A day with nothing planned (24 Oct 2026: the Wed ride and Sun rounds were dropped): an open box to note what he did. */
+export interface OpenRule { kind: 'open' }
+export type ConditioningRule = RideRule | BoxingRule | RoundsRule | OpenRule;
 
 export interface ProgramDay {
   key: DayKey;
@@ -262,6 +272,12 @@ export interface ProgramDefinition {
   bodyweightRate: {
     minKgPerWeek: number; maxKgPerWeek: number; adjustKcal: number; fromWeek: number;
     fitFromWeek?: number; minWeighIns?: number; outlierKg?: number;
+    /**
+     * R2-14: the expected path is re-anchored at this week's 7-day average (its Sunday): from then on the band is
+     * shifted to pass through it. Until then the early jump (glycogen, creatine, gut) reads as expected unless it is
+     * more than `earlyAboveKg` over the path.
+     */
+    anchorWeek?: number; earlyAboveKg?: number;
   };
   nutrition: { kcal: number; proteinG: number; fatG: number; carbsG: number; targetBodyweightKg: [number, number] };
   /** Old-best e1RMs (R1-03): once the TM reaches them a hit holds the TM and a beat adds at most +2.5 kg. */
@@ -352,6 +368,8 @@ export interface PlanState {
      * Heavy-slow loading: the load goes up when the rung's reps drop (15 → 12 → …), not within a rung.
      */
     last?: { load: number; reps: number; allHit: boolean; next: number };
+    /** R2-15: rungs earned so far (index into `rungs`); the dose is the lower of this and the week schedule. */
+    earned?: number;
   };
 }
 

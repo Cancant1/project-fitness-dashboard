@@ -3,6 +3,8 @@ import {
   DEFAULT_EQUIPMENT,
   PROVISIONAL_NOTE,
   apreNextLoad,
+  catchUpLoad,
+  wristLadderDose,
   bodyweightRateCheck,
   ceilLoad,
   failureProgression,
@@ -279,7 +281,7 @@ describe('incline DB and pull-up', () => {
   });
 
   it('deload and taper: 3 × 5 one step lighter, no rep-out (default 8)', () => {
-    for (const week of [7, 10, 18]) {
+    for (const week of [7, 18]) {
       expect(shape(notWarmup(ex(week, 'upper_a', 'incline_db_press').sets))).toEqual([['working', 20, 5], ['working', 20, 5], ['working', 20, 5]]);
       expect(shape(notWarmup(ex(week, 'upper_a', 'weighted_pullup').sets))).toEqual([['working', 2.5, 5], ['working', 2.5, 5], ['working', 2.5, 5]]);
     }
@@ -344,7 +346,7 @@ describe('week shapes', () => {
       .toEqual([['incline_db_press', 37.5, 8], ['weighted_pullup', 20, 8]]);
     expect(week[4]!.exercises.map((e) => [e.exerciseKey, e.sets.at(-1)?.load])).toEqual([['deadlift', 205]]);
     expect(week[5]).toMatchObject({ kind: 'rest', exercises: [] });
-    expect(week[6]).toMatchObject({ kind: 'rest', conditioning: { skipped: true, rounds: 0 } });
+    expect(week[6]).toMatchObject({ kind: 'conditioning', conditioning: { kind: 'open' } });
     expect(week.map((d) => d.workingSetCount)).toEqual([1, 2, 0, 0, 1, 0, 0]);
   });
 
@@ -439,18 +441,37 @@ describe('missed week', () => {
 });
 
 describe('conditioning and food', () => {
-  const ride = P.days.find((d) => d.key === 'easy_ride')!.conditioning as RideRule;
+  // The ride rule left the plan on 24 Oct 2026; the function stays for older plans.
+  const ride: RideRule = { kind: 'ride', startMinutes: 30, holdThroughWeek: 2, addPerWeek: 5, maxMinutes: 45 };
 
   it('ride: 30 min in weeks 0–2, +5 a week up to 45', () => {
     expect([0, 1, 2, 3, 4, 5, 6, 12].map((w) => rideMinutes(ride, w))).toEqual([30, 30, 30, 35, 40, 45, 45, 45]);
-    expect(prescribeDay(P, 3, 'easy_ride', STATE).conditioning).toMatchObject({ kind: 'ride', minutes: 35 });
+    expect(prescribeDay(P, 3, 'easy_ride', STATE).conditioning).toEqual({ kind: 'open' });
     expect(prescribeDay(P, 3, 'boxing', STATE).conditioning).toEqual({ kind: 'boxing', minutes: 45 });
   });
 
-  it('rounds: 6 to start, half in deloads, skipped in the test week', () => {
-    expect(prescribeDay(P, 0, 'rounds', STATE).conditioning).toMatchObject({ rounds: 6, workSec: 120, easySec: 60 });
-    expect(prescribeDay(P, 7, 'rounds', { ...STATE, sundayRounds: 7 }).conditioning?.rounds).toBe(4);
-    expect(prescribeDay(P, 10, 'rounds', STATE).conditioning?.rounds).toBe(3);
+  it('Wed and Sun are free days (open) since 24 Oct 2026; week 10 (England) is a full rest week', () => {
+    expect(prescribeDay(P, 0, 'rounds', STATE).conditioning).toEqual({ kind: 'open' });
+    expect(prescribeDay(P, 3, 'rounds', STATE)).toMatchObject({ kind: 'conditioning', title: 'Free day' });
+    const england = prescribeWeek(P, 10, STATE);
+    expect(england.every((d) => d.kind === 'rest' && d.exercises.length === 0 && d.workingSetCount === 0)).toBe(true);
+    expect(P.weeks[10]).toMatchObject({ type: 'deload', rest: true });
+  });
+
+  it('R2-04 catch-up: set 1 at 35+ reps → two steps up, never lower than the normal next load', () => {
+    expect(catchUpLoad(20, 20, 35, 10)).toBe(40);
+    expect(catchUpLoad(20, 30, 50, 10)).toBe(40);
+    expect(catchUpLoad(20, 20, 34, 10)).toBe(20);
+    expect(catchUpLoad(20, 50, 40, 10)).toBe(50);
+    expect(catchUpLoad(20, 20, null, 10)).toBe(20);
+  });
+
+  it('R2-15 wrist ladder dose: the lower of the week schedule and the earned rung', () => {
+    const ladder = P.wristLadder!;
+    expect(wristLadderDose(ladder, 4, 'lower_a', 0)?.reps).toBe(10);
+    expect(wristLadderDose(ladder, 4, 'lower_a', 0, 1)?.reps).toBe(12);
+    expect(wristLadderDose(ladder, 4, 'lower_a', 0, 4)?.reps).toBe(10);
+    expect(wristLadderDose(ladder, 1, 'easy_ride', 0)).toBeNull();
   });
 
   it('roundsNextWeek: +1 when the last round is within 10% of the first, max 10', () => {

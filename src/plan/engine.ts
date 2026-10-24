@@ -352,6 +352,19 @@ export function bigJumpEarned(lastSets: readonly LoggedSet[], repRange: readonly
   return lastSets.reduce((t, s) => t + (s.reps ?? 0), 0) / lastSets.length >= aim - 1e-9;
 }
 
+/** R2-04 (DECISIONS 2026-10-24): set 1 of a non-elbow failure isolation at this many reps or more is far too light. */
+export const CATCH_UP_REPS = 35;
+
+/**
+ * R2-04 catch-up rule: when set 1 reached CATCH_UP_REPS, the next session goes up two steps from the last load, past
+ * the jump cap (growth data in trained lifters stop at ~35 reps; K-REP-CEILING). Never lowers `next`. Elbow-loading
+ * moves don't use it (the caller skips them).
+ */
+export function catchUpLoad(lastLoad: number, next: number, firstSetReps: number | null, step: LoadSteps): number {
+  if (firstSetReps == null || firstSetReps < CATCH_UP_REPS) return next;
+  return Math.max(next, stepLoad(lastLoad, step, 1, 2));
+}
+
 export type ApreJump = 'plus7_5' | 'plus5' | 'plus1' | 'minus1' | 'same';
 
 /**
@@ -591,7 +604,7 @@ function prescribeConditioning(program: ProgramDefinition, day: ProgramDay, rule
       // E13: the Wednesday wrist ladder at home, in the ride card.
       const ladder = program.wristLadder;
       const dose = ladder && day.key === ladder.homeDayKey && week.type !== 'test'
-        ? wristLadderDose(ladder, week.weekNo, day.key, state.wristLadder?.rungOffset) : null;
+        ? wristLadderDose(ladder, week.weekNo, day.key, state.wristLadder?.rungOffset, state.wristLadder?.earned) : null;
       if (ladder && dose) {
         const [a, b] = ladder.isometric.holdSec;
         out.homeTasks = [isometricOn(state, date)
@@ -602,6 +615,8 @@ function prescribeConditioning(program: ProgramDefinition, day: ProgramDay, rule
     }
     case 'boxing':
       return { kind: 'boxing', minutes: rule.minutes };
+    case 'open':
+      return { kind: 'open' };
     case 'rounds': {
       const base = { kind: 'rounds' as const, workSec: rule.workSec, easySec: rule.easySec, warmupMin: rule.warmupMin };
       // "Skip Sunday rounds in the week of the PR test." / "In deload weeks … do half the rounds."
@@ -762,6 +777,9 @@ export function prescribeDay(program: ProgramDefinition, weekNo: number, dayKey:
     title: day.title,
     notes: [...day.notes],
   };
+
+  // A full rest week (week 10, England): nothing on any day.
+  if (week.rest) return { ...base, notes: [], kind: 'rest', exercises: [], workingSetCount: 0 };
 
   if (day.kind === 'conditioning' && day.conditioning) {
     const conditioning = prescribeConditioning(program, day, day.conditioning, week, state, date);
@@ -1037,7 +1055,7 @@ function compoundRamp(slot: ProgramSlot, load: number, ctx: SlotContext): DraftS
  * During a flare-up (3–7 days after a morning elbow score ≥ baseline + 2): isometric holds, effort `easy`.
  */
 function prescribeWristLadder(slot: ProgramSlot, ctx: SlotContext, ladder: WristLadder): DraftExercise | null {
-  const dose = wristLadderDose(ladder, ctx.week.weekNo, ctx.dayKey, ctx.state.wristLadder?.rungOffset);
+  const dose = wristLadderDose(ladder, ctx.week.weekNo, ctx.dayKey, ctx.state.wristLadder?.rungOffset, ctx.state.wristLadder?.earned);
   if (!dose) return null;
   // Heavy-slow: the weight goes up when the rung's reps drop and the last rung was completed; within a rung it stays.
   const last = ctx.state.wristLadder?.last;
@@ -1059,18 +1077,25 @@ function prescribeWristLadder(slot: ProgramSlot, ctx: SlotContext, ladder: Wrist
     sets: Array.from({ length: dose.sets }, (): DraftSet => ({
       kind: 'working', load, unit: slot.unit, reps: dose.reps, repRange: [dose.reps, dose.reps], effort: 'care',
     })),
-    notes: [maintain ? `Maintenance: ${dose.sets} × ${dose.reps}, once a week.` : `Ladder: ${dose.sets} × ${dose.reps}. Same weight until the reps drop to the next rung; then the next dumbbell up.`, ...shell.notes],
+    notes: [maintain ? `Maintenance: ${dose.sets} × ${dose.reps}, once a week.` : ladder.stepRule
+      ? `Ladder: ${dose.sets} × ${dose.reps}. Next rung (fewer reps, next dumbbell) once every set is clean, pain ≤ ${ladder.stepRule.maxPain}/10 and the next morning no worse than ${ladder.stepRule.morningRise} over usual.`
+      : `Ladder: ${dose.sets} × ${dose.reps}. Same weight until the reps drop to the next rung; then the next dumbbell up.`, ...shell.notes],
   };
 }
 
-/** E13: the ladder's sets and reps on a day (lifting or the home day), or null when the ladder is not on it. */
-export function wristLadderDose(ladder: WristLadder, weekNo: number, dayKey: DayKey, rungOffset = 0): { sets: number; reps: number } | null {
+/**
+ * E13: the ladder's sets and reps on a day (lifting or the home day), or null when the ladder is not on it.
+ * R2-15: with a step rule, the rung is the lower of the week schedule and `earned` (rungs earned by clean sessions).
+ */
+export function wristLadderDose(ladder: WristLadder, weekNo: number, dayKey: DayKey, rungOffset = 0,
+  earned?: number): { sets: number; reps: number } | null {
   if (weekNo >= ladder.maintainFromWeek) {
     return dayKey === ladder.maintain.dayKey ? { sets: ladder.maintain.sets, reps: ladder.maintain.reps } : null;
   }
   if (!(ladder.dayKeys as readonly DayKey[]).includes(dayKey) && dayKey !== ladder.homeDayKey) return null;
   let i = 0;
   ladder.rungs.forEach((r, k) => { if (r.fromWeek <= weekNo) i = k; });
+  if (ladder.stepRule && earned != null) i = Math.min(i, earned);
   const rung = ladder.rungs[Math.max(0, i - Math.max(0, rungOffset))]!;
   return { sets: ladder.sets, reps: rung.reps };
 }

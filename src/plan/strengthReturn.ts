@@ -104,8 +104,8 @@ const FLYE = (): ProgramSlot => isolation('chest_cable_flye', failure(2, 10, 15)
   ['Pulleys at chest height, 1 s pause in the stretch. Right shoulder: stop the stretch a little earlier.'],
   { alternatives: ['low_to_high_cable_flye'] });
 
-// E13 wrist-extension heavy-slow ladder (J-ELBOW, R1-15): Mon and Fri in the gym, Wed at home. Reps by plan week
-// come from WRIST_LADDER; the scheme here is the first rung. Care work: not counted as working sets.
+// E13 wrist-extension heavy-slow ladder (J-ELBOW, R1-15): Mon and Fri in the gym (the Wed home session was dropped
+// 24 Oct 2026). Rungs follow the week schedule once earned (R2-15); the scheme here is the first rung. Care work: not counted as working sets.
 const WRIST_LADDER_SLOT: ProgramSlot = isolation('wrist_extension', scheme(3, 15, 15), 4, 'kg', 'per_hand',
   ['Forearm supported, palm down; 3 s up, 3 s down; the last 1–2 reps hard but clean.',
     'Right arm is the priority; do both. Pain rule. No extensor stretching.'], { restSec: 60, rehab: true });
@@ -160,10 +160,12 @@ const DAYS: ProgramDay[] = [
         { extraOnly: true }),
     ],
   },
+  // 24 Oct 2026 (DECISIONS): the Wednesday ride and the Sunday rounds were dropped; both days are free, with an open
+  // box to note what he did. The day keys stay so older ride and rounds logs still line up.
   {
-    key: 'easy_ride', weekday: 3, title: 'Easy ride', focus: 'Aerobic base', kind: 'conditioning', slots: [],
-    conditioning: { kind: 'ride', startMinutes: 30, holdThroughWeek: 2, addPerWeek: 5, maxMinutes: 45 },
-    notes: ['Talking pace: full sentences, nose breathing. Same loop each time; note the loop time.', 'Lunch walk.'],
+    key: 'easy_ride', weekday: 3, title: 'Free day', focus: 'Nothing planned', kind: 'conditioning', slots: [],
+    conditioning: { kind: 'open' },
+    notes: ['Nothing planned. Did something anyway (a ride, a walk, rounds)? Note it.'],
   },
   {
     key: 'boxing', weekday: 4, title: 'Boxing', focus: 'Boxing class', kind: 'conditioning', slots: [],
@@ -227,13 +229,9 @@ const DAYS: ProgramDay[] = [
     ],
   },
   {
-    key: 'rounds', weekday: 7, title: 'Rounds', focus: 'Boxing-format intervals', kind: 'conditioning', slots: [],
-    conditioning: {
-      kind: 'rounds', workSec: 120, easySec: 60, warmupMin: 5, startRounds: 6, maxRounds: 10, dropOffFraction: 0.1,
-      // R1-30: from week 4, 2 of the rounds are burst rounds; finish by 14:00 (~30 h before Monday's squat).
-      burstFromWeek: 4, burstRounds: 2, burstWorkSec: 5, burstEasySec: 10, finishBy: '14:00',
-    },
-    notes: ['Jump rope or running. Every round about equal; count skips (or distance) in round 1 and the last round.'],
+    key: 'rounds', weekday: 7, title: 'Free day', focus: 'Nothing planned', kind: 'conditioning', slots: [],
+    conditioning: { kind: 'open' },
+    notes: ['Nothing planned. Did something anyway? Note it.'],
   },
 ];
 
@@ -252,7 +250,7 @@ const WEEK_TYPE_LABELS: Record<WeekType, string> = {
   deload: 'Deload', taper: 'Taper', test: 'PR test',
 };
 
-/** E24 / P-VARIETY: at the deloads (weeks 7 and 10). Equivalents are each slot's `alternatives`. */
+/** E24 / P-VARIETY: at the week-7 deload (week 10 became a rest week, 24 Oct 2026). Equivalents are each slot's `alternatives`. */
 export const VARIETY_NOTE = 'You may swap up to 2 accessories for a listed equivalent this week (same muscle).';
 /**
  * R1-08: the extra sets after checkpoint 1 are fixed (arms), with an optional rear delt set. They run in every
@@ -272,11 +270,12 @@ const CALENDAR: Array<[string, WeekType, string[], Partial<ProgramWeek>?]> = [
   ['2026-11-09', 'A', []],
   ['2026-11-16', 'B', []],
   ['2026-11-23', 'C', ['Checkpoint 1 at the end of this week (29 Nov).'], { checkpoint: CHECKPOINT_1 }],
-  ['2026-11-30', 'deload', ['1 set per accessory, not to failure; half the Sunday rounds.', VARIETY_NOTE]],
+  ['2026-11-30', 'deload', ['1 set per accessory, not to failure.', VARIETY_NOTE]],
   ['2026-12-07', 'A', [EXTRA_SETS_NOTE], EXTRA],
   ['2026-12-14', 'B', [EXTRA_SETS_NOTE], EXTRA],
-  ['2026-12-21', 'deload', ['England 20–27 Dec. Hotel or local gym: do the deload sessions. No gym: rest and walk a lot.',
-    'Eat roughly as usual; keep protein up.', VARIETY_NOTE]],
+  // 24 Oct 2026 (DECISIONS): England is a full rest week; it counts as the week-10 deload.
+  ['2026-12-21', 'deload', ['England 20–27 Dec: rest week, no sessions. It counts as the deload.',
+    'Eat roughly as usual; keep protein up.'], { rest: true }],
   ['2026-12-28', 'C', [EXTRA_SETS_NOTE], EXTRA],
   ['2027-01-04', 'A', [EXTRA_SETS_NOTE], EXTRA],
   ['2027-01-11', 'B', [EXTRA_SETS_NOTE], EXTRA],
@@ -285,8 +284,7 @@ const CALENDAR: Array<[string, WeekType, string[], Partial<ProgramWeek>?]> = [
   ['2027-02-01', 'C', [ISO_FEWER, EXTRA_SETS_NOTE], { isolationSetDelta: -1, ...EXTRA }],
   ['2027-02-08', 'D', [ISO_FEWER, EXTRA_SETS_NOTE], { isolationSetDelta: -1, ...EXTRA }],
   ['2027-02-15', 'taper', ['Squat 2 × 2 at 85% TM, deadlift one single at 90%, no rep-outs. 1 set per accessory.']],
-  ['2027-02-22', 'test', ['Rep-outs at 145 kg squat, 205 kg deadlift, 37.5 kg DBs and +20 kg pull-up. No accessories.',
-    'Skip Sunday rounds.']],
+  ['2027-02-22', 'test', ['Rep-outs at 145 kg squat, 205 kg deadlift, 37.5 kg DBs and +20 kg pull-up. No accessories.']],
 ];
 
 const WEEKS: ProgramWeek[] = CALENDAR.map(([startDate, type, notes, extra], weekNo) => ({
@@ -334,14 +332,14 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
     },
     // "3 sets of 5 plus a rep-out at the same load, target 8"; ≥10 up, 6–9 same, ≤5 down.
     // R1-04: incline ≥16 → +2 dumbbells, stuck at 6–9 three times → normal sets 3 × 6, then 3 × 7;
-    // pull-up ≥12 → +5 kg.
+    // pull-up ≥12 → +5 kg; R2-08 (24 Oct 2026): the pull-up gets the same stuck rule.
     incline_db_press: {
       scheme: 'load_step', sets: 3, reps: 5, repOutTarget: 8, stepUpAtReps: 10, stepDownAtReps: 5, lightSets: 3, lightReps: 5,
       doubleStepAtReps: 16, stuck: { after: 3, reps: [6, 7] },
     },
     weighted_pullup: {
       scheme: 'load_step', sets: 3, reps: 5, repOutTarget: 8, stepUpAtReps: 10, stepDownAtReps: 5, lightSets: 3, lightReps: 5,
-      doubleStepAtReps: 12,
+      doubleStepAtReps: 12, stuck: { after: 3, reps: [6, 7] },
     },
   },
   weekTypeRules: {
@@ -370,7 +368,9 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
   repOutRestSec: 240,
   // Every 2 weeks: < +0.1 kg/wk → +100 kcal; > +0.25 → −100 kcal. Creatine (E16): the fit starts at week 3
   // (Mon 2 Nov), so the first check is week 5; ≥ 20 weigh-ins; readings > 1.5 kg off a first fit are dropped.
-  bodyweightRate: { minKgPerWeek: 0.1, maxKgPerWeek: 0.25, adjustKcal: 100, fromWeek: 5, fitFromWeek: 3, minWeighIns: 20, outlierKg: 1.5 },
+  // R2-14 (24 Oct 2026): the path is re-anchored at the week-3 average; until then only > path + 2.5 kg reads as above.
+  bodyweightRate: { minKgPerWeek: 0.1, maxKgPerWeek: 0.25, adjustKcal: 100, fromWeek: 5, fitFromWeek: 3, minWeighIns: 20, outlierKg: 1.5,
+    anchorWeek: 3, earlyAboveKg: 2.5 },
   nutrition: { kcal: 2800, proteinG: 180, fatG: 80, carbsG: 370, targetBodyweightKg: [76, 78] },
   oldBestE1rm: { squat: 165, deadlift: 235 },
   creatineStart: CREATINE_START,
@@ -397,7 +397,8 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
     rungs: [{ fromWeek: 0, reps: 15 }, { fromWeek: 2, reps: 12 }, { fromWeek: 4, reps: 10 }, { fromWeek: 6, reps: 8 }, { fromWeek: 9, reps: 6 }],
     sets: 3,
     dayKeys: ['lower_a', 'lower_b'],
-    homeDayKey: 'easy_ride',
+    // R2-15: next rung only after a clean session (all sets at the reps, pain ≤ 3, next morning ≤ 1 over usual).
+    stepRule: { maxPain: 3, morningRise: 1 },
     maintainFromWeek: 13,
     maintain: { dayKey: 'lower_b', sets: 2, reps: 8 },
     isometric: { sets: 5, holdSec: [30, 45] },

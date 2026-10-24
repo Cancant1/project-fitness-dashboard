@@ -519,6 +519,9 @@ function BlockSets({ block, calibration, latest, equipment, onUpdate, onToggle }
             : <SetLine key={s.id} s={s} effort={effortOf(s)} onUpdate={onUpdate} onToggle={onToggle} />)}
         </section>
       )}
+      {normal.some((s) => needsReps(s) && s.completed) && (
+        <p className="row-sub" style={{ margin: "0 4px" }}>Breath stopped a set? Tap its letter.</p>
+      )}
 
       {repOut && <RepOutCard key={repOut.id} s={repOut} calibration={calibration} latest={latest} equipment={equipment} onUpdate={onUpdate} onToggle={onToggle} />}
 
@@ -560,6 +563,9 @@ function SetBadge({ s, effort }: { s: SetRow; effort: Effort | null }) {
 }
 
 const loadText = (v: number | null | undefined) => (v == null ? "" : String(v).replace(".", ","));
+/** R2-05: set flag for "breathing ended this set, not the muscle"; the coach reads the set as possibly short of failure. */
+export const BREATH_FLAG = "breath";
+
 /** Sets that need the reps he actually got: to failure, or a rep-out. The others are prescribed fixed reps. */
 const needsReps = (s: SetRow) => s.kind === "failure" || s.kind === "rep_out";
 
@@ -578,9 +584,17 @@ function SetLine({ s, effort, onUpdate, onToggle }: { s: SetRow; effort: Effort 
     const n = v.trim() === "" ? null : parseDecimal(v);
     if ((n != null || v.trim() === "") && n !== s.reps) void onUpdate(s, { reps: n == null ? null : Math.round(n) });
   };
+  // R2-05: on a finished set to failure or a rep-out, the letter toggles "breath": breathing ended the set, not the muscle.
+  const breath = s.flags.includes(BREATH_FLAG);
+  const toggleBreath = () => void onUpdate(s, { flags: breath ? s.flags.filter((f) => f !== BREATH_FLAG) : [...s.flags, BREATH_FLAG] });
   return (
     <div className="set-grid">
-      <SetBadge s={s} effort={effort} />
+      {needsReps(s) && s.completed
+        ? <button type="button" className="wk-breath" aria-pressed={breath} onClick={toggleBreath}
+            aria-label={`Set ${label}: ${breath ? "breath ended it, tap to undo" : "tap if breathing ended it"}`}>
+            <SetBadge s={s} effort={effort} />{breath && <span className="wk-breath-dot" aria-hidden="true" />}
+          </button>
+        : <SetBadge s={s} effort={effort} />}
       <label className="mini-field">
         <span className="sr-only">Load</span>
         <input inputMode="decimal" value={load} onChange={(e) => onLoad(e.target.value)}

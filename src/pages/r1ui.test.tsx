@@ -259,23 +259,28 @@ describe("Conditioning card", () => {
     expect(local.all("conditioning").find((c) => c.kind === "boxing")).toMatchObject({ rating: 4, rounds: 3, done: true });
   });
 
-  it("Wednesday: the wrist ladder at home is a done check stored as a conditioning row", async () => {
+  it("Wednesday: a free day; the note box saves an \"other\" row with what he did", async () => {
     vi.setSystemTime(new Date(2026, 9, 21, 9, 0));
     await render(<TodayPage />);
-    const home = host.querySelector(".cd-home")!;
-    expect(home.textContent).toContain("Wrist ladder at home");
-    expect(home.textContent).toContain("3 × 15");
-    await click(home.querySelector("button.check"));
-    await until(() => local.all("conditioning").some((c) => c.note === "wrist_ladder"));
-    expect(local.all("conditioning").find((c) => c.note === "wrist_ladder")).toMatchObject({ kind: "other", done: true, date: "2026-10-21" });
+    const card = host.querySelector(".cd")!;
+    expect(card.textContent).toContain("Nothing planned");
+    expect(host.querySelector(".cd-home")).toBeNull();
+    const box = card.querySelector<HTMLTextAreaElement>("#c-free")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")!.set!.call(box, "Ride, 40 min");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await click(button("Save note", card));
+    await until(() => local.all("conditioning").some((c) => c.note === "Ride, 40 min"));
+    expect(local.all("conditioning").find((c) => c.note === "Ride, 40 min")).toMatchObject({ kind: "other", done: true, date: "2026-10-21" });
   });
 
-  it("Sunday: the rounds text and finish by 14:00", async () => {
+  it("Sunday: a free day, nothing planned", async () => {
     vi.setSystemTime(new Date(2026, 10, 15, 9, 0)); // Sunday of week 4
     await render(<TodayPage />);
     const card = host.querySelector(".cd")!;
-    expect(card.textContent).toContain("burst rounds");
-    expect(card.textContent).toContain("Finish by 14:00");
+    expect(card.textContent).toContain("Free day");
+    expect(card.textContent).not.toContain("burst rounds");
   });
 });
 

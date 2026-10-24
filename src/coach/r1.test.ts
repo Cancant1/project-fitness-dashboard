@@ -222,7 +222,7 @@ describe("C-READINESS", () => {
 });
 
 describe("E22 gassed rating and E24 variety", () => {
-  it("gassed falling → working; unchanged by week 8 while the rounds progress → the pacing tip", () => {
+  it("gassed falling → working; unchanged by week 8 → the pacing tip (no rounds since 24 Oct 2026)", () => {
     const w = new World();
     w.cond(dayIn(1, "boxing"), "boxing", { rating: 4, rounds: 3 });
     w.cond(dayIn(2, "boxing"), "boxing", { rating: 3 });
@@ -230,11 +230,10 @@ describe("E22 gassed rating and E24 variety", () => {
     expect(get(r, "conditioning.gassed")).toMatchObject({ status: "good", message: "Gassed 4 → 3: working." });
     expect(r.numbers.conditioning).toMatchObject({ gassed: 3, fadeRound: null });
     const p = new World();
-    p.cond(dayIn(1, "rounds"), "rounds", { rounds: 6, first_round_count: 50, last_round_count: 48 });
     p.cond(dayIn(3, "boxing"), "boxing", { rating: 3, rounds: 2 });
     p.cond(dayIn(8, "boxing"), "boxing", { rating: 3, rounds: 2 });
     expect(get(weeklyReport(p.data(), 8, sunday(8)), "conditioning.gassed")?.message)
-      .toBe("Gassed 3 → 3 (faded in round 2) while the Sunday rounds progress. Fading may be pacing: round 1 at ~80%, breathe out on punches.");
+      .toBe("Gassed 3 → 3 (faded in round 2). Fading may be pacing: round 1 at ~80%, breathe out on punches.");
   });
   it("deload weeks 7 and 10: the variety note", () => {
     expect(get(weeklyReport(new World().data(), 7, sunday(7)), "muscle.variety")).toMatchObject({ status: "info", why: ["P-VARIETY"] });

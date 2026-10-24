@@ -29,7 +29,7 @@ const TOPICS: Topic[] = [
   { key: "cp", title: "Checkpoints", glyph: <Flag />, line: `End of weeks ${cps.map((c) => c.weekNo).join(" and ")}`, warm: true, Body: Checkpoints },
   { key: "deload", title: "Deload & taper", glyph: "↓", line: `Weeks ${weeksOf((t) => t === "deload" || t === "taper").join(", ")}`, Body: Deloads },
   { key: "food", title: "Food", glyph: "kcal", line: `${PLAN.nutrition.kcal.toLocaleString("en-GB")} kcal, protein 2 g/kg`, Body: Food },
-  { key: "cardio", title: "Conditioning", glyph: "♡", line: "Ride, boxing, rounds", Body: Conditioning },
+  { key: "cardio", title: "Conditioning", glyph: "♡", line: "Boxing; Wed and Sun free", Body: Conditioning },
 ];
 
 export function HowItWorks() {
@@ -314,9 +314,9 @@ function Deloads() {
   const dl = PLAN.mainLifts.deadlift.byWeekType.taper;
   return (
     <>
-      <p>Deloads: weeks {deloads.map((w) => w.weekNo).join(" and ")} ({deloads.map((w) => fmtShortDate(w.startDate)).join(", ")}). Week 10 is the England trip.</p>
+      <p>Deloads: weeks {deloads.map((w) => w.weekNo).join(" and ")} ({deloads.map((w) => fmtShortDate(w.startDate)).join(", ")}). Week 10 is the England trip: a full rest week, no sessions.</p>
       <ol>
-        <li><strong>Keep the deload weeks.</strong> Same days and exercises, lighter main lifts, 1 set per accessory, no rep-outs, half the Sunday rounds.</li>
+        <li><strong>Keep the deload weeks.</strong> Same days and exercises, lighter main lifts, 1 set per accessory, no rep-outs.</li>
         <li><strong>Take it early if needed:</strong> rep-outs below target two weeks running with sleep and bodyweight fine, or joints ache → swap the next week for the deload.</li>
         <li><strong>Don't push it later</strong> than one extra week, even if you feel great.</li>
       </ol>
@@ -357,6 +357,7 @@ function Conditioning() {
     <ul>
       {ride?.kind === "ride" && <li><strong>Wed ride:</strong> {ride.startMinutes} min in weeks 1–{ride.holdThroughWeek}, then +{ride.addPerWeek} min a week up to {ride.maxMinutes}. Talking pace, same loop; note the loop time.</li>}
       {box?.kind === "boxing" && <li><strong>Thu boxing:</strong> {box.minutes} min. Keep sparring controlled.</li>}
+      {ride?.kind === "open" && <li><strong>Wed and Sun:</strong> nothing planned (the ride and the rounds were dropped on 24 Oct 2026). Did something? Note it on the day.</li>}
       {rounds?.kind === "rounds" && <li><strong>Sun rounds:</strong> {rounds.warmupMin} min warm-up, then {fmtRest(rounds.workSec)} hard / {fmtRest(rounds.easySec)} easy. Start at {rounds.startRounds}; last round within {Math.round(rounds.dropOffFraction * 100)}% of the first → +1 next week, up to {rounds.maxRounds}. Half in deload weeks, none in the test week.</li>}
     </ul>
   );

@@ -11,11 +11,17 @@ import { Card, Pill } from "../ui/kit";
 import { CheckIcon } from "../ui/icons";
 import "./conditioning.css";
 
-/** The conditioning row kind each plan day logs. */
-export const CONDITIONING_KIND: Record<string, Conditioning["kind"]> = { easy_ride: "ride", boxing: "boxing", rounds: "rounds" };
+/** The conditioning row kind each plan day logs (free days: an "other" row with his note, 24 Oct 2026). */
+export const CONDITIONING_KIND: Record<string, Conditioning["kind"]> = { easy_ride: "other", boxing: "boxing", rounds: "other" };
+
+/** Home-task ids stored as "other" rows (not free-day notes). */
+const HOME_TASK_IDS = new Set(["wrist_ladder"]);
+
+/** A free-day note: an "other" row that isn't a home-task tick. */
+export const isFreeDayNote = (c: Conditioning): boolean => c.kind === "other" && !!c.note && !HOME_TASK_IDS.has(c.note) && c.done && !c.deleted_at;
 type Gassed = 1 | 2 | 3 | 4 | 5;
 
-/** Wed ride (+ the wrist ladder at home), Thu boxing (+ how gassed), Sun rounds (+ burst rounds): what the plan asks and a quick log. */
+/** Thu boxing (+ how gassed), and the free days (Wed, Sun: an open note box); older ride/rounds rules still render. */
 export function ConditioningCard({ date, dayKey, weekNo, existing }: { date: string; dayKey: DayKey; weekNo: number; existing: Conditioning[] }) {
   const { local } = useStore();
   const plan = usePlan();
@@ -29,7 +35,8 @@ export function ConditioningCard({ date, dayKey, weekNo, existing }: { date: str
     trainingMaxes: { squat: 1, deadlift: 1 }, currentLoads: {},
     ...(sundayRounds !== undefined ? { sundayRounds } : {}), ...(wrist ? { wristLadder: wrist } : {})
   }).conditioning;
-  const kind = CONDITIONING_KIND[dayKey] ?? "other";
+  if (p?.kind === "open") return <FreeDayCard date={date} title={day.title} weekNo={weekNo} weekLabel={getWeek(plan, weekNo).label} existing={existing} />;
+  const kind = p?.kind === "ride" ? "ride" : p?.kind === "rounds" ? "rounds" : CONDITIONING_KIND[dayKey] ?? "other";
   const logged = existing.find((c) => c.kind === kind && c.done);
   const [f, setF] = useState({
     minutes: p?.minutes ? String(p.minutes) : "", loop: "", rounds: p?.rounds ? String(p.rounds) : "", first: "", last: "",
@@ -99,6 +106,49 @@ export function ConditioningCard({ date, dayKey, weekNo, existing }: { date: str
       )}
 
       {p?.homeTasks?.map((t) => <HomeTask key={t.id} date={date} task={t} />)}
+    </Card>
+  );
+}
+
+/** Free day (24 Oct 2026): nothing planned, an open box to note what he did, if anything. Saved as an "other" row. */
+function FreeDayCard({ date, title, weekNo, weekLabel, existing }: { date: string; title: string; weekNo: number; weekLabel: string; existing: Conditioning[] }) {
+  const { local } = useStore();
+  const logged = existing.find(isFreeDayNote);
+  const [text, setText] = useState(logged?.note ?? "");
+  const [minutes, setMinutes] = useState(logged?.minutes != null ? String(logged.minutes) : "");
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    const t = text.trim();
+    if (!t) {
+      if (logged) await local.save("conditioning", { id: logged.id, done: false });
+    } else {
+      await local.save("conditioning", {
+        id: logged?.id, date, kind: "other", done: true, note: t, minutes: parseDecimal(minutes),
+        loop_time_s: null, rounds: null, first_round_count: null, last_round_count: null
+      });
+    }
+    setSaved(true);
+  }
+
+  return (
+    <Card className="cd" aria-label={title}>
+      <div className="cd-top">
+        <Pill tone="plain">Week {weekNo} · {weekLabel}</Pill>
+        {logged && <Pill tone="good"><CheckIcon /> Noted</Pill>}
+      </div>
+      <h2 className="cd-title">{title}</h2>
+      <p className="cd-line">Nothing planned. Did something anyway? Note it.</p>
+      <label className="field" htmlFor="c-free" style={{ height: "auto", padding: 12 }}>
+        <span className="sr-only">What you did</span>
+        <textarea id="c-free" rows={3} placeholder="Ride, walk, rounds, football… (optional)" value={text}
+          onChange={(e) => { setText(e.target.value); setSaved(false); }}
+          style={{ border: 0, background: "transparent", width: "100%", resize: "vertical", outline: "none" }} />
+      </label>
+      <div className="cd-fields">
+        <Num id="c-free-min" label="Minutes (optional)" value={minutes} onChange={(v) => { setMinutes(v); setSaved(false); }} />
+      </div>
+      <button className="btn btn-primary btn-block cd-save" onClick={() => void save()}>{saved ? "Saved" : logged ? "Update" : "Save note"}</button>
     </Card>
   );
 }
