@@ -107,7 +107,7 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 
 // ------------------------------------------------------------------ ranking
 
-export type AddGroup = "favorite" | "recent" | "all";
+export type AddGroup = "used" | "all";
 
 /** Each entry's food: by food_id, or by name for entries the old app logged without one. */
 function foodIdOf(foods: Food[]): (e: FoodEntry) => string | undefined {
@@ -116,51 +116,35 @@ function foodIdOf(foods: Food[]): (e: FoodEntry) => string | undefined {
   return (e) => e.food_id ?? byName.get(normName(e.name));
 }
 
-/** Last date each food was eaten. */
-export function lastUsedByFood(foods: Food[], entries: FoodEntry[]): Map<string, string> {
-  const idOf = foodIdOf(foods);
-  const last = new Map<string, string>();
-  for (const e of entries) {
-    const id = idOf(e);
-    if (id && (last.get(id) ?? "") < e.date) last.set(id, e.date);
-  }
-  return last;
-}
-
-/** Days in which "Favourites" counts what was logged (today and the 6 days before). */
-export const FAVOURITE_DAYS = 7;
+/** Days in which the Add sheet counts how often a food was logged (today and the 29 days before). */
+export const USAGE_DAYS = 30;
 
 function matches(f: Food, needle: string): boolean {
   return !needle || normName(`${f.name} ${f.brand ?? ""} ${f.category ?? ""}`).includes(needle);
 }
 
 /**
- * Foods for the Add sheet: favourites (the 3 foods logged most often in the last 7 days, the latest first on a tie),
- * then the most recent, then the rest A–Z. Archived foods never show.
+ * Foods for the Add sheet's meal tab: the foods logged at that meal in the last 30 days, most often first (the latest
+ * first on a tie), then the rest A–Z. Archived foods never show.
  */
-export function rankFoodsForAdd(foods: Food[], entries: FoodEntry[], query: string, today: string, favCount = 3, recentCount = 8): { food: Food; group: AddGroup }[] {
+export function rankFoodsForAdd(foods: Food[], entries: FoodEntry[], query: string, today: string, meal: Meal): { food: Food; group: AddGroup }[] {
   const needle = normName(query);
-  const last = lastUsedByFood(foods, entries);
   const idOf = foodIdOf(foods);
   const times = new Map<string, number>();
+  const last = new Map<string, string>();
   for (const e of entries) {
-    const id = e.date > addDays(today, -FAVOURITE_DAYS) && e.date <= today ? idOf(e) : undefined;
-    if (id) times.set(id, (times.get(id) ?? 0) + 1);
+    const id = e.meal === meal && e.date > addDays(today, -USAGE_DAYS) && e.date <= today ? idOf(e) : undefined;
+    if (!id) continue;
+    times.set(id, (times.get(id) ?? 0) + 1);
+    if ((last.get(id) ?? "") < e.date) last.set(id, e.date);
   }
   const live = foods.filter((f) => !f.archived && matches(f, needle));
   const az = (a: Food, b: Food) => a.name.localeCompare(b.name, "nl", { sensitivity: "base" });
-  const favs = live.filter((f) => times.has(f.id))
-    .sort((a, b) => times.get(b.id)! - times.get(a.id)! || last.get(b.id)!.localeCompare(last.get(a.id)!) || az(a, b))
-    .slice(0, favCount);
-  const favIds = new Set(favs.map((f) => f.id));
-  const recent = live.filter((f) => !favIds.has(f.id) && last.has(f.id))
-    .sort((a, b) => last.get(b.id)!.localeCompare(last.get(a.id)!) || az(a, b))
-    .slice(0, needle ? Infinity : recentCount);
-  const used = new Set([...favs, ...recent].map((f) => f.id));
-  const rest = live.filter((f) => !used.has(f.id)).sort(az);
+  const used = live.filter((f) => times.has(f.id))
+    .sort((a, b) => times.get(b.id)! - times.get(a.id)! || last.get(b.id)!.localeCompare(last.get(a.id)!) || az(a, b));
+  const rest = live.filter((f) => !times.has(f.id)).sort(az);
   return [
-    ...favs.map((food) => ({ food, group: "favorite" as const })),
-    ...recent.map((food) => ({ food, group: "recent" as const })),
+    ...used.map((food) => ({ food, group: "used" as const })),
     ...rest.map((food) => ({ food, group: "all" as const }))
   ];
 }

@@ -5,22 +5,25 @@ import { fmtNum, parseDecimal } from "../../lib/format";
 import { entryFromFood, rankFoodsForAdd, servingOf, type AddGroup, type EntryDraft } from "../../lib/nutrition";
 import { Sheet } from "../../ui/Sheet";
 import { PlusIcon } from "../../ui/icons";
-import { FoodLine, MealPicker, QuantityStepper, SearchIcon, fmtQty, mealLabel } from "./ui";
+import { FoodLine, MealPicker, QuantityStepper, SearchIcon, Switch, fmtQty, mealLabel } from "./ui";
 
 const EMPTY_QUICK = { name: "", kcal: "", protein: "", carbs: "", fat: "" };
-const GROUP_LABEL: Record<AddGroup, string> = { favorite: "Favourites", recent: "Recent", all: "All foods" };
+const GROUP_LABEL: Record<AddGroup, string> = { used: "Most used · 30 days", all: "All foods" };
 /** Quick picks in the quantity step (servings). */
 const QUICK_QTY = [0.5, 1, 1.5, 2, 3];
 
 /**
- * Pick a food (favourites = the 3 most logged this week, recent, the rest; archived foods are hidden), choose how
- * many servings, add. Quick add for one-offs.
+ * Pick a food (the meal tab's foods by how often they were logged there in the last 30 days, then the rest A–Z;
+ * archived foods are hidden), choose how many servings, add. Quick add for one-offs; a named one can be saved to
+ * your foods so it shows up next time.
  */
-export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entries, onAdd, onClose }: {
+export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entries, onAdd, onSaveFood, onClose }: {
   meal: Meal; today: string; foods: Food[]; entries: FoodEntry[];
   /** Short name of the day being logged to ("Tue 6 Oct"), or null for today. */
   day?: string | null;
   onAdd: (items: EntryDraft[]) => Promise<void> | void;
+  /** Saves a quick add as a food (1 serving = these numbers). */
+  onSaveFood: (food: Pick<Food, "name" | "kcal" | "protein" | "carbs" | "fat">) => Promise<Food>;
   onClose: () => void;
 }) {
   const [meal, setMeal] = useState<Meal>(initialMeal);
@@ -29,9 +32,10 @@ export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entr
   const [qty, setQty] = useState(1);
   const [quick, setQuick] = useState(EMPTY_QUICK);
   const [quickError, setQuickError] = useState(false);
+  const [saveQuick, setSaveQuick] = useState(true);
   const [added, setAdded] = useState<string[]>([]);
 
-  const ranked = useMemo(() => rankFoodsForAdd(foods, entries, q, today), [foods, entries, q, today]);
+  const ranked = useMemo(() => rankFoodsForAdd(foods, entries, q, today, meal), [foods, entries, q, today, meal]);
 
   function add(food: Food, quantity: number) {
     void onAdd([entryFromFood(food, quantity, meal)]);
@@ -40,7 +44,7 @@ export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entr
     setQty(1);
   }
 
-  function addQuick() {
+  async function addQuick() {
     const kcal = parseDecimal(quick.kcal);
     const protein = quick.protein.trim() ? parseDecimal(quick.protein) : 0;
     if (kcal == null || kcal < 0 || protein == null || protein < 0) return setQuickError(true);
@@ -49,11 +53,14 @@ export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entr
     const carbs = optional(quick.carbs);
     const fat = optional(quick.fat);
     if ((quick.carbs.trim() && (carbs == null || carbs < 0)) || (quick.fat.trim() && (fat == null || fat < 0))) return setQuickError(true);
-    const name = quick.name.trim() || "Quick add";
-    void onAdd([{ meal, food_id: null, name, serving_label: null, quantity: 1, kcal, protein, carbs, fat, note: null }]);
-    setAdded((a) => [...a, name]);
+    const named = quick.name.trim();
+    const name = named || "Quick add";
     setQuick(EMPTY_QUICK);
     setQuickError(false);
+    setAdded((a) => [...a, name]);
+    // Only a named quick add can be saved: an unnamed one would show up as "Quick add" in the list.
+    if (named && saveQuick) return void onAdd([entryFromFood(await onSaveFood({ name, kcal, protein, carbs, fat }), 1, meal)]);
+    void onAdd([{ meal, food_id: null, name, serving_label: null, quantity: 1, kcal, protein, carbs, fat, note: null }]);
   }
 
   const title = added.length
@@ -89,7 +96,7 @@ export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entr
     );
   }
 
-  const groups = (["favorite", "recent", "all"] as AddGroup[])
+  const groups = (["used", "all"] as AddGroup[])
     .map((g) => ({ g, items: ranked.filter((r) => r.group === g).map((r) => r.food) }))
     .filter((x) => x.items.length);
 
@@ -141,7 +148,11 @@ export function AddFoodSheet({ meal: initialMeal, day = null, today, foods, entr
             <label className="field" htmlFor="qa-f"><span className="sr-only">Fat</span><input id="qa-f" className="num" inputMode="decimal" placeholder="Optional" value={quick.fat} onChange={(e) => setQuick({ ...quick, fat: e.target.value })} /><span className="field-suffix">g fat</span></label>
           </div>
           {quickError && <p role="alert" style={{ color: "var(--bad)", fontSize: 13, margin: "0 4px" }}>Enter the numbers as numbers.</p>}
-          <button className="btn btn-tinted" style={{ height: 44, alignSelf: "flex-end" }} onClick={addQuick}>Add to {mealLabel(meal)}</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Switch on={saveQuick} onChange={setSaveQuick} label="Save to my foods" />
+            <span className="row-sub" style={{ flex: 1 }} aria-hidden>Save to my foods</span>
+            <button className="btn btn-tinted" style={{ height: 44 }} onClick={() => void addQuick()}>Add to {mealLabel(meal)}</button>
+          </div>
         </div>
       </section>
     </Sheet>

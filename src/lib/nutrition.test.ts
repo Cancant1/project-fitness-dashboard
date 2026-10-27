@@ -96,33 +96,28 @@ describe("food form", () => {
 });
 
 describe("ranking", () => {
-  const fav = food("Zz favourite", { favorite: true });
-  const recentA = food("Pizza", { id: "pizza" });
-  const old = food("Appel", { id: "appel" });
-  const archived = food("Gone", { archived: true });
-  const entries = [entry("Pizza", { date: "2026-09-05" }), entry("Appel", { food_id: "appel", date: "2026-08-01" })];
-
-  it("puts recent (also matched by name), then the rest; a starred food is not a favourite by itself; never archived", () => {
-    const r = rankFoodsForAdd([old, recentA, fav, archived, food("Banaan")], entries, "", "2026-10-21");
-    expect(r.map((x) => [x.food.name, x.group])).toEqual([
-      ["Pizza", "recent"], ["Appel", "recent"], ["Banaan", "all"], ["Zz favourite", "all"]
-    ]);
-  });
-  it("favourites: the 3 foods logged most in the last 7 days, the latest first on a tie", () => {
-    const foods = ["Skyr", "Kwark", "Banaan", "Appel", "Pizza"].map((n) => food(n, { id: n.toLowerCase() }));
+  it("the meal's foods by times logged in the last 30 days (latest first on a tie, also matched by name), then the rest A–Z; never archived", () => {
+    const foods = ["Skyr", "Kwark", "Banaan", "Appel", "Pizza", "Zz starred", "Chili"].map((n) => food(n, { id: n.toLowerCase(), favorite: n === "Zz starred" }));
+    foods.push(food("Gone", { archived: true }));
+    const dinner = (name: string, date: string, over: Partial<FoodEntry> = {}) => entry(name, { food_id: name.toLowerCase(), meal: "dinner", date, ...over });
     const log = [
-      ...["2026-10-15", "2026-10-17", "2026-10-18"].map((date) => entry("Kwark", { food_id: "kwark", date })),
-      ...["2026-10-19", "2026-10-20"].map((date) => entry("Banaan", { food_id: "banaan", date })),
-      ...["2026-10-16", "2026-10-21"].map((date) => entry("Appel", { food_id: "appel", date })),
-      entry("Skyr", { date: "2026-10-21" }), // matched by name
-      ...["2026-10-10", "2026-10-11", "2026-10-12", "2026-10-14"].map((date) => entry("Pizza", { food_id: "pizza", date })) // before the 7 days
+      ...["2026-10-15", "2026-10-17", "2026-10-18"].map((d) => dinner("Pizza", d)),
+      ...["2026-10-02", "2026-10-20"].map((d) => dinner("Chili", d)),
+      ...["2026-10-16", "2026-10-21"].map((d) => dinner("Appel", d)),
+      dinner("Skyr", "2026-10-21", { food_id: null }), // matched by name
+      dinner("Gone", "2026-10-21"),
+      dinner("Banaan", "2026-09-21"), // before the 30 days
+      ...["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-21"].map((d) => entry("Kwark", { food_id: "kwark", meal: "breakfast", date: d }))
     ];
-    const r = rankFoodsForAdd(foods, log, "", "2026-10-21");
-    expect(r.filter((x) => x.group === "favorite").map((x) => x.food.name)).toEqual(["Kwark", "Appel", "Banaan"]);
-    expect(r.filter((x) => x.group === "recent").map((x) => x.food.name)).toEqual(["Skyr", "Pizza"]);
+    const r = rankFoodsForAdd(foods, log, "", "2026-10-21", "dinner");
+    expect(r.map((x) => [x.food.name, x.group])).toEqual([
+      ["Pizza", "used"], ["Appel", "used"], ["Chili", "used"], ["Skyr", "used"],
+      ["Banaan", "all"], ["Kwark", "all"], ["Zz starred", "all"]
+    ]);
+    expect(rankFoodsForAdd(foods, log, "", "2026-10-21", "breakfast")[0]).toMatchObject({ food: { name: "Kwark" }, group: "used" });
   });
   it("searches name and brand", () => {
-    expect(rankFoodsForAdd([food("Skyr", { brand: "Jumbo" }), food("Kwark")], [], "jumbo", "2026-10-21").map((x) => x.food.name)).toEqual(["Skyr"]);
+    expect(rankFoodsForAdd([food("Skyr", { brand: "Jumbo" }), food("Kwark")], [], "jumbo", "2026-10-21", "dinner").map((x) => x.food.name)).toEqual(["Skyr"]);
   });
   it("lists the library favourites first, then A–Z, in use or removed", () => {
     const foods = [food("b"), food("a"), food("c", { favorite: true }), food("x", { archived: true })];

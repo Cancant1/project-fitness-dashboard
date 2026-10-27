@@ -6,7 +6,7 @@ import { useRows, useStore } from "../data/store";
 import type { FoodEntry, Meal, SavedMeal } from "../data/types";
 import { addDays, fmtLongDate, fmtNum, fmtShortDate, todayIso } from "../lib/format";
 import {
-  PLAN_DAY_NAME, bodyweight7d, dayTotals, entryFromFood, foodSetupDone, hasPlanTarget, mealForHour, planTargetRow, servingText, sumEntries, targetFor,
+  PLAN_DAY_NAME, bodyweight7d, dayTotals, entryFromFood, foodSetupDone, hasPlanTarget, mealForHour, newFood, planTargetRow, servingText, sumEntries, targetFor,
   type EntryDraft
 } from "../lib/nutrition";
 import { Bar, Card, Label, PageHead, Pill, Ring } from "../ui/kit";
@@ -260,7 +260,8 @@ export function FoodPage() {
       </div>
 
       {adding && (
-        <AddFoodSheet meal={adding} day={dayName} today={today} foods={foods} entries={entries} onClose={closeAdd} onAdd={async (items) => { await log(items); }} />
+        <AddFoodSheet meal={adding} day={dayName} today={today} foods={foods} entries={entries} onClose={closeAdd} onAdd={async (items) => { await log(items); }}
+          onSaveFood={async (v) => (await local.save("foods", newFood({ ...v, brand: null, serving: "1 serving", source: "custom" })))[0]!} />
       )}
       {editing && (
         <EntrySheet entry={editing} onClose={closeEdit}
