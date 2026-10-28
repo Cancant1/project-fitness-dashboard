@@ -9,7 +9,7 @@ describe("progression from ticked sets", () => {
     const w = new World();
     w.session(dayIn(0, "lower_a"), "lower_a");
     const loads = w.data().state.currentLoads;
-    expect(loads.cable_lateral_raise).toBe(20);
+    expect(loads.cable_leg_extension).toBe(30);
     expect(loads.lying_db_hamstring_curl).toBe(25);
     expect(loads.romanian_deadlift).toBe(80);
   });

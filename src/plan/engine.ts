@@ -849,7 +849,7 @@ export function prescribeWeek(program: ProgramDefinition, weekNo: number, state:
     .map((d) => prescribeDay(program, weekNo, d.key, state, profile));
 }
 
-/** Working sets excluding warm-ups and care work (shoulder block, wrist extensions): 72 in a normal week. */
+/** Working sets excluding warm-ups and care work (shoulder block, wrist extensions): 70 in a normal week (72 before 28 Oct 2026). */
 export function countWorkingSets(exercises: readonly PrescribedExercise[]): number {
   return exercises
     .filter((e) => e.role !== 'shoulder' && !e.rehab)

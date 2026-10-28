@@ -12,18 +12,18 @@ describe("muscle.volume", () => {
     w.week(1, {}, days);
     return get(weeklyReport(w.data(), 1, today), "muscle.volume");
   };
-  it("≥ 90% of the planned 72 good · 70–90% watch · < 70% act (care work never counts)", () => {
-    expect(vol(["lower_a", "upper_a", "lower_b", "upper_b"])).toMatchObject({ status: "good", message: "72 of 72 working sets." });
-    expect(vol(["lower_a", "upper_a", "lower_b"])).toMatchObject({ status: "watch", message: "53 of 72 working sets." });
-    expect(vol(["lower_a", "upper_a"])).toMatchObject({ status: "act", message: "38 of 72 sets: below the dose that keeps you growing." });
+  it("≥ 90% of the planned 70 good · 70–90% watch · < 70% act (care work never counts)", () => {
+    expect(vol(["lower_a", "upper_a", "lower_b", "upper_b"])).toMatchObject({ status: "good", message: "70 of 70 working sets." });
+    expect(vol(["lower_a", "upper_a", "lower_b"])).toMatchObject({ status: "watch", message: "51 of 70 working sets." });
+    expect(vol(["lower_a", "upper_a"])).toMatchObject({ status: "act", message: "36 of 70 sets: below the dose that keeps you growing." });
   });
   it("pending while the week runs", () => {
-    expect(vol(["lower_a", "upper_a"], dayIn(1, "boxing"))).toMatchObject({ status: "pending", message: "38 of 72 working sets so far." });
+    expect(vol(["lower_a", "upper_a"], dayIn(1, "boxing"))).toMatchObject({ status: "pending", message: "36 of 70 working sets so far." });
   });
-  it("the planned count follows the adjusted week (deload 37)", () => {
+  it("the planned count follows the adjusted week (deload 36)", () => {
     const w = new World();
     w.week(7);
-    expect(get(weeklyReport(w.data(), 7, sunday(7)), "muscle.volume")?.message).toBe("37 of 37 working sets.");
+    expect(get(weeklyReport(w.data(), 7, sunday(7)), "muscle.volume")?.message).toBe("36 of 36 working sets.");
   });
 });
 
@@ -42,7 +42,7 @@ describe("muscle.by_muscle", () => {
     const w = new World();
     for (const e of w.tables.exercises) if (e.muscle_direct === "side_delts") e.muscle_direct = "Side delts";
     w.week(1);
-    expect(weeklyReport(w.data(), 1, sunday(1)).numbers.muscles.find((m) => m.key === "side_delts")?.sets).toBe(10);
+    expect(weeklyReport(w.data(), 1, sunday(1)).numbers.muscles.find((m) => m.key === "side_delts")?.sets).toBe(8); // 3 + 2 + 3 since Monday's laterals went (28 Oct 2026)
   });
 });
 
@@ -76,10 +76,10 @@ describe("muscle.effort (§6.3)", () => {
   it("every failure set ≥ hi + 5 → info with the engine's next load (jump cap: one pin, not two)", () => {
     const at = (reps: number) => {
       const w = new World();
-      w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? reps : undefined) });
-      return get(weeklyReport(w.data(), 1, sunday(1)), "muscle.effort.cable_lateral_raise");
+      w.session(dayIn(1, "upper_b"), "upper_b", { reps: (ex, p) => (ex.exerciseKey === "cable_rear_delt_fly" && p.kind === "failure" ? reps : undefined) });
+      return get(weeklyReport(w.data(), 1, sunday(1)), "muscle.effort.cable_rear_delt_fly");
     };
-    expect(at(25)).toMatchObject({ status: "info", message: "Single-arm cable lateral raise: 25 reps is above the 12–20 range. Next time 30 lb (from 20)." });
+    expect(at(25)).toMatchObject({ status: "info", message: "Cable rear delt fly: 25 reps is above the 12–20 range. Next time 40 lb (from 30)." });
     expect(at(24)).toBeUndefined();
   });
 });

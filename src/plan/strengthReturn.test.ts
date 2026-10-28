@@ -66,13 +66,13 @@ describe('days', () => {
   it('lists every exercise in plan order', () => {
     const order = (key: string) => P.days.find((d) => d.key === key)!.slots.map((s) => s.exerciseKey);
     expect(order('lower_a')).toEqual(['squat', 'romanian_deadlift', 'lying_db_hamstring_curl', 'cable_leg_extension',
-      'cable_calf_raise', 'kneeling_cable_crunch', 'cable_lateral_raise', 'cross_body_triceps_extension', 'wrist_extension']);
+      'cable_calf_raise', 'kneeling_cable_crunch', 'cross_body_triceps_extension', 'wrist_extension']); // no laterals on Monday (28 Oct 2026)
     expect(order('upper_a')).toEqual(['incline_db_press', 'weighted_pullup', 'seated_cable_row',
-      'chest_cable_flye', 'cable_lateral_raise', 'bayesian_curl', 'overhead_cable_triceps_extension', 'cable_rear_delt_fly']);
+      'chest_cable_flye', 'db_lateral_raise', 'bayesian_curl', 'overhead_cable_triceps_extension', 'cable_rear_delt_fly']);
     expect(order('lower_b')).toEqual(['deadlift', 'bulgarian_split_squat', 'seated_cable_leg_curl', 'cable_leg_extension',
-      'cable_calf_raise', 'hanging_knee_raise', 'cable_lateral_raise', 'preacher_curl', 'wrist_extension']);
+      'cable_calf_raise', 'hanging_knee_raise', 'db_lateral_raise', 'preacher_curl', 'wrist_extension']);
     expect(order('upper_b')).toEqual(['barbell_row', 'db_bench_press', 'lat_pulldown', 'chest_cable_flye',
-      'cable_lateral_raise', 'cable_rear_delt_fly', 'single_arm_cable_curl', 'bar_pushdown']);
+      'db_lateral_raise', 'cable_rear_delt_fly', 'db_curl', 'bar_pushdown']);
   });
 
   it('has a definition for every slot exercise', () => {
@@ -97,7 +97,9 @@ describe('days', () => {
     expect(pick('lower_a', 'cable_leg_extension')).toEqual([30, 'lb']);
     expect(pick('lower_a', 'cable_calf_raise')).toEqual([250, 'lb']);
     expect(pick('lower_a', 'kneeling_cable_crunch')).toEqual([90, 'lb']);
-    expect(pick('lower_a', 'cable_lateral_raise')).toEqual([20, 'lb']);
+    expect(P.days.find((d) => d.key === 'lower_a')!.slots.some((s) => s.exerciseKey === 'db_lateral_raise')).toBe(false);
+    expect(pick('upper_a', 'db_lateral_raise')).toEqual([10, 'kg']);
+    expect(slot('upper_a', 'db_lateral_raise').loadBasis).toBe('per_hand');
     expect(pick('upper_a', 'seated_cable_row')).toEqual([100, 'lb']);
     expect(pick('upper_a', 'chest_cable_flye')).toEqual([50, 'lb']);
     expect(pick('upper_a', 'bayesian_curl')).toEqual([40, 'lb']);
@@ -108,6 +110,8 @@ describe('days', () => {
     expect(pick('upper_b', 'barbell_row')).toEqual([70, 'kg']);
     expect(pick('upper_b', 'lat_pulldown')).toEqual([120, 'lb']);
     expect(pick('upper_b', 'bar_pushdown')).toEqual([80, 'lb']);
+    expect(pick('upper_b', 'db_curl')).toEqual([12, 'kg']);
+    expect(slot('upper_b', 'db_curl').loadBasis).toBe('per_hand');
     expect(slot('upper_a', 'weighted_pullup').loadBasis).toBe('added');
     expect(slot('upper_a', 'incline_db_press').loadBasis).toBe('per_hand');
   });
@@ -129,11 +133,12 @@ describe('days', () => {
 });
 
 describe('weekly working sets (normal week; shoulder block and wrist extensions are care work)', () => {
-  // The agreed plan (chat export, Part 1): 72 working sets a week. The wrist extension (2 × 15) is elbow care.
+  // The agreed plan (chat export, Part 1): 72 working sets a week; 70 since Monday's laterals went (28 Oct 2026).
+  // The wrist extension (2 × 15) is elbow care.
   const count = (week: number, day: LiftingDayKey) => prescribeDay(P, week, day, STATE).workingSetCount;
 
-  it('is 19 / 19 / 15 / 19 = 72 in an A week', () => {
-    expect([count(1, 'lower_a'), count(1, 'upper_a'), count(1, 'lower_b'), count(1, 'upper_b')]).toEqual([19, 19, 15, 19]);
+  it('is 17 / 19 / 15 / 19 = 70 in an A week', () => {
+    expect([count(1, 'lower_a'), count(1, 'upper_a'), count(1, 'lower_b'), count(1, 'upper_b')]).toEqual([17, 19, 15, 19]);
   });
 
   it('keeps the wrist extension in the session but out of the count', () => {

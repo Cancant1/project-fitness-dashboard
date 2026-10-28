@@ -56,7 +56,7 @@ describe("weeklyReport", () => {
     expect(r.signals.filter((x) => x.status === "act")).toEqual([]);
     expect(r.numbers.sessions).toEqual({ done: 4, planned: 4 });
     expect(r.numbers.habit).toEqual({ weeks: 1, target: 6, missedTwice: 0, comebacks: 0 });
-    expect(r.numbers.workingSets).toEqual({ done: 72, planned: 72 });
+    expect(r.numbers.workingSets).toEqual({ done: 70, planned: 70 });
     expect(r.staticInfo.map((x) => x.id)).toEqual(["joints.redflags", "recovery.caffeine", "recovery.alcohol"]);
   });
 

@@ -23,8 +23,8 @@ describe("joints.swap", () => {
   });
   it("no swap on the list → watch", () => {
     const w = new World();
-    w.pain(dayIn(1, "lower_a"), "right_shoulder", "cable_lateral_raise", { next_morning: "sore" });
-    expect(get(weeklyReport(w.data(), 1, sunday(1)), "joints.swap.cable_lateral_raise")).toMatchObject({ status: "watch" });
+    w.pain(dayIn(1, "upper_a"), "right_shoulder", "db_lateral_raise", { next_morning: "sore" });
+    expect(get(weeklyReport(w.data(), 1, sunday(1)), "joints.swap.db_lateral_raise")).toMatchObject({ status: "watch" });
   });
   it("not with a swap running, and not after 14 days", () => {
     const w = new World();

@@ -48,10 +48,10 @@ describe("E1 effort per exercise and set", () => {
   });
   it("accessories: rep-out-last compounds controlled + max, isolation failure, wrist ladder care", () => {
     expect(efforts(ex(1, "lower_a", "romanian_deadlift"))).toEqual(["controlled", "controlled", "max"]);
-    expect(ex(1, "lower_a", "cable_lateral_raise").effort).toBe("failure");
+    expect(ex(1, "lower_a", "cable_leg_extension").effort).toBe("failure");
     expect(ex(1, "lower_a", "wrist_extension").effort).toBe("care");
     expect(ex(0, "lower_a", "romanian_deadlift").effort).toBe("controlled"); // calibration: easy sets stop at the top of the range
-    expect(ex(7, "lower_a", "cable_lateral_raise").effort).toBe("controlled"); // deload: not to failure
+    expect(ex(7, "lower_a", "cable_leg_extension").effort).toBe("controlled"); // deload: not to failure
   });
   it("labels", () => {
     expect(effortLabel("controlled", 5)).toBe("Stop at 5 reps, even if more are there");
@@ -140,7 +140,7 @@ describe("E3 missed week (skip_deload) and recalibration", () => {
     expect(p.weeks[7]).toMatchObject({ type: "C", label: "Week C", deloadSkipped: true });
     expect(p.weeks[7]!.notes.some((n) => /checkpoint/i.test(n))).toBe(false);
     expect(p.weeks).toHaveLength(20);
-    expect(prescribeWeek(p, 7, STATE).reduce((n, d) => n + d.workingSetCount, 0)).toBe(72);
+    expect(prescribeWeek(p, 7, STATE).reduce((n, d) => n + d.workingSetCount, 0)).toBe(70);
     expect(applyAdjustments(PLAN, [adj({ kind: "skip_deload", weekNo: 8 })]).weeks[8]!.type).toBe("A"); // not a deload: unchanged
   });
   it("recalibrate: each TM lift without a new TM row gets a calibration rep-out at 75% of the last TM", () => {
@@ -242,11 +242,11 @@ describe("E8 extra sets at checkpoint 1 (R1-08)", () => {
     const arms: PlanState = { ...STATE, extraSetTargets: PLAN.extraSets!.arms.targets };
     expect(ex(8, "upper_a", "bayesian_curl", arms).sets).toHaveLength(3);
     expect(ex(8, "upper_a", "overhead_cable_triceps_extension", arms).sets).toHaveLength(3);
-    expect(ex(9, "upper_b", "single_arm_cable_curl", arms).sets).toHaveLength(3);
+    expect(ex(9, "upper_b", "db_curl", arms).sets).toHaveLength(3);
     expect(ex(9, "upper_b", "bar_pushdown", arms).sets).toHaveLength(3);
     const total = (s: PlanState, n: number) => prescribeWeek(PLAN, n, s).reduce((k, d) => k + d.workingSetCount, 0);
-    expect(total(arms, 8)).toBe(76);
-    expect(total(arms, 11)).toBe(76);
+    expect(total(arms, 8)).toBe(74);
+    expect(total(arms, 11)).toBe(74);
     expect(total(arms, 17) - total(STATE, 17)).toBe(4);
     for (const w of [6, 7, 10, 18, 19]) expect(total(arms, w)).toBe(total(STATE, w));
     expect(day(8, "upper_a", arms).exercises.map((e) => e.exerciseKey)).not.toContain("cable_rear_delt_fly");
@@ -255,7 +255,7 @@ describe("E8 extra sets at checkpoint 1 (R1-08)", () => {
     const rear = tue.find((e) => e.exerciseKey === "cable_rear_delt_fly")!;
     expect(rear.sets).toHaveLength(1);
     expect(tue.some((e) => e.pair)).toBe(false); // straight sets: Upper A is all cables
-    expect(total(both, 8)).toBe(77);
+    expect(total(both, 8)).toBe(75);
   });
 });
 
@@ -267,10 +267,10 @@ describe("E9 effort rule for the elbow and bad days", () => {
     const bay = ex(1, "upper_a", "bayesian_curl", s);
     expect(bay.effort).toBe("stop_sign");
     expect(bay.notes.join(" ")).toContain("Elbow irritable");
-    expect(ex(1, "upper_a", "cable_lateral_raise", s).effort).toBe("failure"); // not elbow-loading
+    expect(ex(1, "upper_a", "db_lateral_raise", s).effort).toBe("failure"); // not elbow-loading
     expect(ex(1, "lower_a", "cross_body_triceps_extension", s).effort).toBe("failure"); // before the check
-    expect(ex(2, "upper_b", "single_arm_cable_curl", s).effort).toBe("stop_sign");
-    expect(ex(3, "upper_b", "single_arm_cable_curl", s).effort).toBe("failure"); // 7 Nov: past the 14 days
+    expect(ex(2, "upper_b", "db_curl", s).effort).toBe("stop_sign");
+    expect(ex(3, "upper_b", "db_curl", s).effort).toBe("failure"); // 7 Nov: past the 14 days
     expect(effortState([], [pain("2026-10-20", "right_elbow", { pain_score: 3 }), pain("2026-10-20", "right_shoulder", { pain_score: 6 })], PLAN)).toBeUndefined();
     expect(effortState([], [pain("2026-10-20", "right_elbow", { during_set: "sharp" })], PLAN)?.elbowIrritableUntil).toBe("2026-11-03");
   });
@@ -281,9 +281,9 @@ describe("E9 effort rule for the elbow and bad days", () => {
     const e = w.data().state.effort;
     expect(e).toEqual({ lowFeelWeekNo: 1 });
     const s: PlanState = { ...STATE, effort: e };
-    expect(ex(1, "upper_b", "cable_lateral_raise", s).effort).toBe("stop_sign");
+    expect(ex(1, "upper_b", "db_lateral_raise", s).effort).toBe("stop_sign");
     expect(ex(1, "upper_b", "lat_pulldown", s).effort).toBe("failure");
-    expect(ex(2, "upper_b", "cable_lateral_raise", s).effort).toBe("failure");
+    expect(ex(2, "upper_b", "db_lateral_raise", s).effort).toBe("failure");
   });
 });
 
@@ -310,13 +310,13 @@ describe("E11 pairs (P-TIMESAVE)", () => {
   it("straight sets keep the slot order; a pair, if one is set, makes its members adjacent", () => {
     const mon = day(1, "lower_a").exercises;
     expect(mon.map((e) => e.exerciseKey)).toEqual(["squat", "romanian_deadlift", "lying_db_hamstring_curl", "cable_leg_extension",
-      "cable_calf_raise", "kneeling_cable_crunch", "cable_lateral_raise", "cross_body_triceps_extension", "wrist_extension"]);
+      "cable_calf_raise", "kneeling_cable_crunch", "cross_body_triceps_extension", "wrist_extension"]);
     expect(mon.some((e) => e.pair || e.pairLabel)).toBe(false);
     const fri = day(1, "lower_b").exercises;
-    const paired = arrangePairs(fri.map((e) => (e.exerciseKey === "hanging_knee_raise" || e.exerciseKey === "cable_lateral_raise" ? { ...e, pair: "x" } : e)));
+    const paired = arrangePairs(fri.map((e) => (e.exerciseKey === "hanging_knee_raise" || e.exerciseKey === "db_lateral_raise" ? { ...e, pair: "x" } : e)));
     const k = paired.findIndex((e) => e.exerciseKey === "hanging_knee_raise");
     expect(paired.slice(k, k + 2).map((e) => [e.exerciseKey, e.pairLabel, e.restSec])).toEqual([
-      ["hanging_knee_raise", "A", 50], ["cable_lateral_raise", "B", 75]
+      ["hanging_knee_raise", "A", 50], ["db_lateral_raise", "B", 75]
     ]);
     // A pair with one member left that day is a straight set.
     const solo = arrangePairs([{ ...fri[0]!, pair: "x" }]);
@@ -361,7 +361,7 @@ describe("E13 wrist ladder", () => {
     const mon = ex(2, "lower_a", "wrist_extension");
     expect(mon).toMatchObject({ effort: "care", rehab: true });
     expect(shape(mon.sets)).toEqual([["working", 4, 12], ["working", 4, 12], ["working", 4, 12]]);
-    expect(day(2, "lower_a").workingSetCount).toBe(19); // care work: not counted
+    expect(day(2, "lower_a").workingSetCount).toBe(17); // care work: not counted
     expect(shape(ex(14, "lower_b", "wrist_extension").sets)).toEqual([["working", 4, 8], ["working", 4, 8]]);
     expect(day(14, "lower_a").exercises.map((e) => e.exerciseKey)).not.toContain("wrist_extension");
   });
@@ -419,18 +419,18 @@ describe("E14 pain 0–10 helpers and the hold rule", () => {
   });
   it("hold: the latest check ≥ 4 for an exercise holds its load until it is trained again", () => {
     const w = new World();
-    w.session(dayIn(1, "lower_a"), "lower_a", { reps: (e, p) => (e.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? 25 : undefined) });
-    const p = w.pain(dayIn(1, "lower_a"), "right_shoulder", "cable_lateral_raise", { pain_score: 4, during_set: "ache" });
-    expect(w.data().state.holdLoad).toEqual({ cable_lateral_raise: true });
-    expect(w.data().state.currentLoads.cable_lateral_raise).toBe(20); // would be 30 (one pin: the jump cap)
-    expect(ex(2, "lower_a", "cable_lateral_raise", { ...w.data().state, trainingMaxes: STATE.trainingMaxes }).notes.join(" ")).toContain("Hold the load");
+    w.session(dayIn(1, "upper_b"), "upper_b", { reps: (e, p) => (e.exerciseKey === "cable_rear_delt_fly" && p.kind === "failure" ? 25 : undefined) });
+    const p = w.pain(dayIn(1, "upper_b"), "right_shoulder", "cable_rear_delt_fly", { pain_score: 4, during_set: "ache" });
+    expect(w.data().state.holdLoad).toEqual({ cable_rear_delt_fly: true });
+    expect(w.data().state.currentLoads.cable_rear_delt_fly).toBe(30); // would be 40 (one pin: the jump cap)
+    expect(ex(2, "upper_b", "cable_rear_delt_fly", { ...w.data().state, trainingMaxes: STATE.trainingMaxes }).notes.join(" ")).toContain("Hold the load");
     p.pain_score = 3;
-    expect(w.data().state.currentLoads.cable_lateral_raise).toBe(30);
+    expect(w.data().state.currentLoads.cable_rear_delt_fly).toBe(40);
     p.pain_score = 5;
-    w.session(dayIn(1, "upper_a"), "upper_a");
+    w.session(dayIn(2, "upper_b"), "upper_b");
     expect(w.data().state.holdLoad).toBeUndefined();
-    const keyOf = new Map([[w.ids.get("cable_lateral_raise")!, "cable_lateral_raise"]]);
-    expect(holdLoadState([p], keyOf, [], [])).toEqual({ cable_lateral_raise: true });
+    const keyOf = new Map([[w.ids.get("cable_rear_delt_fly")!, "cable_rear_delt_fly"]]);
+    expect(holdLoadState([p], keyOf, [], [])).toEqual({ cable_rear_delt_fly: true });
   });
   it("maxUpdates: a main lift with pain ≥ 4 this session gets no increase (decreases still apply)", () => {
     const set = { id: "s1", session_id: "x", kind: "rep_out", completed: true, reps: 13, load: 100, legacy_ref: { plan: { exerciseKey: "squat", role: "main", mainLift: "squat", target: 10, restSec: 240 } } } as unknown as SetRow;
@@ -454,7 +454,7 @@ describe("E14 pain 0–10 helpers and the hold rule", () => {
     expect(bay(4).sets).toHaveLength(1);
     expect(bay(4).notes.join(" ")).toContain("Sets cut by a third");
     expect(bay(6).sets).toHaveLength(2);
-    expect(prescribeDay(p, 4, "upper_a", STATE).exercises.find((e) => e.exerciseKey === "cable_lateral_raise")!.sets).toHaveLength(3);
+    expect(prescribeDay(p, 4, "upper_a", STATE).exercises.find((e) => e.exerciseKey === "db_lateral_raise")!.sets).toHaveLength(3);
   });
 });
 
@@ -513,7 +513,7 @@ describe("E23 / E24 plan data", () => {
     expect(PLAN.exercises.incline_hammer_curl!.name).toBe("Seated high-incline hammer curl");
     expect(PLAN.alternativeSlots!.incline_hammer_curl).toMatchObject({ startLoad: 12, unit: "kg", scheme: { repRange: [8, 12] } });
     expect(PLAN.days.flatMap((d) => d.slots).some((s) => s.exerciseKey === "incline_hammer_curl")).toBe(false);
-    expect(ex(1, "upper_b", "single_arm_cable_curl").alternatives).toContain("incline_hammer_curl");
+    expect(ex(1, "upper_b", "db_curl").alternatives).toContain("incline_hammer_curl");
   });
   it("the week-7 deload carries the variety note (week 10 is a rest week); accessories list equivalents", () => {
     expect(PLAN.weeks.filter((w) => w.notes.includes(VARIETY_NOTE)).map((w) => w.weekNo)).toEqual([7]);

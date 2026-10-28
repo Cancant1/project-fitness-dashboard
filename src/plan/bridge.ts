@@ -64,6 +64,7 @@ export const HISTORY_NAME: Record<string, string> = {
   incline_hammer_curl: "Hammer Curl",
   hammer_curl: "Hammer Curl",
   db_lateral_raise: "Lateral Raise (DB)",
+  db_curl: "DB Curl",
   heel_elevated_goblet_squat: "Heel-Elevated Goblet Squat",
   single_arm_lat_pulldown: "Single-Arm Lat Pulldown",
   db_reverse_lunge: "Lunges"

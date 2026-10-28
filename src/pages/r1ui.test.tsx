@@ -98,12 +98,12 @@ describe("Logger: saving what was typed (bug hunt 12 Oct)", () => {
   it("a failure set needs its reps; typed values save without a blur and the tick keeps them", async () => {
     const id = await startDay(1, "lower_a", STATE, "2026-10-19");
     await render(null, `/workout/${id}`);
-    await goTo("lateral");
+    await goTo("leg extension");
     const row = host.querySelector(".set-grid")!;
     const [loadIn, repsIn] = [...row.querySelectorAll("input")] as HTMLInputElement[];
     const tick = row.querySelector("button.check")!;
     await click(tick);
-    const setId = () => local.all("sets").find((x) => x.session_id === id && planRef(x)?.exerciseKey === "cable_lateral_raise" && x.set_no === 1)!;
+    const setId = () => local.all("sets").find((x) => x.session_id === id && planRef(x)?.exerciseKey === "cable_leg_extension" && x.set_no === 1)!;
     expect(setId().completed).toBe(false); // no reps typed: asks for them instead of logging the range top
     expect(document.activeElement).toBe(repsIn);
     await type(loadIn!, "22,5");
@@ -115,13 +115,13 @@ describe("Logger: saving what was typed (bug hunt 12 Oct)", () => {
   it("an unreadable load puts the old value back instead of clearing it", async () => {
     const id = await startDay(1, "lower_a", STATE, "2026-10-19");
     await render(null, `/workout/${id}`);
-    await goTo("lateral");
+    await goTo("leg extension");
     const loadIn = host.querySelector(".set-grid input") as HTMLInputElement;
     const before = loadIn.value;
     await type(loadIn, "82,,5");
     await act(async () => { loadIn.dispatchEvent(new FocusEvent("focusout", { bubbles: true })); });
     expect(loadIn.value).toBe(before);
-    const s = local.all("sets").find((x) => x.session_id === id && planRef(x)?.exerciseKey === "cable_lateral_raise" && x.set_no === 1)!;
+    const s = local.all("sets").find((x) => x.session_id === id && planRef(x)?.exerciseKey === "cable_leg_extension" && x.set_no === 1)!;
     expect(s.load).toBe(Number(before.replace(",", ".")));
   });
 
@@ -159,7 +159,7 @@ describe("Logger (Part U)", () => {
       await local.save("sets", { id: s.id, legacy_ref: { plan: rest } });
     }
     await render(null, `/workout/${id}`);
-    await goTo("lateral");
+    await goTo("leg extension");
     expect(host.querySelector(".wk-effort .wk-eff")?.textContent).toBe("Failure");
     expect(host.querySelector('.wk-setno[data-tone="accent"]')?.textContent).toBe("F");
   });

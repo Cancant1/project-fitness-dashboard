@@ -20,7 +20,7 @@ describe("applyAdjustments", () => {
     expect(out.weeks[4]).toBe(PLAN.weeks[4]);
     expect(out.weeks[7]!.type).toBe("deload");
     expect(PLAN.weeks[3]!.type).toBe("C");
-    expect(total(out, 3)).toBe(37);
+    expect(total(out, 3)).toBe(36);
   });
 
   it("deload_now on a week that is not A–D changes nothing", () => {
@@ -44,9 +44,9 @@ describe("applyAdjustments", () => {
   it("extra_sets → PlanState.extraSetsMuscles (+1 set in the A–D weeks 8–17)", () => {
     const state = { ...STATE, ...adjustmentState([adj({ kind: "extra_sets", muscles: ["triceps", "biceps"], fromWeek: 8 })]) };
     expect(state.extraSetsMuscles).toEqual(["triceps", "biceps"]);
-    expect(total(PLAN, 8, state)).toBe(74);
-    expect(total(PLAN, 9, state)).toBe(74);
-    expect(total(PLAN, 11, state)).toBe(74);
+    expect(total(PLAN, 8, state)).toBe(72);
+    expect(total(PLAN, 9, state)).toBe(72);
+    expect(total(PLAN, 11, state)).toBe(72);
     expect(total(PLAN, 10, state)).toBe(total(PLAN, 10));
   });
 

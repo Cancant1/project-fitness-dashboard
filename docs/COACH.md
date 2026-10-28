@@ -154,7 +154,7 @@ each at week 19. Deload and taper weeks still count toward the line.
 
 | id | Rule | Status and message |
 |---|---|---|
-| `muscle.volume` | Completed working sets this week (not warm-up, not care work) vs the adjusted week's planned working sets (72 in a normal week). | ≥90%: `good` "{k} of {p} working sets." · 70–90%: `watch` · <70% with the week complete: `act` "{k} of {p} sets: below the dose that keeps you growing." |
+| `muscle.volume` | Completed working sets this week (not warm-up, not care work) vs the adjusted week's planned working sets (70 in a normal week). | ≥90%: `good` "{k} of {p} working sets." · 70–90%: `watch` · <70% with the week complete: `act` "{k} of {p} sets: below the dose that keeps you growing." |
 | `muscle.by_muscle` | Fractional sets per muscle this week vs the plan's per-muscle figure and the good-week reference (`REFERENCE` in `progress/cards.tsx`; move it to `src/coach/reference.ts`). | `info` with a series: the two muscles with the lowest % of good-week volume. Used by the `extra_sets` action. |
 | `muscle.progress` | Per accessory exercise (double progression or rep-out last): sessions since the load or total reps last went up. | 3+ sessions without either: `watch` "{Exercise} hasn't moved in {n} sessions. Last sets: {sets}. Make sure the last set reaches a stop sign." · Summary `info` "{m} of {n} accessories progressed in the last 2 weeks." |
 | `muscle.effort` | Failure-scheme isolation sets more than 5 reps above the range top on every set. | `info` "{Exercise}: {reps} reps is above the {lo}–{hi} range. The load jumps two steps next time." |

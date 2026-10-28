@@ -5,8 +5,7 @@ import type { Exercise, SetRow } from "../data/types";
 import { fractionalVolume } from "../lib/analysis";
 import { addDays } from "../lib/format";
 import { PLAN } from "../plan/bridge";
-import { OVERSHOOT_REPS, bigJumpEarned, isBigJump, stepLoad, weekForDate } from "../plan/engine";
-import { weightsFor } from "../plan/equipment";
+import { OVERSHOOT_REPS, weekForDate } from "../plan/engine";
 import { VARIETY_NOTE } from "../plan/strengthReturn";
 import type { Muscle, ProgramSlot } from "../plan/types";
 
@@ -114,7 +113,6 @@ export function muscleRules(ctx: WeekCtx): AreaResult {
   out.push(...progressSignals(ctx));
   out.push(...effortSignals(ctx));
   out.push(...breathSignal(ctx));
-  out.push(...lateralDecision(ctx));
 
   return { signals: out, numbers: { workingSets: { done, planned }, muscles } };
 }
@@ -184,38 +182,7 @@ function progressSignals(ctx: WeekCtx): Signal[] {
   return out;
 }
 
-// ---------- muscle.lateral_decision (R2-06) ----------
-
-/** R2-06 (DECISIONS 2026-10-24): on this date, cable laterals still held by the jump cap → switch to DB laterals. */
-export const LATERAL_DECISION = { date: "2026-11-14", exerciseKey: "cable_lateral_raise", to: "db_lateral_raise" } as const;
-
-function lateralDecision(ctx: WeekCtx): Signal[] {
-  const { data } = ctx;
-  const d = LATERAL_DECISION;
-  if (d.date < ctx.from || d.date > ctx.to || ctx.asOf < d.date) return [];
-  const why: Signal["why"] = ["P-PROG-DOUBLE", "P-EXERCISE"];
-  // Judged on that week's own lateral sets (not today's engine state), so the verdict holds when the report is read later.
-  const id = data.ids.get(d.exerciseKey);
-  const slot = ACCESSORIES.find((s) => s.exerciseKey === d.exerciseKey);
-  const failure = ctx.sets.filter((s) => s.exercise_id === id && s.kind === "failure" && s.reps != null && s.load != null);
-  const lastSession = failure.at(-1)?.session_id;
-  const sets = failure.filter((s) => s.session_id === lastSession);
-  if (!slot?.scheme || !sets.length) {
-    return [sig("muscle.lateral_decision", "muscle", "info", "Lateral raise decision",
-      "No cable laterals logged this week: decide cable or DB laterals at the check-in.", why)];
-  }
-  const load = Math.max(...sets.map((s) => Number(s.load)));
-  const pins = weightsFor(d.exerciseKey);
-  const next = pins ? stepLoad(load, pins, 1) : load;
-  const range = slot.scheme.repRange;
-  const held = isBigJump(load, next) && !bigJumpEarned(sets.map((s) => ({ load: Number(s.load), reps: s.reps })), range, true);
-  if (held) {
-    return [sig("muscle.lateral_decision", "muscle", "act", "Switch to DB laterals",
-      `Cable laterals are still at ${fmtLoad(load)} lb: the next pin (${fmtLoad(next)} lb) needs a ${range[1] + OVERSHOOT_REPS}-rep average. Switch to DB laterals (1–2 kg steps) from Monday; Claude updates the plan at the check-in.`, why)];
-  }
-  return [sig("muscle.lateral_decision", "muscle", "good", "Keep the cable laterals",
-    `Cable laterals at ${fmtLoad(load)} lb are past the big pin jump: keep them.`, why)];
-}
+// muscle.lateral_decision (R2-06) was removed 28 Oct 2026: DB laterals replaced the cable ones early (DECISIONS).
 
 // ---------- muscle.breath (R2-05, D-BREATH-STOP) ----------
 

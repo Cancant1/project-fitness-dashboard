@@ -41,22 +41,11 @@ describe("R2-16 shoulder block trigger", () => {
   });
 });
 
-describe("R2-06 lateral raise decision on 14 Nov", () => {
-  const laterals = (reps: number[]) => {
+describe("R2-06 lateral raise decision (closed 28 Oct 2026)", () => {
+  it("no longer judged: DB laterals replaced the cable ones", () => {
     const w = new World();
-    for (const n of [1, 2, 3, 4]) {
-      w.week(n, { reps: (e, p, i) => (e.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? reps[i] ?? reps.at(-1) : undefined) });
-    }
-    return weeklyReport(w.data(), 4, sunday(4));
-  };
-  it("still held by the jump cap → switch to DB laterals", () => {
-    expect(get(laterals([20, 15, 13]), "muscle.lateral_decision")).toMatchObject({ status: "act", title: "Switch to DB laterals" });
-  });
-  it("the pin was earned → keep the cables; other weeks say nothing", () => {
-    expect(get(laterals([30, 25, 22]), "muscle.lateral_decision")).toMatchObject({ status: "good", title: "Keep the cable laterals" });
-    const w = new World();
-    w.week(3);
-    expect(get(weeklyReport(w.data(), 3, sunday(3)), "muscle.lateral_decision")).toBeUndefined();
+    for (const n of [1, 2, 3, 4]) w.week(n);
+    expect(get(weeklyReport(w.data(), 4, sunday(4)), "muscle.lateral_decision")).toBeUndefined();
   });
 });
 
@@ -117,11 +106,6 @@ describe("review fixes (24 Oct 2026)", () => {
   it("rest week: conditioning reads 'Rest week', not 'Boxing done'", () => {
     const s = get(weeklyReport(new World().data(), 10, sunday(10)), "conditioning.week");
     expect(s).toMatchObject({ status: "info", title: "Rest week", message: "Nothing planned · 0 free-day notes." });
-  });
-  it("lateral decision: judged on that week's sets; nothing logged → decide at the check-in", () => {
-    const none = new World();
-    none.week(4, { only: ["squat"] }, ["lower_a"]);
-    expect(get(weeklyReport(none.data(), 4, sunday(4)), "muscle.lateral_decision")).toMatchObject({ status: "info", title: "Lateral raise decision" });
   });
   it("session lengths leave minimum sessions out", () => {
     const w = new World();

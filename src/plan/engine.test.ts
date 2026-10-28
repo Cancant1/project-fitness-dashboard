@@ -299,9 +299,9 @@ describe('week shapes', () => {
     expect(ex(0, 'upper_a', 'incline_db_press').sets.at(-1)).toMatchObject({ kind: 'rep_out', load: 22.5, target: 8 });
     expect(ex(0, 'upper_a', 'weighted_pullup').sets.at(-1)).toMatchObject({ kind: 'rep_out', load: 5, target: 8 });
     expect(shape(ex(0, 'lower_a', 'romanian_deadlift').sets)).toEqual([['working', 80, 10], ['working', 80, 10]]);
-    expect(shape(ex(0, 'upper_a', 'cable_lateral_raise').sets)).toEqual([['working', 20, 20], ['working', 20, 20]]);
+    expect(shape(ex(0, 'upper_a', 'db_lateral_raise').sets)).toEqual([['working', 10, 20], ['working', 10, 20]]);
     expect(ex(0, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
-    expect(prescribeWeek(P, 0, STATE).map((d) => d.workingSetCount)).toEqual([15, 12, 0, 0, 14, 16, 0]);
+    expect(prescribeWeek(P, 0, STATE).map((d) => d.workingSetCount)).toEqual([13, 12, 0, 0, 14, 16, 0]);
   });
 
   it('training week: compounds end with a rep-out, isolation goes to failure', () => {
@@ -313,9 +313,9 @@ describe('week shapes', () => {
   });
 
   it('uses the accessory loads from state', () => {
-    const s: PlanState = { ...STATE, currentLoads: { ...STATE.currentLoads, romanian_deadlift: 85, cable_lateral_raise: 25 } };
+    const s: PlanState = { ...STATE, currentLoads: { ...STATE.currentLoads, romanian_deadlift: 85, db_lateral_raise: 12 } };
     expect(ex(1, 'lower_a', 'romanian_deadlift', s).sets[0]!.load).toBe(85);
-    expect(ex(1, 'upper_b', 'cable_lateral_raise', s).sets[0]).toMatchObject({ load: 25, unit: 'lb' });
+    expect(ex(1, 'upper_b', 'db_lateral_raise', s).sets[0]).toMatchObject({ load: 12, unit: 'kg' });
   });
 
   it('deload: mains light with no rep-outs, 1 set per accessory, not to failure', () => {
@@ -327,13 +327,13 @@ describe('week shapes', () => {
       expect(e.sets[0]!.kind).toBe('working');
     });
     expect(ex(7, 'lower_b', 'wrist_extension').sets).toHaveLength(3); // elbow care unchanged (the ladder keeps its 3 sets)
-    expect(prescribeWeek(P, 7, STATE).map((d) => d.workingSetCount)).toEqual([10, 11, 0, 0, 8, 8, 0]);
+    expect(prescribeWeek(P, 7, STATE).map((d) => d.workingSetCount)).toEqual([9, 11, 0, 0, 8, 8, 0]);
   });
 
   it('taper: squat 2 × 2 at 85%, deadlift one single at 90%, no rep-outs', () => {
     expect(shape(notWarmup(ex(18, 'lower_a', 'squat').sets))).toEqual([['working', 117.5, 2], ['working', 117.5, 2]]);
     expect(shape(notWarmup(ex(18, 'lower_b', 'deadlift').sets))).toEqual([['top', 180, 1]]);
-    expect(weekTotal(18)).toBe(9 + 11 + 8 + 8);
+    expect(weekTotal(18)).toBe(8 + 11 + 8 + 8);
   });
 
   it('test week: rep-outs at the goal loads, no accessories, no Sunday rounds', () => {
@@ -354,8 +354,8 @@ describe('week shapes', () => {
   });
 
   it('weeks 15–17: one set fewer on isolation slots only, never below 1 (default 4)', () => {
-    expect(prescribeWeek(P, 15, STATE).map((d) => d.workingSetCount)).toEqual([13, 15, 0, 0, 10, 14, 0]);
-    expect(ex(15, 'upper_b', 'cable_lateral_raise').sets).toHaveLength(2);
+    expect(prescribeWeek(P, 15, STATE).map((d) => d.workingSetCount)).toEqual([12, 15, 0, 0, 10, 14, 0]);
+    expect(ex(15, 'upper_b', 'db_lateral_raise').sets).toHaveLength(2);
     expect(ex(15, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
     expect(ex(15, 'upper_b', 'barbell_row').sets.filter((s) => s.kind !== 'warmup')).toHaveLength(3);
     expect(ex(15, 'upper_b', 'lat_pulldown').sets).toHaveLength(2);
@@ -363,14 +363,14 @@ describe('week shapes', () => {
   });
 
   it('weekly totals across the block', () => {
-    expect([0, 1, 7, 15, 18, 19].map((w) => weekTotal(w))).toEqual([57, 72, 37, 52, 36, 4]);
+    expect([0, 1, 7, 15, 18, 19].map((w) => weekTotal(w))).toEqual([55, 70, 36, 51, 35, 4]);
   });
 });
 
 describe('extra sets and checkpoint fallbacks', () => {
   it('places +1 set on the first isolation slot of each lagging muscle (default 7)', () => {
     expect(extraSetTargets(P, ['triceps', 'rear_delts', 'back'])).toEqual([
-      { muscle: 'triceps', dayKey: 'lower_a', slotIndex: 7, exerciseKey: 'cross_body_triceps_extension' },
+      { muscle: 'triceps', dayKey: 'lower_a', slotIndex: 6, exerciseKey: 'cross_body_triceps_extension' },
       { muscle: 'rear_delts', dayKey: 'upper_b', slotIndex: 5, exerciseKey: 'cable_rear_delt_fly' },
       { muscle: 'back', dayKey: 'upper_a', slotIndex: 2, exerciseKey: 'seated_cable_row' },
     ]);
@@ -380,11 +380,11 @@ describe('extra sets and checkpoint fallbacks', () => {
     const s: PlanState = { ...STATE, extraSetsMuscles: ['triceps', 'rear_delts'] };
     expect(ex(8, 'lower_a', 'cross_body_triceps_extension', s).sets).toHaveLength(3);
     expect(ex(9, 'upper_b', 'cable_rear_delt_fly', s).sets).toHaveLength(3);
-    expect(weekTotal(8, s)).toBe(74);
-    expect(weekTotal(11, s)).toBe(74);
+    expect(weekTotal(8, s)).toBe(72);
+    expect(weekTotal(11, s)).toBe(72);
     for (const w of [12, 13, 14, 15, 16, 17]) expect(weekTotal(w, s) - weekTotal(w)).toBe(2);
-    expect(weekTotal(6, s)).toBe(72);
-    expect(weekTotal(7, s)).toBe(37);
+    expect(weekTotal(6, s)).toBe(70);
+    expect(weekTotal(7, s)).toBe(36);
     for (const w of [10, 18, 19]) expect(weekTotal(w, s)).toBe(weekTotal(w));
   });
 

@@ -19,7 +19,7 @@ import type {
 const EXERCISES: ExerciseDefinition[] = [
   { key: 'squat', name: 'Back squat', equipment: 'barbell', muscles: ['quads', 'glutes', 'adductors'] },
   { key: 'romanian_deadlift', name: 'Romanian deadlift', equipment: 'barbell', muscles: ['hamstrings', 'glutes'] },
-  { key: 'lying_db_hamstring_curl', name: 'Lying DB hamstring curl, flat bench', equipment: 'dumbbell', muscles: ['hamstrings'] },
+  { key: 'lying_db_hamstring_curl', name: 'Lying DB hamstring curl, on the floor', equipment: 'dumbbell', muscles: ['hamstrings'] },
   { key: 'cable_leg_extension', name: 'Cable leg extension, backrest reclined', equipment: 'cable', muscles: ['quads'] },
   { key: 'cable_calf_raise', name: 'Calf raise, cable bar', equipment: 'cable_pair', muscles: ['calves'] },
   { key: 'kneeling_cable_crunch', name: 'Kneeling cable crunch', equipment: 'cable', muscles: ['abs'] },
@@ -54,8 +54,12 @@ const EXERCISES: ExerciseDefinition[] = [
   { key: 'rope_pushdown', name: 'Rope pushdown', equipment: 'cable', muscles: ['triceps'] },
   // Saturday's pushdown from 24 Oct 2026 (DECISIONS): Mario prefers it to the rope.
   { key: 'bar_pushdown', name: 'Straight-bar pushdown, overhand', equipment: 'cable', muscles: ['triceps'] },
-  // Not a default: an alternative to the Saturday cable curl once the elbow is at 0–3 for 4 weeks (E23).
+  // Not a default: an alternative to the Saturday DB curl once the elbow is at 0–3 for 4 weeks (E23).
   { key: 'incline_hammer_curl', name: 'Seated high-incline hammer curl', equipment: 'dumbbell', muscles: ['biceps', 'forearms'] },
+  // 28 Oct 2026 (DECISIONS, cold reviews): dumbbells where the cable pins are too coarse. The cable lateral raise and
+  // the single-arm cable curl above stay for history and as alternatives.
+  { key: 'db_lateral_raise', name: 'DB lateral raise, both arms', equipment: 'dumbbell', muscles: ['side_delts'] },
+  { key: 'db_curl', name: 'DB curl, both arms', equipment: 'dumbbell', muscles: ['biceps'] },
 ];
 
 /** Creatine 5 g a day from this date (DECISIONS, Mario's answers): bodyweight band and rate fit (E16). */
@@ -89,10 +93,12 @@ const repOutLast = (sets: number, min: number, max: number) => scheme(sets, min,
 // Shoulder care block dropped 23 Oct 2026 (DECISIONS: Mario, sessions run long and the shoulder is fine). Face pull
 // (13 Oct), prone Y-raise (17 Oct), external rotation and serratus punch: their definitions stay for history.
 
-const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', failure(sets, 12, 20), 20, 'lb', 'per_arm',
-  ['Slightly in front of the body, to shoulder height, lead with the elbow. Right shoulder pinching: stop a little lower.',
-    'One set = left then right, no rest between; the 90 s rest comes after both arms.'],
-  { alternatives: ['db_lateral_raise'] });
+// 28 Oct 2026: DB laterals replace the cable ones (stuck at 20 lb: the next pin is +50%). 10 kg is below his 2025
+// 14 kg × 12–15; dumbbells step 2 kg.
+const LATERAL = (sets: number): ProgramSlot => isolation('db_lateral_raise', failure(sets, 12, 20), 10, 'kg', 'per_hand',
+  ['Both arms together, slightly in front of the body, to shoulder height, lead with the elbow. No swing.',
+    'Right shoulder pinching: stop a little lower.'],
+  { alternatives: ['cable_lateral_raise'] });
 const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
   ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.',
     'Pulley at 7, no higher: full pull in the stretch. Same height every week.'], { alternatives: ['heel_elevated_goblet_squat'] });
@@ -119,15 +125,15 @@ const DAYS: ProgramDay[] = [
     slots: [
       main('squat', 'squat', 100, 'total', ['Safety bars just below your bottom position.', 'About 2 s down, up fast.']),
       compound('romanian_deadlift', repOutLast(3, 6, 10), 80, 'kg', 'total', ['Straps.', '2–3 s down.'], { alternatives: ['db_romanian_deadlift'] }),
-      // 12 Oct 2026: his bench can't incline, so flat (prone). The Friday seated cable curl covers the stretched position.
+      // He does it face down on the floor (an incline isn't possible). The Friday seated cable curl covers the stretched position.
       isolation('lying_db_hamstring_curl', failure(2, 10, 15), 25, 'kg', 'total',
-        ['Face down on a flat bench, knees just past the end, dumbbell between your feet.', 'Curl up, 2 s down to a full stretch.'],
+        ['Face down on the floor, dumbbell between your feet.', 'Curl up, 2 s down to a full stretch.'],
         { alternatives: ['seated_cable_leg_curl'] }),
       LEG_EXTENSION(2),
       CALF_RAISE(),
       isolation('kneeling_cable_crunch', failure(2, 10, 15), 90, 'lb', 'total', ['Single pulley: 90 lb ≈ 41 kg, the plan’s 40 kg.','Curl ribs to pelvis; hips stay still.'],
         { alternatives: ['hanging_knee_raise'] }),
-      LATERAL(2),
+      // Monday laterals dropped 28 Oct 2026 (side delts 10 → 8 sets; the longest day).
       // R1-10: triceps 12–20 (kinder to the elbow, same growth).
       isolation('cross_body_triceps_extension', failure(2, 12, 20), 20, 'lb', 'per_arm',
         ['One arm at a time: pulley on the opposite side at about head height, grab it across your body and extend the arm out to the side.', 'Soft lockout.', 'Front of shoulder/collarbone hurts: switch to rope pushdowns.'],
@@ -216,12 +222,12 @@ const DAYS: ProgramDay[] = [
       // June 40 lb −10% → 30 (no 35 pin)
       isolation('cable_rear_delt_fly', failure(2, 12, 20), 30, 'lb', 'per_arm', ['Cables crossed; keep it in the shoulders.'],
         { alternatives: ['prone_db_rear_delt_raise'] }),
-      // 17 Oct 2026: replaces the straight-bar underhand curl (40 lb × 13 two-handed → 20 lb per arm) and the
-      // reverse-grip pushdown (80 lb × 20; the rope starts a pin lower).
-      isolation('single_arm_cable_curl', failure(2, 8, 12), 20, 'lb', 'per_arm',
-        ['D-handle, one arm at a time. Let the wrist turn where it is comfortable: palm up or a little thumb-up.',
-          'Soft lockout at the bottom.'],
-        { elbowLoading: true, alternatives: ['underhand_cable_curl', 'incline_hammer_curl', 'preacher_curl'] }),
+      // 28 Oct 2026: DB curl replaces the single-arm cable curl (20 lb × 30, 21: the next pin is +50%). 12 kg = his
+      // Sep 2026 hammer curl. The wrist turns freely, as the 17 Oct cable swap intended.
+      isolation('db_curl', failure(2, 8, 12), 12, 'kg', 'per_hand',
+        ['Both arms together. Start thumbs-forward and turn the palm up as you curl, only as far as the wrist is comfortable.',
+          'Soft lockout at the bottom; no swing.'],
+        { elbowLoading: true, alternatives: ['single_arm_cable_curl', 'incline_hammer_curl', 'preacher_curl'] }),
       // 24 Oct 2026: straight bar, overhand (his pick over the rope; 80 lb × 28, 16 that day).
       isolation('bar_pushdown', failure(2, 12, 20), 80, 'lb', 'total',
         ['Thumbless overhand grip; don’t squeeze the bar. Soft lockout.', 'Elbow aches: back to the rope.'],
@@ -276,7 +282,9 @@ const CALENDAR: Array<[string, WeekType, string[], Partial<ProgramWeek>?]> = [
   // 24 Oct 2026 (DECISIONS): England is a full rest week; it counts as the week-10 deload.
   ['2026-12-21', 'deload', ['England 20–27 Dec: rest week, no sessions. It counts as the deload.',
     'Eat roughly as usual; keep protein up.'], { rest: true }],
-  ['2026-12-28', 'C', [EXTRA_SETS_NOTE], EXTRA],
+  // 28 Oct 2026 (DECISIONS): New Year's Eve party on Thu 31 Dec, so the week runs Mon–Wed.
+  ['2026-12-28', 'C', ['After England: Mon Lower A, Tue Upper A, Wed 30 Dec Lower B (start it from Workouts). Thu 31 – Sun 3: off, New Year. Upper B skipped this week.',
+    EXTRA_SETS_NOTE], EXTRA],
   ['2027-01-04', 'A', [EXTRA_SETS_NOTE], EXTRA],
   ['2027-01-11', 'B', [EXTRA_SETS_NOTE], EXTRA],
   ['2027-01-18', 'C', ['Checkpoint 2 at the end of this week (24 Jan).', EXTRA_SETS_NOTE], { checkpoint: CHECKPOINT_2, ...EXTRA }],
@@ -386,7 +394,7 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
       targets: [
         { dayKey: 'upper_a', exerciseKey: 'bayesian_curl' },
         { dayKey: 'upper_a', exerciseKey: 'overhead_cable_triceps_extension' },
-        { dayKey: 'upper_b', exerciseKey: 'single_arm_cable_curl' },
+        { dayKey: 'upper_b', exerciseKey: 'db_curl' },
         { dayKey: 'upper_b', exerciseKey: 'bar_pushdown' },
       ],
     },

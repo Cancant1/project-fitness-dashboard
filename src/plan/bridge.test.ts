@@ -40,26 +40,27 @@ describe("planState: accessories", () => {
   });
 
   it("jump cap: never more than +25% at once; a coarser pin waits for top + 5 on average", () => {
-    const at = (key: string, reps: number[]) => {
+    const at = (key: string, reps: number[], day: "lower_a" | "upper_b" = "upper_b") => {
       const w = new World();
-      w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p, i) => (ex.exerciseKey === key && p.kind === "failure" ? reps[i] : undefined) });
+      w.session(dayIn(1, day), day, { reps: (ex, p, i) => (ex.exerciseKey === key && p.kind === "failure" ? reps[i] : undefined) });
       return stateOf(w);
     };
-    // 20 lb → 30 is +50%: top + 5 (25) earns one pin, not two.
-    expect(at("cable_lateral_raise", [25, 25]).currentLoads.cable_lateral_raise).toBe(30);
-    expect(at("cable_lateral_raise", [25, 25]).bigJump?.cable_lateral_raise).toBeUndefined();
+    // 28 Oct 2026: the cable laterals left the plan; the rear delt fly (12–20, dual pulley) has the same kind of pin gap.
+    // 30 lb → 40 is +33%: top + 5 (25) earns one pin, not two.
+    expect(at("cable_rear_delt_fly", [25, 25]).currentLoads.cable_rear_delt_fly).toBe(40);
+    expect(at("cable_rear_delt_fly", [25, 25]).bigJump?.cable_rear_delt_fly).toBeUndefined();
     // 19 Oct 2026: the average counts, because set 2 after a failure set always loses reps. 34 + 20 → up one pin.
-    expect(at("cable_lateral_raise", [34, 20]).currentLoads.cable_lateral_raise).toBe(30);
+    expect(at("cable_rear_delt_fly", [34, 20]).currentLoads.cable_rear_delt_fly).toBe(40);
     // R2-04 catch-up: a first set of 35+ reps → two pins at once, past the cap.
-    expect(at("cable_lateral_raise", [35, 20]).currentLoads.cable_lateral_raise).toBe(40);
-    expect(at("cable_leg_extension", [50, 30]).currentLoads.cable_leg_extension).toBe(50);
-    // His 19 Oct session, 25 + 18 (average 21.5): stays, with a note for the next session.
-    const s = at("cable_lateral_raise", [25, 18]);
-    expect(s.currentLoads.cable_lateral_raise).toBe(20);
-    expect(s.bigJump?.cable_lateral_raise).toEqual({ next: 30, reps: 25, average: true });
-    const lateral = prescribeDay(PLAN, 2, "lower_a", { ...s, trainingMaxes: { squat: 140, deadlift: 200 } }).exercises.find((e) => e.exerciseKey === "cable_lateral_raise")!;
-    expect(lateral.notes.join(" ")).toContain("stay here until your sets average 25 reps");
-    expect(lateral.sets.every((x) => x.kind === "warmup" || (x.aimReps === 25 && x.aimAverage === true))).toBe(true);
+    expect(at("cable_rear_delt_fly", [35, 20]).currentLoads.cable_rear_delt_fly).toBe(50);
+    expect(at("cable_leg_extension", [50, 30], "lower_a").currentLoads.cable_leg_extension).toBe(50);
+    // Like his 19 Oct lateral session, 25 + 18 (average 21.5): stays, with a note for the next session.
+    const s = at("cable_rear_delt_fly", [25, 18]);
+    expect(s.currentLoads.cable_rear_delt_fly).toBe(30);
+    expect(s.bigJump?.cable_rear_delt_fly).toEqual({ next: 40, reps: 25, average: true });
+    const rear = prescribeDay(PLAN, 2, "upper_b", { ...s, trainingMaxes: { squat: 140, deadlift: 200 } }).exercises.find((e) => e.exerciseKey === "cable_rear_delt_fly")!;
+    expect(rear.notes.join(" ")).toContain("stay here until your sets average 25 reps");
+    expect(rear.sets.every((x) => x.kind === "warmup" || (x.aimReps === 25 && x.aimAverage === true))).toBe(true);
   });
 
   it("jump cap on elbow-loading moves still waits for every set (cross-body 30 + 20 stays at 20 lb)", () => {
@@ -79,7 +80,7 @@ describe("planState: accessories", () => {
     w.session(dayIn(7, "lower_a"), "lower_a");
     const s = stateOf(w);
     expect(s.currentLoads.romanian_deadlift).toBe(80);
-    expect(s.currentLoads.cable_lateral_raise).toBe(20);
+    expect(s.currentLoads.cable_leg_extension).toBe(30);
   });
 
   it("ignores flagged sets", () => {
@@ -100,7 +101,7 @@ describe("planState: adjustments and rounds", () => {
     expect(s.addMainLiftSet).toEqual({ squat: true, deadlift: true });
     const total = prescribeWeek(PLAN, 8, { ...s, trainingMaxes: { squat: 140, deadlift: 200 } }).reduce((n, d) => n + d.workingSetCount, 0);
     // +1 triceps, +1 biceps; R1-07: squat → light Friday squat 2 × 3, deadlift → 2 back-off sets
-    expect(total).toBe(72 + 2 + 2 + 2);
+    expect(total).toBe(70 + 2 + 2 + 2);
   });
 
   it("Sunday rounds follow the log in a plan that still has them: +1 within 10%; deloads hold", () => {
@@ -143,11 +144,11 @@ describe("planState: adjustments and rounds", () => {
 describe("review fixes (24 Oct 2026)", () => {
   it("a first failure set below the range steps one pin back (catch-up overshoot safety net)", () => {
     const w = new World();
-    w.session(dayIn(1, "lower_a"), "lower_a", {
-      load: (ex, p) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? 40 : undefined),
-      reps: (ex, p, i) => (ex.exerciseKey === "cable_lateral_raise" && p.kind === "failure" ? [8, 6][i] : undefined)
+    w.session(dayIn(1, "upper_b"), "upper_b", {
+      load: (ex, p) => (ex.exerciseKey === "cable_rear_delt_fly" && p.kind === "failure" ? 40 : undefined),
+      reps: (ex, p, i) => (ex.exerciseKey === "cable_rear_delt_fly" && p.kind === "failure" ? [8, 6][i] : undefined)
     });
-    expect(stateOf(w).currentLoads.cable_lateral_raise).toBe(30);
+    expect(stateOf(w).currentLoads.cable_rear_delt_fly).toBe(30);
   });
   it("a repeated week leaves the England rest week on its dates", () => {
     const shifted = shiftAfterMissedWeek(PLAN, 3);

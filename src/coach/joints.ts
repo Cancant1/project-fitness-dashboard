@@ -212,10 +212,10 @@ function hammerCurlOffer(ctx: WeekCtx): Signal | null {
     && (Math.max(duringScore(p) ?? 0, Number(p.morning_score ?? 0)) >= PAIN_HOLD || p.next_morning === "sore"));
   if (bad) return null;
   const [lo, hi] = slot.scheme!.repRange;
-  return sig("joints.alternative.single_arm_cable_curl", "joints", "info", "Incline hammer curl allowed",
-    `Elbow at 0–3/10 for 4 weeks: the ${swapLabel("incline_hammer_curl")} (start ${slot.startLoad} kg, ${lo}–${hi} reps) may replace the single-arm cable curl on Saturday. Optional; back to the cable curl if the elbow climbs past 3.`,
+  return sig("joints.alternative.db_curl", "joints", "info", "Incline hammer curl allowed",
+    `Elbow at 0–3/10 for 4 weeks: the ${swapLabel("incline_hammer_curl")} (start ${slot.startLoad} kg, ${lo}–${hi} reps) may replace the DB curl on Saturday. Optional; back to the DB curl if the elbow climbs past 3.`,
     ["J-ELBOW", "J-SWAPS", "P-EXERCISE"],
-    { action: { kind: "swap", exerciseKey: "single_arm_cable_curl", to: "incline_hammer_curl", until: data.end, startLoad: slot.startLoad, unit: slot.unit } });
+    { action: { kind: "swap", exerciseKey: "db_curl", to: "incline_hammer_curl", until: data.end, startLoad: slot.startLoad, unit: slot.unit } });
 }
 
 /**
