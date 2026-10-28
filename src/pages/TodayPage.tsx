@@ -24,6 +24,7 @@ import { useToast } from "./food/ui";
 import "./today.css";
 import "./plan/plan.css";
 import { ThemeSwitch } from "../ui/theme";
+import { RestLeft } from "./rest";
 
 const DAY_LETTER = ["M", "T", "W", "T", "F", "S", "S"];
 const SQUAT_GOAL_E1RM = 145 * (1 + 5 / 30);
@@ -197,7 +198,7 @@ export function TodayPage() {
         <div className="k-col">
           {inProgress ? (
             <Card tone="hero" className="today-hero">
-              <div className="today-hero-top"><Pill tone="plain">In progress</Pill></div>
+              <div className="today-hero-top"><Pill tone="plain">In progress</Pill><RestLeft sessionId={inProgress.id} className="k-pill k-pill-accent num" /></div>
               <h2 className="today-hero-title">{inProgress.title}</h2>
               <Link to={`/workout/${inProgress.id}`} className="btn today-hero-btn"><PlayIcon /> Continue</Link>
             </Card>

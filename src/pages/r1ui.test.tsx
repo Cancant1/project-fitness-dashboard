@@ -106,7 +106,6 @@ describe("Logger: saving what was typed (bug hunt 12 Oct)", () => {
     const setId = () => local.all("sets").find((x) => x.session_id === id && planRef(x)?.exerciseKey === "cable_lateral_raise" && x.set_no === 1)!;
     expect(setId().completed).toBe(false); // no reps typed: asks for them instead of logging the range top
     expect(document.activeElement).toBe(repsIn);
-    expect(button(/^Type the reps for set 1/, host)).toBeTruthy();
     await type(loadIn!, "22,5");
     await type(repsIn!, "14");
     await click(tick);
@@ -198,7 +197,9 @@ describe("Logger (Part U)", () => {
     await until(() => !!host.querySelector(".wk-hold"));
     expect(host.querySelector(".wk-hold")?.textContent).toContain("Hold the load next time");
 
-    await click(button("Pain check"));
+    await click(button("Note"));
+    await click(button("Pain check", document.querySelector('[role="dialog"]')!));
+    await until(() => document.querySelector('[role="dialog"]')?.textContent?.includes("Sharp") === true);
     const sheet = document.querySelector('[role="dialog"]')!;
     const range = sheet.querySelector<HTMLInputElement>('input[type="range"]')!;
     await act(async () => {
@@ -210,7 +211,6 @@ describe("Logger (Part U)", () => {
     await until(() => !!host.querySelector(".wk-stop"));
     expect(host.querySelector(".wk-stop")?.textContent).toContain("Stop this exercise today");
     expect(local.all("pain_checks").find((p) => p.pain_score === 7)).toMatchObject({ site: "right_elbow", during_set: "ache", session_id: id });
-    expect(button("Next exercise", document)).toBeTruthy();
   });
 
   it("isometric holds show seconds with a countdown button; the deadlift back-off sets have their own group", async () => {

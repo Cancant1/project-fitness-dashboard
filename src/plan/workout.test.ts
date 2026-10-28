@@ -64,6 +64,15 @@ describe("addExerciseToSession", () => {
     expect(rows.every((r) => r.load === 0 && r.load_kg === 0 && r.unit === "bodyweight")).toBe(true);
   });
 
+  it("takes the unit he picks over the exercise's default", async () => {
+    const local = await store();
+    const id = await startFreeWorkout(local, "2026-10-28");
+    const ex = await exercise(local, { name: "Ab Crunch (Cable/Machine)", default_unit: "kg" });
+    const rows = await addExerciseToSession(local, id, ex, 8, 2, "lb");
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.unit === "lb")).toBe(true);
+  });
+
   it("appends after the last block of that session only", async () => {
     const local = await store();
     const a = await startFreeWorkout(local, "2026-10-11");

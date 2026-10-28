@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useRows, useStore } from "../data/store";
-import type { Exercise, PainCheck, Session, SetRow } from "../data/types";
+import type { Exercise, PainCheck, Session, SetRow, Unit } from "../data/types";
 import { fmtNum, parseDecimal, toKg } from "../lib/format";
 import { STEP_RULES, incrementAfterRepOut, platesPerSide, trainingMaxAfterRepOut } from "../plan/engine";
 import { STACK_LABEL, STACK_OF, pinLabel, weightsFor } from "../plan/equipment";
@@ -13,6 +13,7 @@ import { compareSets } from "../lib/analysis";
 import type { Effort, EquipmentProfile, StepLiftKey } from "../plan/types";
 import { saveSessionEnergy, savePainCheck } from "../coach";
 import { Segmented } from "../ui/kit";
+import { clock, useRest } from "./rest";
 import { Sheet } from "../ui/Sheet";
 import { CheckIcon, ChevronDown, ChevronLeft, ChevronRight, MinusIcon, PlayIcon, PlusIcon } from "../ui/icons";
 import "../ui/kit.css";
@@ -28,10 +29,6 @@ interface Block {
 
 /** "warm" | "plain" | "accent" | "muted" for an effort. */
 const toneOf = (e: Effort) => EFFORT_TONE[e];
-
-/** "Do later" swaps an exercise with the next one; pairs (P-TIMESAVE) stay together, so not for those. */
-const canDoLater = (blocks: Block[], i: number): boolean =>
-  i < blocks.length - 1 && !blocks[i]!.ref?.pair && !blocks[i + 1]!.ref?.pair;
 
 export function WorkoutPage() {
   const { sessionId = "" } = useParams();
@@ -73,7 +70,7 @@ export function WorkoutPage() {
   const [index, setIndex] = useState<number | null>(null);
   const i = Math.min(index ?? (firstOpen < 0 ? 0 : firstOpen), Math.max(0, blocks.length - 1));
   const block = blocks[i];
-  const [rest, setRest] = useState<{ until: number; total: number } | null>(null);
+  const [rest, setRest] = useRest(sessionId);
   const [pain, setPain] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -117,15 +114,6 @@ export function WorkoutPage() {
     });
   }
 
-  // Machine taken: this exercise swaps places with the next one, so the screen shows the next exercise and the
-  // log keeps the order he actually lifted in. Tap again to push it further down.
-  async function doLater(b: Block, next: Block) {
-    await local.save("sets", [
-      ...b.sets.map((s) => ({ id: s.id, exercise_position: next.position })),
-      ...next.sets.map((s) => ({ id: s.id, exercise_position: b.position }))
-    ]);
-  }
-
   const finishUpdates = () => maxUpdates(session, blocks.flatMap((b) => b.sets), ids, maxes, equipment, { painChecks });
   async function doneEditing() {
     await saveEditedWorkout(local, session!, blocks.flatMap((b) => b.sets), finishUpdates(), ids, program);
@@ -144,9 +132,9 @@ export function WorkoutPage() {
         <button className="btn btn-glass btn-sm" style={{ height: 44, borderRadius: 22, color: "var(--accent-text)" }} onClick={finish}>{editing ? "Done" : "Finish"}</button>
       </header>
 
-      {/* Tight spacing so one exercise (with the rest timer) fits a phone screen without scrolling; the bottom padding
-          is just the fixed action bar (56) plus 16. */}
-      <main className="page" style={{ paddingTop: 8, gap: 16, maxWidth: 640, paddingBottom: "calc(max(var(--safe-bottom), 12px) + 72px)" }}>
+      {/* Tight spacing so one exercise fits a phone screen without scrolling; the bottom padding is the fixed rest
+          timer (64) plus 16. */}
+      <main className="page" style={{ paddingTop: 8, gap: 16, maxWidth: 640, paddingBottom: "calc(max(var(--safe-bottom), 12px) + 80px)" }}>
         {editing && <DurationField session={session} />}
         {block ? (
           <>
@@ -172,15 +160,12 @@ export function WorkoutPage() {
               {/* Short labels so the four buttons fit one line on a phone. */}
               <button className="btn btn-glass btn-sm" aria-label="Add set" onClick={() => void addSet(block)}><PlusIcon /> Set</button>
               <ExerciseNotes block={block} />
-              <ExerciseNote sessionId={session.id} date={session.date} exerciseId={block.exerciseId} name={block.name} />
+              <ExerciseNote sessionId={session.id} date={session.date} exerciseId={block.exerciseId} name={block.name} onPain={() => setPain(true)} />
               <button className="btn btn-glass btn-sm" aria-label="Add exercise" onClick={() => setAdding(true)}><PlusIcon /> Exercise</button>
             </div>
 
-            {rest && rest.until > now && <RestTimer rest={rest} now={now} onAdd={() => setRest({ until: rest.until + 30_000, total: rest.total + 30 })} onSkip={() => setRest(null)} />}
-
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <button className="btn btn-plain btn-icon" aria-label="Previous exercise" disabled={i === 0} onClick={() => setIndex(i - 1)}><ChevronLeft /></button>
-              {!editing && canDoLater(blocks, i) && <button className="btn btn-plain" style={{ flex: "none", whiteSpace: "nowrap" }} onClick={() => void doLater(blocks[i]!, blocks[i + 1]!)}>Do later</button>}
               <span style={{ flex: 1 }} />
               {i < blocks.length - 1
                 ? <button className="btn btn-plain" style={{ minWidth: 0 }} onClick={() => setIndex(i + 1)}>
@@ -197,16 +182,13 @@ export function WorkoutPage() {
         )}
       </main>
 
-      <div className="workout-actions">
-        <button className="btn btn-glass" style={{ padding: "0 20px", fontSize: 15 }} onClick={() => setPain(true)}>Pain check</button>
-        {block && <PrimaryAction block={block} stopped={painNow?.action === "stop"} onToggle={toggle} onNext={() => i < blocks.length - 1 ? setIndex(i + 1) : finish()} />}
-      </div>
+      {rest && rest.until > now && <RestTimer rest={rest} now={now} onAdd={() => setRest({ until: rest.until + 30_000, total: rest.total + 30 })} onSkip={() => setRest(null)} />}
 
       {adding && (
         <AddExerciseSheet
           onClose={() => setAdding(false)}
-          onPick={async (ex) => {
-            await addExerciseToSession(local, session.id, ex, nextExercisePosition(allSets, session.id));
+          onPick={async (ex, n, unit) => {
+            await addExerciseToSession(local, session.id, ex, nextExercisePosition(allSets, session.id), n, unit);
             setIndex(blocks.length);
             setAdding(false);
           }}
@@ -223,6 +205,7 @@ export function WorkoutPage() {
             if (notes) await local.save("sessions", { id: session.id, notes });
             if (energy) await saveSessionEnergy(local, session.id, energy);
             await finishWorkout(local, session, sets, finishUpdates(), ids, program);
+            setRest(null);
             navigate(`/session/${session.id}`, { replace: true });
           }}
           onDiscard={async () => {
@@ -254,13 +237,6 @@ function DurationField({ session }: { session: Session }) {
       </span>
     </div>
   );
-}
-
-function clock(sec: number) {
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function useNow(ms: number) {
@@ -718,29 +694,12 @@ function RepOutCard({ s, calibration, latest, equipment, onUpdate, onToggle }: {
   );
 }
 
-function PrimaryAction({ block, stopped, onToggle, onNext }: { block: Block; stopped: boolean; onToggle: (s: SetRow, extra?: Partial<SetRow>) => Promise<void>; onNext: () => void }) {
-  const next = block.sets.find((s) => !s.completed);
-  if (!next || stopped) return <button className="btn btn-primary" style={{ flex: 1 }} onClick={onNext}>Next exercise</button>;
-  if (next.kind === "rep_out" && planRef(next)?.mainLift) return <button className="btn btn-glass" style={{ flex: 1 }} disabled>Log the rep-out above</button>;
-  const sec = planRef(next)?.durationSec;
-  if (needsReps(next) && next.reps == null) return <button className="btn btn-glass" style={{ flex: 1 }} disabled>Type the reps for set {next.set_no}</button>;
-  const what = next.kind === "warmup" ? "warm-up" : next.kind === "timed" ? `hold ${next.set_no}` : next.kind === "backoff" ? "back-off" : `set ${next.set_no}`;
-  const detail = next.kind === "timed"
-    ? (sec != null ? ` · ${sec} s` : "")
-    : `${next.load != null ? ` · ${fmtNum(next.load)} ${unitLabel(next.unit)}` : ""} × ${next.reps ?? next.target_reps ?? "?"}`;
-  return (
-    <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => void onToggle(next)}>
-      Done: {what}{detail}
-    </button>
-  );
-}
-
 function RestTimer({ rest, now, onAdd, onSkip }: { rest: { until: number; total: number }; now: number; onAdd: () => void; onSkip: () => void }) {
   const left = Math.max(0, Math.ceil((rest.until - now) / 1000));
   const frac = left / rest.total;
   const C = 2 * Math.PI * 17;
   return (
-    <section className="rest" role="timer" aria-label="Rest">
+    <section className="rest rest-dock" role="timer" aria-label="Rest">
       <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">
         <circle cx="20" cy="20" r="17" fill="none" stroke="var(--ink-fg2)" strokeOpacity="0.35" strokeWidth="3" />
         <circle cx="20" cy="20" r="17" fill="none" stroke="var(--ink-fg)" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${C * frac} ${C}`} transform="rotate(-90 20 20)" />
@@ -809,7 +768,7 @@ type Energy = 1 | 2 | 3 | 4 | 5;
  * A note per exercise in this session ("felt X", "ask Claude about Y"): one annotations row, kind "note", linked to the
  * session and exercise. Shown on the session page and read at the weekly check-in.
  */
-function ExerciseNote({ sessionId, date, exerciseId, name }: { sessionId: string; date: string; exerciseId: string; name: string }) {
+function ExerciseNote({ sessionId, date, exerciseId, name, onPain }: { sessionId: string; date: string; exerciseId: string; name: string; onPain: () => void }) {
   const { local } = useStore();
   const annotations = useRows("annotations");
   const existing = annotations.find((a) => a.kind === "note" && a.session_id === sessionId && a.exercise_id === exerciseId);
@@ -834,6 +793,8 @@ function ExerciseNote({ sessionId, date, exerciseId, name }: { sessionId: string
             else if (t) await local.save("annotations", { ...(existing ? { id: existing.id } : {}), kind: "note", date, end_date: null, exercise_id: exerciseId, session_id: sessionId, text: t, status: "open" });
             close();
           }}>Save note</button>
+          {/* J-PAINRULE: the pain check lives here since the bottom bar went (28 Oct 2026). */}
+          <button className="btn btn-plain" onClick={() => { close(); onPain(); }}>Pain check</button>
         </Sheet>
       )}
     </>
@@ -894,11 +855,48 @@ function FinishSheet({ blocks, updates, onClose, onFinish, onDiscard }: {
   );
 }
 
-function AddExerciseSheet({ onClose, onPick }: { onClose: () => void; onPick: (e: Exercise) => Promise<void> }) {
+/** Sets and unit for an added exercise, preset from the last session he logged it in (else 3 sets, its own unit). */
+function lastSetup(e: Exercise, sessions: readonly Session[], sets: readonly SetRow[]): { sets: number; unit: Unit } {
+  const date = new Map(sessions.filter((s) => s.status === "completed").map((s) => [s.id, s.date]));
+  const mine = sets.filter((s) => s.exercise_id === e.id && s.kind !== "warmup" && date.has(s.session_id));
+  if (!mine.length) return { sets: 3, unit: e.default_unit };
+  const last = mine.reduce((a, b) => (date.get(b.session_id)! > date.get(a.session_id)! ? b : a)).session_id;
+  const rows = mine.filter((s) => s.session_id === last);
+  return { sets: Math.min(10, rows.length), unit: rows[0]!.unit };
+}
+
+function AddExerciseSheet({ onClose, onPick }: { onClose: () => void; onPick: (e: Exercise, sets: number, unit: Unit) => Promise<void> }) {
   const exercises = useRows("exercises");
+  const sessions = useRows("sessions");
+  const allSets = useRows("sets");
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const [picked, setPicked] = useState<{ e: Exercise; sets: number; unit: Unit } | null>(null);
   const q = query.trim().toLowerCase();
+  if (picked) {
+    const { e, sets, unit } = picked;
+    const weighed = unit === "kg" || unit === "lb";
+    return (
+      <Sheet title={e.name} onClose={onClose}>
+        {unit !== "min" && (
+          <div className="row">
+            <span>Sets</span>
+            <div className="stepper">
+              <button aria-label="One set fewer" disabled={sets <= 1} onClick={() => setPicked({ ...picked, sets: sets - 1 })}><MinusIcon /></button>
+              <span className="stepper-value"><span className="num" style={{ fontSize: 26, fontWeight: 700 }} aria-label={`${sets} sets`}>{sets}</span></span>
+              <button aria-label="One set more" disabled={sets >= 10} onClick={() => setPicked({ ...picked, sets: sets + 1 })}><PlusIcon /></button>
+            </div>
+          </div>
+        )}
+        {weighed && (
+          <div className="wk-seg44"><Segmented label="Unit" value={unit} onChange={(u) => setPicked({ ...picked, unit: u })}
+            options={[{ value: "kg", label: "kg" }, { value: "lb", label: "lb" }]} /></div>
+        )}
+        <button className="btn btn-primary" disabled={busy} onClick={async () => { setBusy(true); await onPick(e, sets, unit); }}>Add</button>
+        <button className="btn btn-plain" onClick={() => setPicked(null)}>Back to the list</button>
+      </Sheet>
+    );
+  }
   const list = exercises
     .filter((e) => !e.archived)
     .filter((e) => !q || `${e.name} ${e.aliases.join(" ")} ${e.muscle_direct ?? ""}`.toLowerCase().includes(q))
@@ -912,9 +910,9 @@ function AddExerciseSheet({ onClose, onPick }: { onClose: () => void; onPick: (e
       {list.length ? (
         <div className="list">
           {list.map((e) => (
-            <button key={e.id} className="row" disabled={busy}
+            <button key={e.id} className="row"
               style={{ width: "100%", border: 0, background: "transparent", padding: "8px 0", textAlign: "left", cursor: "pointer" }}
-              onClick={async () => { setBusy(true); await onPick(e); }}>
+              onClick={() => setPicked({ e, ...lastSetup(e, sessions, allSets) })}>
               <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
                 <span style={{ fontWeight: 500 }}>{e.name}</span>
                 <span className="row-sub">{[e.equipment, e.default_unit === "min" ? "timed, min" : e.default_unit, e.muscle_direct, !e.available && "not at this gym"].filter(Boolean).join(" · ")}</span>

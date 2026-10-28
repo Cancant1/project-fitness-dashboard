@@ -1,5 +1,5 @@
 import type { LocalStore } from "../data/local";
-import type { Exercise, PainCheck, Program, SetRow, Session } from "../data/types";
+import type { Exercise, PainCheck, Program, SetRow, Session, Unit } from "../data/types";
 import { toKg } from "../lib/format";
 import { PROVISIONAL_NOTE, STEP_RULES, incrementAfterRepOut, trainingMaxAfterRepOut } from "./engine";
 import { PLAN, latestMaxes } from "./bridge";
@@ -237,12 +237,11 @@ export function nextExercisePosition(sets: Pick<SetRow, "session_id" | "exercise
 }
 
 /**
- * Adds an exercise as a new block: `sets` empty working sets in its default unit,
+ * Adds an exercise as a new block: `sets` empty working sets in `unit` (default: the exercise's unit),
  * or one timed set when the exercise is logged in minutes. Bodyweight sets start at 0 (= no added weight).
  */
 export async function addExerciseToSession(local: LocalStore, sessionId: string,
-  exercise: Pick<Exercise, "id" | "name" | "default_unit">, position: number, sets = 3): Promise<SetRow[]> {
-  const unit = exercise.default_unit;
+  exercise: Pick<Exercise, "id" | "name" | "default_unit">, position: number, sets = 3, unit: Unit = exercise.default_unit): Promise<SetRow[]> {
   const timed = unit === "min";
   const n = timed ? 1 : Math.max(1, Math.round(sets));
   const load = unit === "bodyweight" ? 0 : null;

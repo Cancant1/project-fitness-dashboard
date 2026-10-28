@@ -405,8 +405,8 @@ export interface WarmupOptions {
 /**
  * Squat and upper mains: empty bar × 8, then ~50% × 5, 70% × 3, 85% × 1 of the working load.
  * Deadlift: 60% × 3, 75% × 2, 90% × 1 of the top set.
- * Barbell warm-ups round to 20 kg (last step 10 kg): 100 → bar, 60, 80, 90. Dumbbells have no "empty bar" step and round down to the rack; the pull-up starts with a
- * bodyweight set and works on the added load. Steps that round onto the bar, onto an earlier
+ * Barbell warm-ups round to 20 kg (last step 10 kg): 100 → bar, 60, 80, 90. Dumbbells have no "empty bar" step and round down to the rack; the pull-up warms up with one
+ * bodyweight set × 5 and nothing else. Steps that round onto the bar, onto an earlier
  * step or up to the working load are dropped.
  */
 export function warmupRamp(lift: MainLiftKey, workingLoadKg: number, barKg = DEFAULT_EQUIPMENT.barKg,
@@ -433,13 +433,16 @@ export function warmupRamp(lift: MainLiftKey, workingLoadKg: number, barKg = DEF
     out.push({ kind: 'warmup', load, unit: 'kg', reps, ...(note ? { note } : {}) });
   };
   if (lift === 'squat' && !singles) add(barKg, 8, 'Empty bar');
-  if (lift === 'weighted_pullup' && workingLoadKg > 0) add(0, 5, 'Bodyweight');
+  // 28 Oct 2026 (P-WARMUP): the pull-up warms up at bodyweight only; +2.5/+5 kg steps add nothing next to his bodyweight.
+  if (lift === 'weighted_pullup') {
+    if (workingLoadKg > 0) add(0, 5, 'Bodyweight');
+    return out;
+  }
 
   for (const [k, [pct, reps]] of steps.entries()) {
     const load = round(workingLoadKg * pct, k === steps.length - 1);
     if (load === null || load >= workingLoadKg - EPS) continue;
     if (isBarbell && load <= barKg + EPS) continue;
-    if (lift === 'weighted_pullup' && load <= 0) continue;
     if (out.some((s) => Math.abs(s.load - load) < EPS)) continue;
     add(load, reps, singles ? `${Math.round(pct * 100)}% of the goal` : undefined);
   }

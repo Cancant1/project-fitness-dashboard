@@ -148,7 +148,7 @@ const DAYS: ProgramDay[] = [
       FLYE(),
       LATERAL(3),
       // Plan said 50 lb (23 kg); 13 Oct 2026 50 lb was too heavy on the return, 40 lb × 12, 12 (DECISIONS).
-      isolation('bayesian_curl', failure(2, 8, 12), 40, 'lb', 'per_arm', ['Front of shoulder hurts: switch to preacher curls.'],
+      isolation('bayesian_curl', failure(2, 8, 12), 40, 'lb', 'per_arm', ['Pulley at height 4 (of 1–35).', 'Front of shoulder hurts: switch to preacher curls.'],
         { elbowLoading: true, alternatives: ['preacher_curl'] }),
       isolation('overhead_cable_triceps_extension', failure(2, 12, 20), 20, 'lb', 'per_arm',
         ['Pulley at about shoulder height behind you; face away, elbow up beside your head, slight forward lean, one foot forward.',
