@@ -33,10 +33,55 @@ describe("planState: accessories", () => {
     expect(stateOf(w).currentLoads.bulgarian_split_squat).toBe(16);
   });
 
-  it("failure isolation 5+ reps over the range top on every set → two steps up", () => {
+  it("failure isolation 5+ reps over the range top on every set: two steps, capped to one pin when the pin is big", () => {
     const w = new World();
-    w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p) => (ex.exerciseKey === "lying_db_hamstring_curl" && p.kind === "failure" ? 20 : undefined) });
-    expect(stateOf(w).currentLoads.lying_db_hamstring_curl).toBe(30); // 25 → 27.5 → 30 kg: +20%, under the cap
+    w.session(dayIn(1, "upper_b"), "upper_b", { reps: (ex, p) => (ex.exerciseKey === "chest_cable_flye" && p.kind === "failure" ? 20 : undefined) });
+    expect(stateOf(w).currentLoads.chest_cable_flye).toBe(65); // 50 → 65 lb is already +30% on the dual stack: one pin
+  });
+
+  it("set-1 lifts (28 Oct 2026): set 1 alone decides; sets 2–3 don't hold it back", () => {
+    const at = (key: string, reps: number[], day: "lower_a" | "upper_b" = "lower_a") => {
+      const w = new World();
+      w.session(dayIn(1, day), day, { reps: (ex, p, i) => (ex.exerciseKey === key && p.kind === "failure" ? reps[i] : undefined) });
+      return stateOf(w);
+    };
+    // Hamstring curl 10–15, 25 kg: set 1 at 15 → +1 step even though set 2 dropped to 10.
+    expect(at("lying_db_hamstring_curl", [15, 10]).currentLoads.lying_db_hamstring_curl).toBe(27.5);
+    // His 27 Oct session, 25 + 15: top + 10 → two steps (+20%, each step small).
+    expect(at("lying_db_hamstring_curl", [25, 15]).currentLoads.lying_db_hamstring_curl).toBe(30);
+    expect(at("lying_db_hamstring_curl", [14, 14]).currentLoads.lying_db_hamstring_curl).toBe(25);
+    // Floor 2 under the bottom: 8 stays, 7 steps down.
+    expect(at("lying_db_hamstring_curl", [8, 6]).currentLoads.lying_db_hamstring_curl).toBe(25);
+    expect(at("lying_db_hamstring_curl", [7, 5]).currentLoads.lying_db_hamstring_curl).toBe(22.5);
+    // DB laterals 12–20 from 12 kg: 20 + 13 + 11 → 14 kg; 30 → 16 kg; 19 → stays.
+    expect(at("db_lateral_raise", [20, 13, 11], "upper_b").currentLoads.db_lateral_raise).toBe(14);
+    expect(at("db_lateral_raise", [30, 20, 16], "upper_b").currentLoads.db_lateral_raise).toBe(16);
+    expect(at("db_lateral_raise", [19, 14, 12], "upper_b").currentLoads.db_lateral_raise).toBe(12);
+    // Leg extension at 30 lb: the next pin is +33%, so +1 waits for set 1 at 25; 35+ still takes two (R2-04).
+    const s = at("cable_leg_extension", [22, 20]);
+    expect(s.currentLoads.cable_leg_extension).toBe(30);
+    expect(s.bigJump?.cable_leg_extension).toEqual({ next: 40, reps: 25, firstSet: true });
+    const ext = prescribeDay(PLAN, 2, "lower_a", { ...s, trainingMaxes: { squat: 140, deadlift: 200 } }).exercises.find((e) => e.exerciseKey === "cable_leg_extension")!;
+    expect(ext.notes.join(" ")).toContain("stay here until set 1 reaches 25 reps");
+    expect(ext.sets.every((x) => x.kind === "warmup" || (x.aimReps === 25 && x.aimFirstSet === true))).toBe(true);
+    expect(at("cable_leg_extension", [25, 12]).currentLoads.cable_leg_extension).toBe(40);
+    expect(at("cable_leg_extension", [35, 20]).currentLoads.cable_leg_extension).toBe(50);
+  });
+
+  it("set-1 lifts: `working` sets count, set 1's own load is the base, an unticked set 1 holds (review 28 Oct)", () => {
+    const crunch = (edit: (s: ReturnType<World["tables"]["sets"]["at"]> & object, i: number) => void, reps: number[]) => {
+      const w = new World();
+      w.session(dayIn(1, "lower_a"), "lower_a", { reps: (ex, p, i) => (ex.exerciseKey === "kneeling_cable_crunch" && p.kind === "failure" ? reps[i] : undefined) });
+      const id = w.ids.get("kneeling_cable_crunch");
+      w.tables.sets.filter((s) => s.exercise_id === id).sort((a, b) => a.set_no - b.set_no).forEach(edit);
+      return stateOf(w).currentLoads.kneeling_cable_crunch;
+    };
+    // His 28 Oct crunch: added by hand on Upper A, so logged as `working`, 100 lb × 20, 12 → 110 lb.
+    expect(crunch((s) => { s.kind = "working"; s.load = 100; }, [20, 12])).toBe(110);
+    // Set 1 lighter than set 2: the step starts from set 1's load (90 → 100), not the heavier 100 (→ 110).
+    expect(crunch((s, i) => { s.load = i === 0 ? 90 : 100; }, [15, 10])).toBe(100);
+    // Set 1 not ticked: set 2 is no stand-in (7 reps would step down); the load holds.
+    expect(crunch((s, i) => { if (i === 0) { s.completed = false; s.reps = null; } }, [20, 7])).toBe(90);
   });
 
   it("jump cap: never more than +25% at once; a coarser pin waits for top + 5 on average", () => {

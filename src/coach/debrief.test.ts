@@ -16,7 +16,8 @@ describe("post-session debrief", () => {
     expect(d.next).toMatchObject({ title: "Lower A", date: "19 Oct", lift: "Squat", added: false });
     expect(d.next!.scheme).toMatch(/^\d × \d+ · max set/);
     expect(d.rows.find((r) => r.name === "Lying DB hamstring curl")?.dir).toBe("up");
-    expect(d.rows.find((r) => r.name === "Cable leg extension")).toMatchObject({ dir: "same", hint: "up at 20 reps" });
+    // Set-1 lift: set 1 at 20 would step up, but 30 → 40 lb is a big pin, so it waits for 25 on set 1.
+    expect(d.rows.find((r) => r.name === "Cable leg extension")).toMatchObject({ dir: "same", hint: "up at 25 on set 1" });
     expect(d.rows.find((r) => r.name === "Slow wrist extension")?.dir).toBe("up"); // rung 15 → 12, all hit: next dumbbell
     expect(d.held).toBe(false);
   });

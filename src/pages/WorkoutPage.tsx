@@ -337,7 +337,7 @@ function EffortLine({ block }: { block: Block }) {
     <>
       <EffortTag effort={block.effort} text={effortLabel(block.effort, reps, ref?.capReps)} />
       {other && <EffortTag effort={other} text={`Last set · ${effortLabel(other)}`} />}
-      {ref?.aimReps != null && <p className="wk-eff-text">Next pin is a big jump: {ref.aimAverage ? `average ${ref.aimReps} reps over your sets` : `${ref.aimReps} reps on every set`} first.</p>}
+      {ref?.aimReps != null && <p className="wk-eff-text">Next pin is a big jump: {ref.aimFirstSet ? `${ref.aimReps} reps on set 1` : ref.aimAverage ? `average ${ref.aimReps} reps over your sets` : `${ref.aimReps} reps on every set`} first.</p>}
     </>
   );
 }

@@ -8,7 +8,7 @@ import { isFlagged } from "../lib/analysis";
 import { todayIso } from "../lib/format";
 import { adjustmentState, adjustmentsOf, applyAdjustments } from "./adjustments";
 import {
-  apreNextLoad, capJump, catchUpLoad, doubleProgression, DEFAULT_EQUIPMENT, dumbbellFloor, failureProgression, isBigJump, OVERSHOOT_REPS,
+  apreNextLoad, capJump, catchUpLoad, doubleProgression, DEFAULT_EQUIPMENT, dumbbellFloor, failureProgression, firstSetProgression, isBigJump, OVERSHOOT_REPS,
   progressionStep, roundBarbell, stepLoad,
   roundsNextWeek, stuckNormalReps, weekForDate
 } from "./engine";
@@ -173,6 +173,7 @@ const weekTypeOf = (s: Session | undefined): string | undefined => (s?.legacy_re
  * - training maxes (squat, deadlift) and the next incline/pull-up load;
  * - for every accessory, the next load from its last session in this plan:
  *   - last set a rep-out (`kind === "rep_out"`): APRE jump from the rep-out reps (§6.1);
+ *   - set-1 lifts (`scheme.firstSet`, DECISIONS 2026-10-28): set 1 alone decides (`firstSetProgression`);
  *   - failure isolation: double progression, +2 steps when every set overshoots the range top by ≥ 5 (§6.3);
  *   - otherwise double progression (top of the range on every set → one step up);
  *   - a deload or taper session carries its load forward (those sets are not a test);
@@ -250,6 +251,21 @@ export function planState(args: {
       continue;
     }
     const repOut = slot.scheme?.lastSetRepOut ? last.find((s) => s.kind === "rep_out" && s.reps != null) : undefined;
+    const first = [...last].filter((s) => s.kind === "failure").sort((a, b) => a.set_no - b.set_no)[0];
+    if (slot.scheme?.firstSet && slot.scheme.toFailure && weekType !== "calibration") {
+      // Set-1 rule (DECISIONS 2026-10-28): set 1 alone decides; it carries its own jump cap, catch-up and floor.
+      // Set 1 = the session's lowest set number of any kind but warm-up (an exercise he added himself logs `working`
+      // sets). Not ticked, flagged or without reps → the load holds (set 2 is no stand-in for set 1).
+      const lastSession = last[0]!.session_id;
+      const set1 = sets.filter((s) => s.exercise_id === id && s.session_id === lastSession && !s.deleted_at
+        && s.kind !== "warmup" && s.kind !== "timed").sort((a, b) => a.set_no - b.set_no)[0];
+      const counted = set1 && last.includes(set1) ? set1 : undefined;
+      const base = counted ? Number(counted.load) : lastLoad;
+      const r = firstSetProgression(counted?.reps ?? null, base, slot.scheme.repRange, step);
+      if (r.waitsFor != null) bigJump[key] = { next: stepLoad(base, step, 1), reps: r.waitsFor, firstSet: true };
+      currentLoads[key] = hold[key] ? Math.min(r.load, base) : r.load;
+      continue;
+    }
     let next: number;
     if (weekType === "calibration") {
       // Week 0: sets stop at the range top, so the load goes up only on more reps than the top (plan, "Weights to
@@ -273,7 +289,6 @@ export function planState(args: {
       const average = !slot.elbowLoading;
       next = capJump(lastLoad, next, logged, ownRange, step, { average });
       // R2-04: a first set at 35+ reps is far too light: two steps once, past the cap (not elbow work).
-      const first = [...last].filter((s) => s.kind === "failure").sort((a, b) => a.set_no - b.set_no)[0];
       if (slot.scheme?.toFailure && !slot.elbowLoading && weekType !== "calibration") {
         next = catchUpLoad(lastLoad, next, first?.reps ?? null, step);
       }

@@ -205,12 +205,15 @@ function effortSignals(ctx: WeekCtx): Signal[] {
   for (const slot of ACCESSORIES) {
     if (slot.role !== "isolation" || !slot.scheme?.toFailure) continue;
     const id = data.ids.get(slot.exerciseKey);
-    const failure = ctx.sets.filter((s) => s.exercise_id === id && s.kind === "failure" && s.reps != null);
+    // Set-1 lifts also count `working` sets (an exercise he added himself), as planState does.
+    const failure = ctx.sets.filter((s) => s.exercise_id === id && s.reps != null
+      && (s.kind === "failure" || (slot.scheme!.firstSet && s.kind === "working")));
     const lastSession = failure.at(-1)?.session_id;
-    const sets = failure.filter((s) => s.session_id === lastSession);
+    const sets = failure.filter((s) => s.session_id === lastSession).sort((a, b) => a.set_no - b.set_no);
     if (!sets.length) continue;
     const [lo, hi] = slot.scheme.repRange;
-    const reps = sets.map((s) => s.reps!);
+    // Set-1 lifts are judged on set 1 alone (DECISIONS 2026-10-28).
+    const reps = (slot.scheme.firstSet ? sets.slice(0, 1) : sets).map((s) => s.reps!);
     if (reps.every((r) => r >= hi + OVERSHOOT_REPS)) {
       const name = exerciseLabel(data, slot.exerciseKey);
       const lowR = Math.min(...reps);

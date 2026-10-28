@@ -188,7 +188,7 @@ function StopSigns() {
 function SetEnds() {
   return (
     <>
-      <p><strong>Double progression</strong> for everything except the main lifts: each exercise has a rep range. When every set reaches the top of the range, add the smallest load step next session.</p>
+      <p><strong>Double progression</strong> for everything except the main lifts: each exercise has a rep range. When every set reaches the top of the range, add the smallest load step next session. Laterals, leg extension, hamstring curl, calf raise and crunch go by <strong>set 1</strong> only: set 1 at the top adds a step, 10 past it two, more than 2 under the bottom takes one off.</p>
       <div className="pl-tbl">
         <table className="data">
           <thead><tr><th>Set</th><th>Used on</th><th>Ends</th></tr></thead>

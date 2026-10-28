@@ -98,7 +98,7 @@ describe('days', () => {
     expect(pick('lower_a', 'cable_calf_raise')).toEqual([250, 'lb']);
     expect(pick('lower_a', 'kneeling_cable_crunch')).toEqual([90, 'lb']);
     expect(P.days.find((d) => d.key === 'lower_a')!.slots.some((s) => s.exerciseKey === 'db_lateral_raise')).toBe(false);
-    expect(pick('upper_a', 'db_lateral_raise')).toEqual([10, 'kg']);
+    expect(pick('upper_a', 'db_lateral_raise')).toEqual([12, 'kg']);
     expect(slot('upper_a', 'db_lateral_raise').loadBasis).toBe('per_hand');
     expect(pick('upper_a', 'seated_cable_row')).toEqual([100, 'lb']);
     expect(pick('upper_a', 'chest_cable_flye')).toEqual([50, 'lb']);

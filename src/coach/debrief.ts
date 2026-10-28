@@ -4,6 +4,10 @@
 import type { SetRow, TrainingMax } from "../data/types";
 import { planRef } from "../plan/workout";
 import type { PrescribedDay, PrescribedExercise } from "../plan/types";
+import { STRENGTH_RETURN_PLAN } from "../plan/strengthReturn";
+
+/** Exercises whose load goes by set 1 alone (`scheme.firstSet`). */
+const SET1_KEYS = new Set(STRENGTH_RETURN_PLAN.days.flatMap((d) => d.slots.filter((s) => s.scheme?.firstSet).map((s) => s.exerciseKey)));
 
 export interface DebriefMax {
   /** "Squat". */
@@ -114,10 +118,17 @@ export function sessionDebrief(args: {
     let hint: string | null = null;
     if (dir === "same") {
       const range = ex.sets.find((s) => s.repRange)?.repRange;
-      const allTop = !!range && logged.every((s) => (s.reps ?? 0) >= range[1]);
+      // Set-1 lifts (DECISIONS 2026-10-28) are judged on set 1 alone; a big next pin waits for its aim instead of the top.
+      const firstSet = SET1_KEYS.has(ex.exerciseKey);
+      const judged = firstSet ? [...logged].sort((a, b) => a.set_no - b.set_no).slice(0, 1) : logged;
+      const aimSet = ex.sets.find((s) => s.aimReps != null);
+      const target = aimSet?.aimReps ?? range?.[1];
+      const reached = target != null && (aimSet?.aimAverage
+        ? judged.reduce((t, s) => t + (s.reps ?? 0), 0) / judged.length >= target
+        : judged.every((s) => (s.reps ?? 0) >= target));
       if (ex.rehab) hint = "up when reps drop";
-      else if (calibration && allTop) out.held = true;
-      else if (range && !allTop) hint = `up at ${range[1]} reps`;
+      else if (calibration && reached) out.held = true;
+      else if (target != null && !reached) hint = firstSet ? `up at ${target} on set 1` : aimSet?.aimAverage ? `up at ${target} average` : `up at ${target} reps`;
     }
     out.rows.push({ name: shortName(ex.name), from, to, unit, ...(ex.loadBasis === "added" ? { added: true } : {}), dir, hint });
   }

@@ -8,6 +8,7 @@ import {
   bodyweightRateCheck,
   ceilLoad,
   failureProgression,
+  firstSetProgression,
   stepLoad,
   trainingMaxAfterRepOut,
   checkpointStatus,
@@ -299,7 +300,7 @@ describe('week shapes', () => {
     expect(ex(0, 'upper_a', 'incline_db_press').sets.at(-1)).toMatchObject({ kind: 'rep_out', load: 22.5, target: 8 });
     expect(ex(0, 'upper_a', 'weighted_pullup').sets.at(-1)).toMatchObject({ kind: 'rep_out', load: 5, target: 8 });
     expect(shape(ex(0, 'lower_a', 'romanian_deadlift').sets)).toEqual([['working', 80, 10], ['working', 80, 10]]);
-    expect(shape(ex(0, 'upper_a', 'db_lateral_raise').sets)).toEqual([['working', 10, 20], ['working', 10, 20]]);
+    expect(shape(ex(0, 'upper_a', 'db_lateral_raise').sets)).toEqual([['working', 12, 20], ['working', 12, 20]]);
     expect(ex(0, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
     expect(prescribeWeek(P, 0, STATE).map((d) => d.workingSetCount)).toEqual([13, 12, 0, 0, 14, 16, 0]);
   });
@@ -578,5 +579,24 @@ describe('compound warm-ups (17 Oct 2026)', () => {
     const bench = ex(1, 'upper_b', 'db_bench_press');
     expect(bench.sets.filter((s) => s.kind === 'warmup').map((s) => [s.load, s.reps])).toEqual([[12, 5], [20, 3]]);
     expect(ex(1, 'upper_b', 'lat_pulldown').sets.some((s) => s.kind === 'warmup')).toBe(false);
+  });
+});
+
+describe('set-1 rule (DECISIONS 2026-10-28)', () => {
+  const rack = [8, 10, 12, 14, 16, 18, 20];
+  it('set 1 ≥ top → +1, ≥ top + 10 → +2, < bottom − 2 → −1, else hold; unlogged holds', () => {
+    expect(firstSetProgression(20, 12, [12, 20], rack)).toEqual({ load: 14, steps: 1 });
+    expect(firstSetProgression(30, 12, [12, 20], rack)).toEqual({ load: 16, steps: 2 });
+    expect(firstSetProgression(19, 12, [12, 20], rack)).toEqual({ load: 12, steps: 0 });
+    expect(firstSetProgression(10, 12, [12, 20], rack)).toEqual({ load: 12, steps: 0 });
+    expect(firstSetProgression(9, 12, [12, 20], rack)).toEqual({ load: 10, steps: -1 });
+    expect(firstSetProgression(null, 12, [12, 20], rack)).toEqual({ load: 12, steps: 0 });
+  });
+  it('a single step above +25% waits for top + 5; 35+ still takes two (R2-04)', () => {
+    const pins = [10, 20, 30, 40, 50];
+    expect(firstSetProgression(24, 30, [12, 20], pins)).toEqual({ load: 30, steps: 0, waitsFor: 25 });
+    expect(firstSetProgression(25, 30, [12, 20], pins)).toEqual({ load: 40, steps: 1 });
+    expect(firstSetProgression(34, 30, [12, 20], pins)).toEqual({ load: 40, steps: 1 });
+    expect(firstSetProgression(35, 30, [12, 20], pins)).toEqual({ load: 50, steps: 2 });
   });
 });

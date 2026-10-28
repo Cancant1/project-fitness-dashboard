@@ -88,21 +88,23 @@ const isolation = (exerciseKey: string, s: AccessoryScheme, startLoad: number, u
   ({ exerciseKey, role: 'isolation', scheme: s, startLoad, unit, loadBasis, notes, ...extra });
 
 const failure = (sets: number, min: number, max: number) => scheme(sets, min, max, { toFailure: true });
+// 28 Oct 2026 (DECISIONS): set 1 decides the load, on failure isolation whose next step is small (+10–20%).
+const failureSet1 = (sets: number, min: number, max: number) => scheme(sets, min, max, { toFailure: true, firstSet: true });
 const repOutLast = (sets: number, min: number, max: number) => scheme(sets, min, max, { lastSetRepOut: true });
 
 // Shoulder care block dropped 23 Oct 2026 (DECISIONS: Mario, sessions run long and the shoulder is fine). Face pull
 // (13 Oct), prone Y-raise (17 Oct), external rotation and serratus punch: their definitions stay for history.
 
-// 28 Oct 2026: DB laterals replace the cable ones (stuck at 20 lb: the next pin is +50%). 10 kg is below his 2025
-// 14 kg × 12–15; dumbbells step 2 kg.
-const LATERAL = (sets: number): ProgramSlot => isolation('db_lateral_raise', failure(sets, 12, 20), 10, 'kg', 'per_hand',
+// 28 Oct 2026: DB laterals replace the cable ones (stuck at 20 lb: the next pin is +50%). 12 kg (Mario; 10 kg was
+// the first pick) is below his 2025 14 kg × 12–15; dumbbells step 2 kg.
+const LATERAL = (sets: number): ProgramSlot => isolation('db_lateral_raise', failureSet1(sets, 12, 20), 12, 'kg', 'per_hand',
   ['Both arms together, slightly in front of the body, to shoulder height, lead with the elbow. No swing.',
     'Right shoulder pinching: stop a little lower.'],
   { alternatives: ['cable_lateral_raise'] });
-const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failure(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
+const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failureSet1(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
   ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.',
     'Pulley at 7, no higher: full pull in the stretch. Same height every week.'], { alternatives: ['heel_elevated_goblet_squat'] });
-const CALF_RAISE = (): ProgramSlot => isolation('cable_calf_raise', failure(2, 10, 15), 250, 'lb', 'total', // 125 + 125 lb ≈ 113 kg (plan 120 kg; no pin for it)
+const CALF_RAISE = (): ProgramSlot => isolation('cable_calf_raise', failureSet1(2, 10, 15), 250, 'lb', 'total', // 125 + 125 lb ≈ 113 kg (plan 120 kg; no pin for it)
   ['Bar between the two pulleys; knees straight; pause 1–2 s in the stretch. Half reps in the bottom after failure.',
     'Two stacked 10 kg plates per foot, in line with the pulleys. Straps.'],
   { alternatives: ['single_leg_db_calf_raise'] });
@@ -126,12 +128,12 @@ const DAYS: ProgramDay[] = [
       main('squat', 'squat', 100, 'total', ['Safety bars just below your bottom position.', 'About 2 s down, up fast.']),
       compound('romanian_deadlift', repOutLast(3, 6, 10), 80, 'kg', 'total', ['Straps.', '2–3 s down.'], { alternatives: ['db_romanian_deadlift'] }),
       // He does it face down on the floor (an incline isn't possible). The Friday seated cable curl covers the stretched position.
-      isolation('lying_db_hamstring_curl', failure(2, 10, 15), 25, 'kg', 'total',
+      isolation('lying_db_hamstring_curl', failureSet1(2, 10, 15), 25, 'kg', 'total',
         ['Face down on the floor, dumbbell between your feet.', 'Curl up, 2 s down to a full stretch.'],
         { alternatives: ['seated_cable_leg_curl'] }),
       LEG_EXTENSION(2),
       CALF_RAISE(),
-      isolation('kneeling_cable_crunch', failure(2, 10, 15), 90, 'lb', 'total', ['Single pulley: 90 lb ≈ 41 kg, the plan’s 40 kg.','Curl ribs to pelvis; hips stay still.'],
+      isolation('kneeling_cable_crunch', failureSet1(2, 10, 15), 90, 'lb', 'total', ['Single pulley: 90 lb ≈ 41 kg, the plan’s 40 kg.','Curl ribs to pelvis; hips stay still.'],
         { alternatives: ['hanging_knee_raise'] }),
       // Monday laterals dropped 28 Oct 2026 (side delts 10 → 8 sets; the longest day).
       // R1-10: triceps 12–20 (kinder to the elbow, same growth).

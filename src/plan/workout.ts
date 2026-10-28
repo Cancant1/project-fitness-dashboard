@@ -32,6 +32,8 @@ export interface PlanSetRef {
   aimReps?: number;
   /** Jump cap: `aimReps` is the sets' average, not every set. */
   aimAverage?: boolean;
+  /** Jump cap: `aimReps` is for set 1 only (set-1 lifts). */
+  aimFirstSet?: boolean;
 }
 
 export function planRef(s: SetRow): PlanSetRef | undefined {
@@ -89,7 +91,8 @@ export async function startWorkout(local: LocalStore, program: Program, day: Pre
             ...(p.durationSec != null ? { durationSec: p.durationSec } : {}),
             ...(p.calibration ? { calibration: true } : {}),
             ...(p.aimReps != null ? { aimReps: p.aimReps } : {}),
-            ...(p.aimAverage ? { aimAverage: true } : {})
+            ...(p.aimAverage ? { aimAverage: true } : {}),
+            ...(p.aimFirstSet ? { aimFirstSet: true } : {})
           } satisfies PlanSetRef
         }
       });

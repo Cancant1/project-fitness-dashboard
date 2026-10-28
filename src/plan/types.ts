@@ -76,6 +76,11 @@ export interface AccessoryScheme {
   lastSetRepOut: boolean;
   /** Every set goes to true failure. */
   toFailure: boolean;
+  /**
+   * Set 1 decides the next load (DECISIONS 2026-10-28): later failure sets lose 30–40% of set 1's reps, so they are
+   * fatigue, not a test. Only on failure isolation whose next step is small (≤ +25%). See `firstSetProgression`.
+   */
+  firstSet?: boolean;
 }
 
 export interface ProgramSlot {
@@ -337,8 +342,11 @@ export interface PlanState {
   /** E14: pain 4–5/10 last time → hold the load (planState already held it; the engine adds a note). */
   holdLoad?: Partial<Record<string, boolean>>;
   /** Jump cap: the next step is more than +25%, so the load waits until every set reaches `reps` (engine note). */
-  /** Jump cap: the next pin and the reps it waits for; `average` = the sets' average (not elbow work), else every set. */
-  bigJump?: Partial<Record<string, { next: number; reps: number; average?: boolean }>>;
+  /**
+   * Jump cap: the next pin and the reps it waits for; `average` = the sets' average (not elbow work), `firstSet` =
+   * set 1 only (set-1 lifts), else every set.
+   */
+  bigJump?: Partial<Record<string, { next: number; reps: number; average?: boolean; firstSet?: boolean }>>;
   /** E3 recalibration (≥ 4 weeks off): load of the next calibration rep-out (75% of the last TM). */
   recalibrate?: Partial<Record<TmLiftKey, number>>;
   /** E9: isolation that ends at the first stop sign instead of failure. */
@@ -396,6 +404,8 @@ export interface PrescribedSet {
   aimReps?: number;
   /** Jump cap: `aimReps` is the sets' average, not every set. */
   aimAverage?: boolean;
+  /** Jump cap: `aimReps` is for set 1 only (set-1 lifts). */
+  aimFirstSet?: boolean;
 }
 
 export interface PrescribedExercise {

@@ -365,6 +365,36 @@ export function catchUpLoad(lastLoad: number, next: number, firstSetReps: number
   return Math.max(next, stepLoad(lastLoad, step, 1, 2));
 }
 
+/** Set-1 rule: set 1 this many reps past the range top → two steps. */
+export const FIRST_SET_DOUBLE_REPS = 10;
+/** Set-1 rule: set 1 more than this many reps under the range bottom → one step down. */
+export const FIRST_SET_FLOOR_REPS = 2;
+
+/**
+ * Set-1 rule (DECISIONS 2026-10-28, cold review `docs/assessments/2026-10-28-cold-rep-ranges.md`). Set 1 alone decides:
+ * ≥ top → +1 step; ≥ top + 10 → +2 steps; < bottom − 2 → −1 step; otherwise the same load. Sets 2–3 still go to
+ * failure but don't count: they lose 30–40% of set 1's reps, so "every set at the top" meant set 1 at ~29–33 reps.
+ * The floor sits 2 under the range so a fresh step (set 1 lands near the bottom) doesn't bounce back.
+ * Jump cap: when one step is already more than +25%, it waits for set 1 at top + 5, and two steps need the R2-04
+ * catch-up (set 1 ≥ 35). When each single step is small, two steps may pass +25% (set 1 at top + 10 still lands in
+ * the range). Unlogged reps keep the load.
+ */
+export function firstSetProgression(firstReps: number | null, load: number, repRange: readonly [number, number],
+  step: LoadSteps): { load: number; steps: -1 | 0 | 1 | 2; waitsFor?: number } {
+  if (firstReps == null) return { load, steps: 0 };
+  const [lo, hi] = repRange;
+  if (firstReps < lo - FIRST_SET_FLOOR_REPS) return { load: stepLoad(load, step, -1), steps: -1 };
+  const one = stepLoad(load, step, 1);
+  if (isBigJump(load, one)) {
+    const aim = hi + OVERSHOOT_REPS;
+    if (firstReps >= CATCH_UP_REPS) return { load: stepLoad(load, step, 1, 2), steps: 2 };
+    return firstReps >= aim ? { load: one, steps: 1 } : { load, steps: 0, waitsFor: aim };
+  }
+  if (firstReps >= hi + FIRST_SET_DOUBLE_REPS) return { load: stepLoad(load, step, 1, 2), steps: 2 };
+  if (firstReps >= hi) return { load: one, steps: 1 };
+  return { load, steps: 0 };
+}
+
 export type ApreJump = 'plus7_5' | 'plus5' | 'plus1' | 'minus1' | 'same';
 
 /**
@@ -972,7 +1002,7 @@ function painNotes(slot: ProgramSlot, ctx: SlotContext): string[] {
   const out: string[] = [];
   if (ctx.state.holdLoad?.[slot.exerciseKey]) out.push(HOLD_NOTE);
   const big = ctx.state.bigJump?.[slot.exerciseKey];
-  if (big) out.push(`The next weight (${big.next} ${slot.unit}) is a big jump: stay here until ${big.average ? `your sets average ${big.reps} reps` : `every set reaches ${big.reps} reps`}.`);
+  if (big) out.push(`The next weight (${big.next} ${slot.unit}) is a big jump: stay here until ${big.firstSet ? `set 1 reaches ${big.reps} reps` : big.average ? `your sets average ${big.reps} reps` : `every set reaches ${big.reps} reps`}.`);
   const f = activeCut(slot, ctx.date);
   if (f != null) out.push(`Sets cut by ${Math.round(f * 100) === 33 ? 'a third' : `${Math.round(f * 100)}%`}: morning pain rising two weeks running.`);
   return out;
@@ -1033,7 +1063,9 @@ function prescribeAccessory(slot: ProgramSlot, ctx: SlotContext): DraftExercise 
 
   const aim = ctx.state.bigJump?.[slot.exerciseKey]?.reps;
   const aimAverage = !!ctx.state.bigJump?.[slot.exerciseKey]?.average;
-  if (aim != null) for (const s of sets) Object.assign(s, { aimReps: aim }, aimAverage ? { aimAverage } : {});
+  // Set-1 lifts: the aim is for set 1 only (`aimFirstSet`).
+  const aimFirstSet = !!ctx.state.bigJump?.[slot.exerciseKey]?.firstSet;
+  if (aim != null) for (const s of sets) Object.assign(s, { aimReps: aim }, aimAverage ? { aimAverage } : {}, aimFirstSet ? { aimFirstSet } : {});
   const ramp = slot.warmup && n > 0 ? compoundRamp(slot, load, ctx) : [];
   const shell = exerciseShell(slot, ctx);
   const ruleNote = !isShoulder && !slot.rehab ? ctx.rule.accessoryNote : undefined;

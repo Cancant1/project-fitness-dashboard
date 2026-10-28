@@ -8,7 +8,7 @@ export const EVIDENCE = {
   "P-EFFORT": "No RPE: normal sets stop at the prescribed reps, rep-outs at a stop sign, isolation at failure (stop sign while the elbow is irritable or after 2 hard-feeling sessions). A set ended by breathing, not the muscle, may be short of failure.",
   "P-PROG-TM": "Squat and deadlift run on a training max that each rep-out moves by −5% … +4%; past the old best (165 / 235) a hit holds it and a beat adds at most 2.5 kg.",
   "P-PROG-STEP": "Incline DB and pull-up: ≥10 reps → one step up (incline ≥16: two dumbbells; pull-up ≥12: +5 kg), 6–9 same, ≤5 one step down; stuck at 6–9 three times → normal sets of 6, then 7. Pull-ups read on bodyweight + belt.",
-  "P-PROG-DOUBLE": "Accessories: once every set reaches the top of the range, add the smallest load step. A first set of 35+ reps (not elbow work) goes up two steps at once.",
+  "P-PROG-DOUBLE": "Accessories: once every set reaches the top of the range, add the smallest load step. A first set of 35+ reps (not elbow work) goes up two steps at once. Laterals, leg extension, hamstring curl, calf raise and crunch: set 1 decides (top → +1 step, top + 10 → +2, under bottom − 2 → −1).",
   "P-PROG-APRE": "Rep-out-last accessories jump by the rep-out reps: +7.5% at range top + 7, +5% at + 2 to + 6; +5% / +2.5% once back at the last logged load.",
   "P-CALIB": "Week 0 rep-outs set the training maxes; past 12 reps the TM is provisional.",
   "P-WEEKTYPES": "Week types A/B/C/D (5s, 4s, 3s, 2s) for squat and deadlift; loads rise over 3 weeks, then reset at a higher TM.",
