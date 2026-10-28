@@ -406,7 +406,7 @@ export interface WarmupOptions {
  * Squat and upper mains: empty bar × 8, then ~50% × 5, 70% × 3, 85% × 1 of the working load.
  * Deadlift: 60% × 3, 75% × 2, 90% × 1 of the top set.
  * Barbell warm-ups round to 20 kg (last step 10 kg): 100 → bar, 60, 80, 90. Dumbbells have no "empty bar" step and round down to the rack; the pull-up warms up with one
- * bodyweight set × 5 and nothing else. Steps that round onto the bar, onto an earlier
+ * bodyweight set × 5, plus a single at half the added load from +15 kg. Steps that round onto the bar, onto an earlier
  * step or up to the working load are dropped.
  */
 export function warmupRamp(lift: MainLiftKey, workingLoadKg: number, barKg = DEFAULT_EQUIPMENT.barKg,
@@ -425,17 +425,18 @@ export function warmupRamp(lift: MainLiftKey, workingLoadKg: number, barKg = DEF
   // Barbell warm-ups load the way Mario does: pairs of 20s/10s (20 kg jumps), last step to the nearest 10.
   const round = (x: number, last: boolean): number | null =>
     lift === 'incline_db_press' ? dumbbellFloor(x, rack)
-      : lift === 'weighted_pullup' ? floorTo(x, beltStep)
-        : last ? Math.round(x / 10) * 10 : Math.round(x / 20) * 20;
+      : last ? Math.round(x / 10) * 10 : Math.round(x / 20) * 20;
 
   const out: PrescribedSet[] = [];
   const add = (load: number, reps: number, note?: string): void => {
     out.push({ kind: 'warmup', load, unit: 'kg', reps, ...(note ? { note } : {}) });
   };
   if (lift === 'squat' && !singles) add(barKg, 8, 'Empty bar');
-  // 28 Oct 2026 (P-WARMUP): the pull-up warms up at bodyweight only; +2.5/+5 kg steps add nothing next to his bodyweight.
+  // 28 Oct 2026 (P-WARMUP): the pull-up warms up at bodyweight; +2.5/+5 kg steps add nothing next to his bodyweight.
+  // From +15 kg the jump gets big, so one single at half the added load follows.
   if (lift === 'weighted_pullup') {
     if (workingLoadKg > 0) add(0, 5, 'Bodyweight');
+    if (workingLoadKg >= 15 - EPS) add(floorTo(workingLoadKg / 2, beltStep), 1);
     return out;
   }
 

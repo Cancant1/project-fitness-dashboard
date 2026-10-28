@@ -187,9 +187,12 @@ describe('warm-ups', () => {
     expect(loads(warmupRamp('incline_db_press', 22.5))).toEqual([[10, 5], [14, 3], [18, 1]]);
   });
 
-  it('pull-up: one bodyweight set, no added-load steps', () => {
-    expect(loads(warmupRamp('weighted_pullup', 20))).toEqual([[0, 5]]);
+  it('pull-up: one bodyweight set; from +15 kg a single at half the added load', () => {
     expect(loads(warmupRamp('weighted_pullup', 7.5))).toEqual([[0, 5]]);
+    expect(loads(warmupRamp('weighted_pullup', 12.5))).toEqual([[0, 5]]);
+    expect(loads(warmupRamp('weighted_pullup', 15))).toEqual([[0, 5], [7.5, 1]]);
+    expect(loads(warmupRamp('weighted_pullup', 17.5))).toEqual([[0, 5], [7.5, 1]]);
+    expect(loads(warmupRamp('weighted_pullup', 20))).toEqual([[0, 5], [10, 1]]);
     expect(warmupRamp('weighted_pullup', 0)).toEqual([]);
   });
 });
