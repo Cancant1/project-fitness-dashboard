@@ -300,7 +300,7 @@ describe('week shapes', () => {
     expect(ex(0, 'upper_a', 'incline_db_press').sets.at(-1)).toMatchObject({ kind: 'rep_out', load: 22.5, target: 8 });
     expect(ex(0, 'upper_a', 'weighted_pullup').sets.at(-1)).toMatchObject({ kind: 'rep_out', load: 5, target: 8 });
     expect(shape(ex(0, 'lower_a', 'romanian_deadlift').sets)).toEqual([['working', 80, 10], ['working', 80, 10]]);
-    expect(shape(ex(0, 'upper_a', 'db_lateral_raise').sets)).toEqual([['working', 12, 20], ['working', 12, 20]]);
+    expect(shape(ex(0, 'upper_a', 'cable_lateral_raise').sets)).toEqual([['working', 20, 20], ['working', 20, 20]]);
     expect(ex(0, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
     expect(prescribeWeek(P, 0, STATE).map((d) => d.workingSetCount)).toEqual([13, 12, 0, 0, 14, 16, 0]);
   });
@@ -314,9 +314,9 @@ describe('week shapes', () => {
   });
 
   it('uses the accessory loads from state', () => {
-    const s: PlanState = { ...STATE, currentLoads: { ...STATE.currentLoads, romanian_deadlift: 85, db_lateral_raise: 12 } };
+    const s: PlanState = { ...STATE, currentLoads: { ...STATE.currentLoads, romanian_deadlift: 85, cable_lateral_raise: 30 } };
     expect(ex(1, 'lower_a', 'romanian_deadlift', s).sets[0]!.load).toBe(85);
-    expect(ex(1, 'upper_b', 'db_lateral_raise', s).sets[0]).toMatchObject({ load: 12, unit: 'kg' });
+    expect(ex(1, 'upper_b', 'cable_lateral_raise', s).sets[0]).toMatchObject({ load: 30, unit: 'lb' });
   });
 
   it('deload: mains light with no rep-outs, 1 set per accessory, not to failure', () => {
@@ -356,7 +356,7 @@ describe('week shapes', () => {
 
   it('weeks 15–17: one set fewer on isolation slots only, never below 1 (default 4)', () => {
     expect(prescribeWeek(P, 15, STATE).map((d) => d.workingSetCount)).toEqual([12, 15, 0, 0, 10, 14, 0]);
-    expect(ex(15, 'upper_b', 'db_lateral_raise').sets).toHaveLength(2);
+    expect(ex(15, 'upper_b', 'cable_lateral_raise').sets).toHaveLength(2);
     expect(ex(15, 'lower_b', 'cable_leg_extension').sets).toHaveLength(1);
     expect(ex(15, 'upper_b', 'barbell_row').sets.filter((s) => s.kind !== 'warmup')).toHaveLength(3);
     expect(ex(15, 'upper_b', 'lat_pulldown').sets).toHaveLength(2);

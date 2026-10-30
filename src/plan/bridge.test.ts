@@ -53,10 +53,13 @@ describe("planState: accessories", () => {
     // Floor 2 under the bottom: 8 stays, 7 steps down.
     expect(at("lying_db_hamstring_curl", [8, 6]).currentLoads.lying_db_hamstring_curl).toBe(25);
     expect(at("lying_db_hamstring_curl", [7, 5]).currentLoads.lying_db_hamstring_curl).toBe(22.5);
-    // DB laterals 12–20 from 12 kg: 20 + 13 + 11 → 14 kg; 30 → 16 kg; 19 → stays.
-    expect(at("db_lateral_raise", [20, 13, 11], "upper_b").currentLoads.db_lateral_raise).toBe(14);
-    expect(at("db_lateral_raise", [30, 20, 16], "upper_b").currentLoads.db_lateral_raise).toBe(16);
-    expect(at("db_lateral_raise", [19, 14, 12], "upper_b").currentLoads.db_lateral_raise).toBe(12);
+    // Cable laterals 12–20 at 20 lb (30 Oct 2026): 30 lb is +50%, so set 1 at 22 holds and waits for 25; his 28 Oct
+    // 25 + 18 + 15 → 30 lb; 35+ still takes two.
+    const lat = at("cable_lateral_raise", [22, 15, 13], "upper_b");
+    expect(lat.currentLoads.cable_lateral_raise).toBe(20);
+    expect(lat.bigJump?.cable_lateral_raise).toEqual({ next: 30, reps: 25, firstSet: true });
+    expect(at("cable_lateral_raise", [25, 18, 15], "upper_b").currentLoads.cable_lateral_raise).toBe(30);
+    expect(at("cable_lateral_raise", [35, 20, 16], "upper_b").currentLoads.cable_lateral_raise).toBe(40);
     // Leg extension at 30 lb: the next pin is +33%, so +1 waits for set 1 at 25; 35+ still takes two (R2-04).
     const s = at("cable_leg_extension", [22, 20]);
     expect(s.currentLoads.cable_leg_extension).toBe(30);

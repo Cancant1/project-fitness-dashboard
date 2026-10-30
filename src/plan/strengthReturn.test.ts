@@ -68,11 +68,11 @@ describe('days', () => {
     expect(order('lower_a')).toEqual(['squat', 'romanian_deadlift', 'lying_db_hamstring_curl', 'cable_leg_extension',
       'cable_calf_raise', 'kneeling_cable_crunch', 'cross_body_triceps_extension', 'wrist_extension']); // no laterals on Monday (28 Oct 2026)
     expect(order('upper_a')).toEqual(['incline_db_press', 'weighted_pullup', 'seated_cable_row',
-      'chest_cable_flye', 'db_lateral_raise', 'bayesian_curl', 'overhead_cable_triceps_extension', 'cable_rear_delt_fly']);
+      'chest_cable_flye', 'cable_lateral_raise', 'bayesian_curl', 'overhead_cable_triceps_extension', 'cable_rear_delt_fly']);
     expect(order('lower_b')).toEqual(['deadlift', 'bulgarian_split_squat', 'seated_cable_leg_curl', 'cable_leg_extension',
-      'cable_calf_raise', 'hanging_knee_raise', 'db_lateral_raise', 'preacher_curl', 'wrist_extension']);
+      'cable_calf_raise', 'hanging_knee_raise', 'cable_lateral_raise', 'preacher_curl', 'wrist_extension']);
     expect(order('upper_b')).toEqual(['barbell_row', 'db_bench_press', 'lat_pulldown', 'chest_cable_flye',
-      'db_lateral_raise', 'cable_rear_delt_fly', 'db_curl', 'bar_pushdown']);
+      'cable_lateral_raise', 'cable_rear_delt_fly', 'db_curl', 'bar_pushdown']);
   });
 
   it('has a definition for every slot exercise', () => {
@@ -97,9 +97,9 @@ describe('days', () => {
     expect(pick('lower_a', 'cable_leg_extension')).toEqual([30, 'lb']);
     expect(pick('lower_a', 'cable_calf_raise')).toEqual([250, 'lb']);
     expect(pick('lower_a', 'kneeling_cable_crunch')).toEqual([90, 'lb']);
-    expect(P.days.find((d) => d.key === 'lower_a')!.slots.some((s) => s.exerciseKey === 'db_lateral_raise')).toBe(false);
-    expect(pick('upper_a', 'db_lateral_raise')).toEqual([12, 'kg']);
-    expect(slot('upper_a', 'db_lateral_raise').loadBasis).toBe('per_hand');
+    expect(P.days.find((d) => d.key === 'lower_a')!.slots.some((s) => s.exerciseKey === 'cable_lateral_raise')).toBe(false);
+    expect(pick('upper_a', 'cable_lateral_raise')).toEqual([20, 'lb']);
+    expect(slot('upper_a', 'cable_lateral_raise').loadBasis).toBe('per_arm');
     expect(pick('upper_a', 'seated_cable_row')).toEqual([100, 'lb']);
     expect(pick('upper_a', 'chest_cable_flye')).toEqual([50, 'lb']);
     expect(pick('upper_a', 'bayesian_curl')).toEqual([40, 'lb']);

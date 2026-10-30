@@ -56,8 +56,8 @@ const EXERCISES: ExerciseDefinition[] = [
   { key: 'bar_pushdown', name: 'Straight-bar pushdown, overhand', equipment: 'cable', muscles: ['triceps'] },
   // Not a default: an alternative to the Saturday DB curl once the elbow is at 0–3 for 4 weeks (E23).
   { key: 'incline_hammer_curl', name: 'Seated high-incline hammer curl', equipment: 'dumbbell', muscles: ['biceps', 'forearms'] },
-  // 28 Oct 2026 (DECISIONS, cold reviews): dumbbells where the cable pins are too coarse. The cable lateral raise and
-  // the single-arm cable curl above stay for history and as alternatives.
+  // 28 Oct 2026 (DECISIONS, cold reviews): dumbbells where the cable pins are too coarse. The single-arm cable curl
+  // above stays for history and as an alternative. The DB lateral is the cable lateral's alternative again (30 Oct).
   { key: 'db_lateral_raise', name: 'DB lateral raise, both arms', equipment: 'dumbbell', muscles: ['side_delts'] },
   { key: 'db_curl', name: 'DB curl, both arms', equipment: 'dumbbell', muscles: ['biceps'] },
 ];
@@ -95,12 +95,13 @@ const repOutLast = (sets: number, min: number, max: number) => scheme(sets, min,
 // Shoulder care block dropped 23 Oct 2026 (DECISIONS: Mario, sessions run long and the shoulder is fine). Face pull
 // (13 Oct), prone Y-raise (17 Oct), external rotation and serratus punch: their definitions stay for history.
 
-// 28 Oct 2026: DB laterals replace the cable ones (stuck at 20 lb: the next pin is +50%). 12 kg (Mario; 10 kg was
-// the first pick) is below his 2025 14 kg × 12–15; dumbbells step 2 kg.
-const LATERAL = (sets: number): ProgramSlot => isolation('db_lateral_raise', failureSet1(sets, 12, 20), 12, 'kg', 'per_hand',
-  ['Both arms together, slightly in front of the body, to shoulder height, lead with the elbow. No swing.',
-    'Right shoulder pinching: stop a little lower.'],
-  { alternatives: ['cable_lateral_raise'] });
+// 30 Oct 2026 (DECISIONS): back on the cable; the dumbbells load his wrist. 28–30 Oct it was DB laterals (the cable
+// sat at 20 lb: the next pin is +50%). The set-1 rule stays, so 20 → 30 lb waits for set 1 at 25.
+const LATERAL = (sets: number): ProgramSlot => isolation('cable_lateral_raise', failureSet1(sets, 12, 20), 20, 'lb', 'per_arm',
+  ['Pulley at the bottom. Slightly in front of the body, to shoulder height, lead with the elbow. No swing.',
+    'One set = left then right, no rest between; the 90 s rest comes after both arms.',
+    'Wrist bothers you: ankle cuff round the wrist instead of the handle. Right shoulder pinching: stop a little lower.'],
+  { alternatives: ['db_lateral_raise'] });
 const LEG_EXTENSION = (sets: number): ProgramSlot => isolation('cable_leg_extension', failureSet1(sets, 12, 20), 30, 'lb', 'per_leg', // June 40 lb −10% → 30 (no 35 pin)
   ['Backrest reclined 30–45°. Knee pain at the bottom: shorten the range.',
     'Pulley at 7, no higher: full pull in the stretch. Same height every week.'], { alternatives: ['heel_elevated_goblet_squat'] });

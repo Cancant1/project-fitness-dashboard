@@ -267,7 +267,7 @@ describe("E9 effort rule for the elbow and bad days", () => {
     const bay = ex(1, "upper_a", "bayesian_curl", s);
     expect(bay.effort).toBe("stop_sign");
     expect(bay.notes.join(" ")).toContain("Elbow irritable");
-    expect(ex(1, "upper_a", "db_lateral_raise", s).effort).toBe("failure"); // not elbow-loading
+    expect(ex(1, "upper_a", "cable_lateral_raise", s).effort).toBe("failure"); // not elbow-loading
     expect(ex(1, "lower_a", "cross_body_triceps_extension", s).effort).toBe("failure"); // before the check
     expect(ex(2, "upper_b", "db_curl", s).effort).toBe("stop_sign");
     expect(ex(3, "upper_b", "db_curl", s).effort).toBe("failure"); // 7 Nov: past the 14 days
@@ -281,9 +281,9 @@ describe("E9 effort rule for the elbow and bad days", () => {
     const e = w.data().state.effort;
     expect(e).toEqual({ lowFeelWeekNo: 1 });
     const s: PlanState = { ...STATE, effort: e };
-    expect(ex(1, "upper_b", "db_lateral_raise", s).effort).toBe("stop_sign");
+    expect(ex(1, "upper_b", "cable_lateral_raise", s).effort).toBe("stop_sign");
     expect(ex(1, "upper_b", "lat_pulldown", s).effort).toBe("failure");
-    expect(ex(2, "upper_b", "db_lateral_raise", s).effort).toBe("failure");
+    expect(ex(2, "upper_b", "cable_lateral_raise", s).effort).toBe("failure");
   });
 });
 
@@ -313,10 +313,10 @@ describe("E11 pairs (P-TIMESAVE)", () => {
       "cable_calf_raise", "kneeling_cable_crunch", "cross_body_triceps_extension", "wrist_extension"]);
     expect(mon.some((e) => e.pair || e.pairLabel)).toBe(false);
     const fri = day(1, "lower_b").exercises;
-    const paired = arrangePairs(fri.map((e) => (e.exerciseKey === "hanging_knee_raise" || e.exerciseKey === "db_lateral_raise" ? { ...e, pair: "x" } : e)));
+    const paired = arrangePairs(fri.map((e) => (e.exerciseKey === "hanging_knee_raise" || e.exerciseKey === "cable_lateral_raise" ? { ...e, pair: "x" } : e)));
     const k = paired.findIndex((e) => e.exerciseKey === "hanging_knee_raise");
     expect(paired.slice(k, k + 2).map((e) => [e.exerciseKey, e.pairLabel, e.restSec])).toEqual([
-      ["hanging_knee_raise", "A", 50], ["db_lateral_raise", "B", 75]
+      ["hanging_knee_raise", "A", 50], ["cable_lateral_raise", "B", 75]
     ]);
     // A pair with one member left that day is a straight set.
     const solo = arrangePairs([{ ...fri[0]!, pair: "x" }]);
@@ -454,7 +454,7 @@ describe("E14 pain 0–10 helpers and the hold rule", () => {
     expect(bay(4).sets).toHaveLength(1);
     expect(bay(4).notes.join(" ")).toContain("Sets cut by a third");
     expect(bay(6).sets).toHaveLength(2);
-    expect(prescribeDay(p, 4, "upper_a", STATE).exercises.find((e) => e.exerciseKey === "db_lateral_raise")!.sets).toHaveLength(3);
+    expect(prescribeDay(p, 4, "upper_a", STATE).exercises.find((e) => e.exerciseKey === "cable_lateral_raise")!.sets).toHaveLength(3);
   });
 });
 
