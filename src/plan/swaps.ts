@@ -9,8 +9,8 @@ export const SWAP_CHAINS: readonly (readonly string[])[] = [
   ['overhead_cable_triceps_extension', 'cross_body_triceps_extension', 'reverse_grip_pushdown'],
   ['bar_pushdown', 'reverse_grip_pushdown', 'rope_pushdown'],
   ['hammer_curl', 'underhand_cable_curl', 'preacher_curl'],
-  ['db_curl', 'single_arm_cable_curl', 'preacher_curl'], // Saturday's curl from 28 Oct 2026
-  ['single_arm_cable_curl', 'preacher_curl'], // Saturday's curl 17–27 Oct 2026
+  ['db_curl', 'single_arm_cable_curl', 'preacher_curl'], // Saturday's curl 28–30 Oct 2026
+  ['single_arm_cable_curl', 'preacher_curl'], // Saturday's curl 17–27 Oct and from 30 Oct 2026
   ['bayesian_curl', 'preacher_curl'], // "if the front of the shoulder hurts"
   ['weighted_pullup', 'lat_pulldown'],
   ['barbell_row', 'barbell_row_underhand', 'seated_cable_row'],

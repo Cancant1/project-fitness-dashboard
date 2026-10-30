@@ -144,7 +144,7 @@ describe("strength.checkpoint (week 6)", () => {
         kind: "extra_sets", muscles: ["triceps", "biceps"], fromWeek: 8,
         targets: [
           { dayKey: "upper_a", exerciseKey: "bayesian_curl" }, { dayKey: "upper_a", exerciseKey: "overhead_cable_triceps_extension" },
-          { dayKey: "upper_b", exerciseKey: "db_curl" }, { dayKey: "upper_b", exerciseKey: "bar_pushdown" }
+          { dayKey: "upper_b", exerciseKey: "single_arm_cable_curl" }, { dayKey: "upper_b", exerciseKey: "bar_pushdown" }
         ]
       }
     });

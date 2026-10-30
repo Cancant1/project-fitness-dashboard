@@ -242,7 +242,7 @@ describe("E8 extra sets at checkpoint 1 (R1-08)", () => {
     const arms: PlanState = { ...STATE, extraSetTargets: PLAN.extraSets!.arms.targets };
     expect(ex(8, "upper_a", "bayesian_curl", arms).sets).toHaveLength(3);
     expect(ex(8, "upper_a", "overhead_cable_triceps_extension", arms).sets).toHaveLength(3);
-    expect(ex(9, "upper_b", "db_curl", arms).sets).toHaveLength(3);
+    expect(ex(9, "upper_b", "single_arm_cable_curl", arms).sets).toHaveLength(3);
     expect(ex(9, "upper_b", "bar_pushdown", arms).sets).toHaveLength(3);
     const total = (s: PlanState, n: number) => prescribeWeek(PLAN, n, s).reduce((k, d) => k + d.workingSetCount, 0);
     expect(total(arms, 8)).toBe(74);
@@ -269,8 +269,8 @@ describe("E9 effort rule for the elbow and bad days", () => {
     expect(bay.notes.join(" ")).toContain("Elbow irritable");
     expect(ex(1, "upper_a", "cable_lateral_raise", s).effort).toBe("failure"); // not elbow-loading
     expect(ex(1, "lower_a", "cross_body_triceps_extension", s).effort).toBe("failure"); // before the check
-    expect(ex(2, "upper_b", "db_curl", s).effort).toBe("stop_sign");
-    expect(ex(3, "upper_b", "db_curl", s).effort).toBe("failure"); // 7 Nov: past the 14 days
+    expect(ex(2, "upper_b", "single_arm_cable_curl", s).effort).toBe("stop_sign");
+    expect(ex(3, "upper_b", "single_arm_cable_curl", s).effort).toBe("failure"); // 7 Nov: past the 14 days
     expect(effortState([], [pain("2026-10-20", "right_elbow", { pain_score: 3 }), pain("2026-10-20", "right_shoulder", { pain_score: 6 })], PLAN)).toBeUndefined();
     expect(effortState([], [pain("2026-10-20", "right_elbow", { during_set: "sharp" })], PLAN)?.elbowIrritableUntil).toBe("2026-11-03");
   });
@@ -513,7 +513,7 @@ describe("E23 / E24 plan data", () => {
     expect(PLAN.exercises.incline_hammer_curl!.name).toBe("Seated high-incline hammer curl");
     expect(PLAN.alternativeSlots!.incline_hammer_curl).toMatchObject({ startLoad: 12, unit: "kg", scheme: { repRange: [8, 12] } });
     expect(PLAN.days.flatMap((d) => d.slots).some((s) => s.exerciseKey === "incline_hammer_curl")).toBe(false);
-    expect(ex(1, "upper_b", "db_curl").alternatives).toContain("incline_hammer_curl");
+    expect(ex(1, "upper_b", "single_arm_cable_curl").alternatives).toContain("incline_hammer_curl");
   });
   it("the week-7 deload carries the variety note (week 10 is a rest week); accessories list equivalents", () => {
     expect(PLAN.weeks.filter((w) => w.notes.includes(VARIETY_NOTE)).map((w) => w.weekNo)).toEqual([7]);

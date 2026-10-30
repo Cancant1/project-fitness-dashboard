@@ -54,10 +54,10 @@ const EXERCISES: ExerciseDefinition[] = [
   { key: 'rope_pushdown', name: 'Rope pushdown', equipment: 'cable', muscles: ['triceps'] },
   // Saturday's pushdown from 24 Oct 2026 (DECISIONS): Mario prefers it to the rope.
   { key: 'bar_pushdown', name: 'Straight-bar pushdown, overhand', equipment: 'cable', muscles: ['triceps'] },
-  // Not a default: an alternative to the Saturday DB curl once the elbow is at 0–3 for 4 weeks (E23).
+  // Not a default: an alternative to Saturday's cable curl once the elbow is at 0–3 for 4 weeks (E23).
   { key: 'incline_hammer_curl', name: 'Seated high-incline hammer curl', equipment: 'dumbbell', muscles: ['biceps', 'forearms'] },
-  // 28 Oct 2026 (DECISIONS, cold reviews): dumbbells where the cable pins are too coarse. The single-arm cable curl
-  // above stays for history and as an alternative. The DB lateral is the cable lateral's alternative again (30 Oct).
+  // 28 Oct 2026 (DECISIONS, cold reviews): dumbbells where the cable pins are too coarse. Undone 30 Oct: the cable
+  // lateral and the cable curl are back; these two stay for history and as their alternatives.
   { key: 'db_lateral_raise', name: 'DB lateral raise, both arms', equipment: 'dumbbell', muscles: ['side_delts'] },
   { key: 'db_curl', name: 'DB curl, both arms', equipment: 'dumbbell', muscles: ['biceps'] },
 ];
@@ -225,12 +225,12 @@ const DAYS: ProgramDay[] = [
       // June 40 lb −10% → 30 (no 35 pin)
       isolation('cable_rear_delt_fly', failure(2, 12, 20), 30, 'lb', 'per_arm', ['Cables crossed; keep it in the shoulders.'],
         { alternatives: ['prone_db_rear_delt_raise'] }),
-      // 28 Oct 2026: DB curl replaces the single-arm cable curl (20 lb × 30, 21: the next pin is +50%). 12 kg = his
-      // Sep 2026 hammer curl. The wrist turns freely, as the 17 Oct cable swap intended.
-      isolation('db_curl', failure(2, 8, 12), 12, 'kg', 'per_hand',
-        ['Both arms together. Start thumbs-forward and turn the palm up as you curl, only as far as the wrist is comfortable.',
-          'Soft lockout at the bottom; no swing.'],
-        { elbowLoading: true, alternatives: ['single_arm_cable_curl', 'incline_hammer_curl', 'preacher_curl'] }),
+      // 30 Oct 2026 (DECISIONS): back to the single-arm cable curl, Mario's pick. 28–30 Oct it was a DB curl (20 lb ×
+      // 30, 21: the next pin is +50%). Elbow move, so the strict jump cap: 30 lb once every set reaches 17.
+      isolation('single_arm_cable_curl', failure(2, 8, 12), 20, 'lb', 'per_arm',
+        ['D-handle, one arm at a time. Let the wrist turn where it is comfortable: palm up or a little thumb-up.',
+          'Soft lockout at the bottom.'],
+        { elbowLoading: true, alternatives: ['db_curl', 'incline_hammer_curl', 'preacher_curl'] }),
       // 24 Oct 2026: straight bar, overhand (his pick over the rope; 80 lb × 28, 16 that day).
       isolation('bar_pushdown', failure(2, 12, 20), 80, 'lb', 'total',
         ['Thumbless overhand grip; don’t squeeze the bar. Soft lockout.', 'Elbow aches: back to the rope.'],
@@ -397,7 +397,7 @@ export const STRENGTH_RETURN_PLAN: ProgramDefinition = {
       targets: [
         { dayKey: 'upper_a', exerciseKey: 'bayesian_curl' },
         { dayKey: 'upper_a', exerciseKey: 'overhead_cable_triceps_extension' },
-        { dayKey: 'upper_b', exerciseKey: 'db_curl' },
+        { dayKey: 'upper_b', exerciseKey: 'single_arm_cable_curl' },
         { dayKey: 'upper_b', exerciseKey: 'bar_pushdown' },
       ],
     },
